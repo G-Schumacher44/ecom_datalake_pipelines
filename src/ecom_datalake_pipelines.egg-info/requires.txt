@@ -1,0 +1,16 @@
+polars>=0.20.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+pyyaml>=6.0.1
+pyarrow>=15.0.0
+fsspec>=2024.2.0
+gcsfs>=2024.2.0
+
+[dev]
+black>=24.2.0
+isort>=5.13.0
+ruff>=0.3.0
+mypy>=1.8.0
+pylint>=3.1.0
+pytest>=8.0.0
+pre-commit>=3.6.0

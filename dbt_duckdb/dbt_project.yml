@@ -1,0 +1,19 @@
+name: "ecom_dbt_duckdb"
+version: "0.1.0"
+config-version: 2
+
+profile: "ecom_dbt_duckdb"
+
+model-paths: ["models"]
+analysis-paths: ["analysis"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+
+vars:
+  bronze_base_path: "gs://ecom-datalake/bronze"
+
+models:
+  ecom_dbt_duckdb:
+    base_silver:
+      +materialized: table
