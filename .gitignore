@@ -1,0 +1,33 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.env
+.env.*
+
+.venv/
+.conda/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+samples/
+
+logs/
+
+# dbt
+dbt_packages/
+logs/
+target/
+
+# airflow
+airflow/logs/
+airflow/airflow.db
+airflow/standalone_admin_password.txt
+airflow/plugins/__pycache__/
+
+# IDE
+.vscode/.ropeproject/
+.DS_Store

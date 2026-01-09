@@ -1,0 +1,11 @@
+# Decision Log
+
+| Date | Decision | Rationale | Impact | Owner | Status |
+| --- | --- | --- | --- | --- | --- |
+| 2026-01-10 | Use daily partitions for Base Silver and Enriched Silver | Daily partitions align with downstream analytics granularity and simplify backfills | Consistent partitioning strategy across layers | Data Engineering | Approved |
+| 2026-01-10 | Use `join_asof` for cart attribution | Temporal joins are efficient in Polars and avoid expensive window joins in SQL | Faster enrichment and cleaner logic | Data Engineering, Business Intelligence | Approved |
+| 2026-01-10 | Hybrid Polars modules + dbt Python wrappers | Keep logic testable and reusable while preserving dbt lineage | Improves maintainability and documentation | Data Engineering | Approved |
+| 2026-01-10 | Separate dbt projects for Base Silver and BigQuery | Clear boundary between local compute and warehouse models | Cleaner dependencies and deployments | Data Engineering, Platform Engineering | Approved |
+| 2026-01-10 | Load enriched parquet to BigQuery before Gold marts | Reduces BQ compute costs by precomputing attributes locally | Lower warehouse spend and faster mart builds | Data Engineering, Business Intelligence | Approved |
+| 2026-01-10 | Table-level processing strategy (8 Base + 5 Enriched tasks) | Bronze backfill is one-time dump (not incremental by date); table-level chunking provides natural boundaries, enables parallelism, and fits in laptop memory (~6GB peak vs 20GB+ for full dataset) | Production-realistic architecture with <10GB memory footprint; each table processes independently | Data Engineering | Approved |
+| 2026-01-10 | GCS ephemeral staging pattern (read → transform → write temp → upload → delete) | Student project requires cost minimization; storing 20GB locally defeats cloud-native simulation; ephemeral staging provides production-like GCS reads/writes with minimal local storage | Cloud-native architecture at ~$2-3/month cost; no persistent local data storage required | Data Engineering, Platform Engineering | Approved |

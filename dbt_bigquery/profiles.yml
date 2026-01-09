@@ -1,0 +1,11 @@
+ecom_dbt_bigquery:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      keyfile: "path/to/keyfile.json"
+      project: "your-gcp-project"
+      dataset: "silver"
+      threads: 4
+      location: "US"

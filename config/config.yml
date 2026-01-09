@@ -1,0 +1,13 @@
+pipeline:
+  project_id: "your-gcp-project"
+  bronze_bucket: "acme-analytics-raw"
+  bronze_prefix: "ecom/raw"
+  silver_bucket: "acme-analytics-silver"
+  silver_base_prefix: "ecom/base"
+  silver_enriched_prefix: "ecom/enriched"
+  bigquery_dataset: "silver"
+  gold_dataset: "gold_marts"
+  default_ingest_dt: "2020-01-01"
+  attribution_tolerance_hours: 48
+  churn_danger_window_days: [30, 90]
+  sales_velocity_window_days: 7

@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: bronze
+    meta:
+      owner: "data-eng"
+    tables:
+      - name: orders
+        external_location: "{{ var('bronze_base_path') }}/orders/*.parquet"
+      - name: order_items
+        external_location: "{{ var('bronze_base_path') }}/order_items/*.parquet"
+      - name: customers
+        external_location: "{{ var('bronze_base_path') }}/customers/*.parquet"
+      - name: shopping_carts
+        external_location: "{{ var('bronze_base_path') }}/shopping_carts/*.parquet"
+      - name: cart_items
+        external_location: "{{ var('bronze_base_path') }}/cart_items/*.parquet"
+      - name: returns
+        external_location: "{{ var('bronze_base_path') }}/returns/*.parquet"
+      - name: return_items
+        external_location: "{{ var('bronze_base_path') }}/return_items/*.parquet"
+      - name: product_catalog
+        external_location: "{{ var('bronze_base_path') }}/product_catalog/*.parquet"

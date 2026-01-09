@@ -1,0 +1,60 @@
+[project]
+name = "ecom-datalake-pipelines"
+version = "0.1.0"
+description = "Medallion architecture pipelines with rich silver transforms."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+authors = [
+  {name = "Garrett Schumacher"}
+]
+dependencies = [
+  "polars>=0.20.0",
+  "pydantic>=2.6.0",
+  "pydantic-settings>=2.2.0",
+  "pyyaml>=6.0.1",
+  "pyarrow>=15.0.0",
+  "fsspec>=2024.2.0",
+  "gcsfs>=2024.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=24.2.0",
+  "isort>=5.13.0",
+  "ruff>=0.3.0",
+  "mypy>=1.8.0",
+  "pylint>=3.1.0",
+  "pytest>=8.0.0",
+  "pre-commit>=3.6.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+
+[tool.pylint.main]
+py-version = "3.12"
+ignore = [".venv", "build", "dist"]
+
+[tool.pylint."messages control"]
+disable = [
+  "missing-module-docstring",
+  "missing-function-docstring",
+  "missing-class-docstring",
+  "too-few-public-methods",
+]

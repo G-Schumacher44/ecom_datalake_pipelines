@@ -1,0 +1,85 @@
+Metadata-Version: 2.4
+Name: ecom-datalake-pipelines
+Version: 0.1.0
+Summary: Medallion architecture pipelines with rich silver transforms.
+Author: Garrett Schumacher
+License: MIT License
+        
+        Copyright (c) 2026 Garrett Schumacher
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: polars>=0.20.0
+Requires-Dist: pydantic>=2.6.0
+Requires-Dist: pydantic-settings>=2.2.0
+Requires-Dist: pyyaml>=6.0.1
+Requires-Dist: pyarrow>=15.0.0
+Requires-Dist: fsspec>=2024.2.0
+Requires-Dist: gcsfs>=2024.2.0
+Provides-Extra: dev
+Requires-Dist: black>=24.2.0; extra == "dev"
+Requires-Dist: isort>=5.13.0; extra == "dev"
+Requires-Dist: ruff>=0.3.0; extra == "dev"
+Requires-Dist: mypy>=1.8.0; extra == "dev"
+Requires-Dist: pylint>=3.1.0; extra == "dev"
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pre-commit>=3.6.0; extra == "dev"
+Dynamic: license-file
+
+# Ecom Datalake Pipelines
+
+Modern lakehouse pipeline showcasing Bronze to Rich Silver to BigQuery Gold marts.
+
+## Quickstart
+
+```bash
+conda env create -f environment.yml
+conda activate ecom-datalake-pipelines
+pre-commit install
+```
+
+## Repo Layout
+
+- `src/` - Polars transforms, validation schemas, audit helpers
+- `dbt_duckdb/` - Base Silver dbt project (DuckDB)
+- `dbt_bigquery/` - Enriched Silver + Gold dbt project (BigQuery)
+- `airflow/` - Local Airflow DAGs and config
+- `config/` - Pipeline config (YAML)
+- `scripts/` - Utilities for pulling samples and bootstrapping Airflow
+- `docs/planning/` - Planning docs and schema samples
+
+## Configuration
+
+- `.env` for secrets and local overrides (see `.env.example`).
+- `config/config.yml` for pipeline settings.
+
+## Airflow (Docker)
+
+```bash
+make airflow-init
+```
+
+## Tests
+
+```bash
+make test
+```
