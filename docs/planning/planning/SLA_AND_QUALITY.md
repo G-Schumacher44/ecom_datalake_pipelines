@@ -5,8 +5,8 @@ Define availability expectations and quality checks for the silver layer.
 This is a lightweight SLA/quality spec for the simulated pipeline.
 
 ## SLAs (Draft)
-- Daily silver availability by 07:00 local time for prior day partitions.
-- Pipeline completes within 2 hours for a weekly backfill batch.
+- Backfill availability: full historical run completes within the table-level SLA window.
+- Incremental availability (future): daily silver availability by 07:00 local time for prior day partitions.
 - Data quality checks must pass before publishing silver partitions.
 
 ## Quality Checks (General)
@@ -109,39 +109,39 @@ This is a lightweight SLA/quality spec for the simulated pipeline.
 
 ### Base Silver (dbt-duckdb)
 
-| Table | Size | Row Count | Target Time | Memory |
-| --- | --- | --- | --- | --- |
-| orders | ~4GB | 6M | 8-12 min | 4GB |
-| order_items | ~3GB | 12M | 6-10 min | 3GB |
-| customers | ~500MB | 500K | 2-3 min | 500MB |
-| product_catalog | ~50MB | 50K | 30-60 sec | 100MB |
-| shopping_carts | ~300MB | 300K | 2-3 min | 300MB |
-| cart_items | ~2GB | 3M | 4-6 min | 2GB |
-| returns | ~1GB | 1M | 3-5 min | 1GB |
-| return_items | ~800MB | 1.5M | 3-4 min | 800MB |
+| Table | Size | Target Time | Memory |
+| --- | --- | --- | --- |
+| cart_items | 9.6GB | 15-20 min | 9.6GB |
+| shopping_carts | 3.0GB | 8-12 min | 3.0GB |
+| customers | 2.2GB | 6-8 min | 2.2GB |
+| order_items | 1.3GB | 4-6 min | 1.3GB |
+| orders | 717MB | 2-3 min | 717MB |
+| product_catalog | 80MB | 30-60 sec | 80MB |
+| return_items | 45MB | 15-30 sec | 45MB |
+| returns | 33MB | 15-30 sec | 33MB |
 
-**Total Base Silver**: 30-45 minutes (parallel execution)
+**Total Base Silver**: 30-50 minutes (parallel execution)
 
-**Peak memory**: ~4GB (orders table)
+**Peak memory**: ~9.6GB (cart_items table)
 
-### Enriched Silver (Polars + dbt-bigquery Python)
+### Enriched Silver (Polars runners)
 
 | Table | Inputs | Target Time | Memory |
 | --- | --- | --- | --- |
-| int_attributed_purchases | carts, orders | 5-8 min | 4.5GB |
-| int_inventory_risk | products, order_items, returns | 6-9 min | 4GB |
-| int_customer_retention | customers, orders | 4-6 min | 4.5GB |
-| int_sales_velocity | orders, order_items | 8-12 min | 5.5GB |
-| int_regional_financials | orders, customers | 5-7 min | 4.5GB |
+| int_attributed_purchases | carts (3GB), orders (717MB) | 8-12 min | 3.7GB |
+| int_inventory_risk | products (80MB), order_items (1.3GB), returns (33MB) | 5-8 min | 1.4GB |
+| int_customer_retention | customers (2.2GB), orders (717MB) | 6-10 min | 2.9GB |
+| int_sales_velocity | orders (717MB), order_items (1.3GB) | 6-10 min | 2.0GB |
+| int_regional_financials | orders (717MB), customers (2.2GB) | 6-10 min | 2.9GB |
 
 **Total Enriched Silver**: 30-50 minutes (parallel execution)
 
-**Peak memory**: ~5.5GB (sales_velocity)
+**Peak memory**: ~3.7GB (attributed_purchases: carts + orders)
 
 ### Overall Pipeline SLA
 
-- **Total processing time**: 60-95 minutes (Base + Enriched in sequence)
-- **Peak memory usage**: ~6GB (Base Silver orders + Enriched Silver sales_velocity overhead)
+- **Total processing time**: 60-100 minutes (Base + Enriched in sequence)
+- **Peak memory usage**: ~9.6GB (Base Silver cart_items table)
 - **Temp storage**: <10GB (ephemeral `/tmp/` files deleted after upload)
 - **GCS egress cost**: ~$2-3/month for read/write operations
 
