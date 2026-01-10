@@ -1,7 +1,7 @@
 # Bronze to Silver Plan (Base + Enriched)
 
 ## Context
-We have a 6-year historical backlog in the bronze/raw GCS bucket. Data is partitioned by
+We have a 6-year historical backlog (~17GB) in the bronze/raw GCS bucket. Data is partitioned by
 `ingest_dt=YYYY-MM-DD` and includes `_MANIFEST.json` per partition. The goal is to produce a clean,
 query-ready Base Silver layer and a Rich (Enriched) Silver layer for downstream analytics.
 
@@ -20,8 +20,8 @@ query-ready Base Silver layer and a Rich (Enriched) Silver layer for downstream 
 - Manifest: `_MANIFEST.json` per partition
 
 ## Outputs (Silver)
-- Base Silver: `gs://<silver-bucket>/silver/base/<table>/<partition_key>=YYYY-MM-DD/`
-- Enriched Silver: `gs://<silver-bucket>/silver/enriched/<table>/<partition_key>=YYYY-MM-DD/`
+- Base Silver: `gs://<silver-bucket>/silver/ecom/base/<table>/<partition_key>=YYYY-MM-DD/`
+- Enriched Silver: `gs://<silver-bucket>/silver/ecom/enriched/<table>/<partition_key>=YYYY-MM-DD/`
 - Metadata: row counts, schema version, and run ID per partition
 
 ## Current Bronze Tables (Reference)
@@ -102,7 +102,7 @@ Return items
 ## Partition Strategy
 - Prefer business date per table (derived from event timestamps).
 - Use `ingest_dt` when no business date exists.
-- Keep partitions small and query-friendly (daily).
+- Keep partitions small and query-friendly (daily), even when the backfill shares a single ingest date.
 
 Per-table recommendation
 - orders: `order_dt`
@@ -118,34 +118,34 @@ Per-table recommendation
 
 ### Overview
 
-Bronze is a one-time backfill (~20GB) with all tables at `ingest_dt=2026-01-10`. Instead of processing by date partition, we process by **table** to:
+Bronze is a one-time backfill (~17GB) with daily partitions and a single ingest date. Instead of processing by date partition, we process by **table** to:
 
 - Enable parallelism (8 Base + 5 Enriched tasks run concurrently)
-- Fit in laptop memory (~6GB peak vs 20GB+ for full dataset)
+- Fit in laptop memory (~9.6GB peak vs 17GB+ for full dataset)
 - Provide natural boundaries for monitoring and retry logic
 
 ### Phase 1: Base Silver (8 parallel tasks)
 
 Each task processes one Bronze table independently using dbt-duckdb:
 
-1. `stg_ecommerce__orders` (~4GB) - 6M rows
-2. `stg_ecommerce__order_items` (~3GB) - 12M rows
-3. `stg_ecommerce__customers` (~500MB) - 500K rows
-4. `stg_ecommerce__product_catalog` (~50MB) - 50K rows
-5. `stg_ecommerce__shopping_carts` (~300MB) - 300K rows
-6. `stg_ecommerce__cart_items` (~2GB) - 3M rows
-7. `stg_ecommerce__returns` (~1GB) - 1M rows
-8. `stg_ecommerce__return_items` (~800MB) - 1.5M rows
+1. `stg_ecommerce__cart_items` (9.6GB) - largest table
+2. `stg_ecommerce__shopping_carts` (3.0GB)
+3. `stg_ecommerce__customers` (2.2GB)
+4. `stg_ecommerce__order_items` (1.3GB)
+5. `stg_ecommerce__orders` (717MB)
+6. `stg_ecommerce__product_catalog` (80MB)
+7. `stg_ecommerce__return_items` (45MB)
+8. `stg_ecommerce__returns` (33MB)
 
 **Processing pattern per task**:
 
 - Read Bronze parquet from GCS via DuckDB httpfs extension
 - Apply cleaning and integrity rules (type casting, deduplication, FK checks)
 - Write Base Silver parquet to `/tmp/silver_base_{table}/`
-- Upload to `gs://<silver-bucket>/silver/base/{table}/ingest_dt=2026-01-10/`
+- Upload to `gs://<silver-bucket>/silver/ecom/base/{table}/ingest_dt=2020-01-01/`
 - Delete local temp files
 
-**Peak memory**: ~4GB (largest single table)
+**Peak memory**: ~9.6GB (cart_items table)
 
 ### Phase 2: Enriched Silver (5 parallel tasks)
 
@@ -153,7 +153,7 @@ Each task reads only required Base Silver tables and produces one enriched table
 
 1. `int_attributed_purchases` (reads: carts, orders) - Cart attribution via `join_asof`
 2. `int_inventory_risk` (reads: products, order_items, returns) - Stock risk scoring
-3. `int_customer_retention` (reads: customers, orders) - Churn signals
+3. `int_customer_retention_signals` (reads: customers, orders) - Churn signals
 4. `int_sales_velocity` (reads: orders, order_items) - Rolling 7-day velocity
 5. `int_regional_financials` (reads: orders, customers) - Tax + FX calculations
 
@@ -162,10 +162,10 @@ Each task reads only required Base Silver tables and produces one enriched table
 - Read Base Silver parquet(s) from GCS into Polars DataFrame
 - Apply Polars transforms from `src/transforms/` modules
 - Write Enriched Silver parquet to `/tmp/silver_enriched_{table}/`
-- Upload to `gs://<silver-bucket>/silver/enriched/{table}/ingest_dt=2026-01-10/`
+- Upload to `gs://<silver-bucket>/silver/ecom/enriched/{table}/ingest_dt=2026-01-10/`
 - Delete local temp files
 
-**Peak memory**: ~5.5GB (int_sales_velocity needs orders + order_items)
+**Peak memory**: ~12GB (int_attributed_purchases needs carts 3GB + orders 717MB + overhead)
 
 ### Phase 3: Load to BigQuery
 
@@ -188,7 +188,7 @@ Each task reads only required Base Silver tables and produces one enriched table
 - Store run metadata in a small audit table or JSON in GCS.
 - Preferred: publish audit logs to a BigQuery metadata table (see `docs/planning/planning/BQ_MIGRATION.md`).
 - Bronze manifests are used for ingestion completeness checks; Silver emits its own audit logs per partition.
- - Local dev: audit logs can be persisted to a DuckDB table for low-cost querying.
+- Local dev: audit logs can be persisted to a DuckDB table for low-cost querying.
 
 ## Governance and Access
 - GCS: bucket-level IAM with least-privilege service accounts for Airflow/dbt.
@@ -200,7 +200,7 @@ Each task reads only required Base Silver tables and produces one enriched table
 - Decide silver storage bucket + prefix.
 - Decide BQ load strategy: external tables vs. scheduled load.
 - Confirm enriched table naming and partition keys.
- - Define audit log retention window and alerting thresholds.
+- Define audit log retention window and alerting thresholds.
 
 ## Risks and Owners (Draft)
 - Event date derivation (joins may be incomplete) — Owner: Data Engineering. Mitigation: fallback to `ingest_dt` and log join miss rate per run.
@@ -238,13 +238,13 @@ Each task reads only required Base Silver tables and produces one enriched table
 ## Flowchart (Mermaid)
 ```mermaid
 flowchart TD
-    A[Trigger DAG run] --> B[Select batch window]
-    B --> C[Validate bronze + Pydantic schema]
-    C --> D[dbt-duckdb base silver]
-    D --> E[dbt-bigquery Python + Polars enrichment]
-    E --> F[Write enriched silver]
+    A[Trigger DAG run] --> B[Validate bronze + Pydantic schema]
+    B --> C[Base Silver: dbt-duckdb models]
+    C --> D[Write Base Silver to GCS]
+    D --> E[Enriched Silver: Polars runners]
+    E --> F[Write Enriched Silver to GCS]
     F --> G[Load to BigQuery silver]
-    G --> H[dbt-bigquery gold marts]
+    G --> H[dbt-bigquery gold marts SQL]
 ```
 
 ## Swimlane Flow (Mermaid)
@@ -252,16 +252,18 @@ flowchart TD
 flowchart LR
     subgraph Airflow[DAG Orchestration]
         A1[Trigger run] --> A2[Validate bronze + Pydantic]
-        A2 --> A3[dbt-duckdb base]
-        A3 --> A4[dbt-bigquery enriched]
+        A2 --> A3[Base Silver: dbt-duckdb]
+        A3 --> A4[Enriched Silver: Polars runners]
         A4 --> A5[Load to BQ silver]
-        A5 --> A6[dbt-bigquery gold marts]
+        A5 --> A6[dbt-bigquery gold marts SQL]
     end
-    subgraph BaseSilver[Base Silver dbt]
-        B1[Read bronze parquet] --> B2[Clean + enforce schema] --> B3[Write base silver]
+    subgraph BaseSilver[Base Silver Processing]
+        B1[Read bronze parquet] --> B2[Clean + enforce schema]
+        B2 --> B3[Write base silver to GCS]
     end
-    subgraph EnrichedSilver[Enriched Silver Polars]
-        E1[Read base silver] --> E2[Apply transforms] --> E3[Write enriched silver]
+    subgraph EnrichedSilver[Enriched Silver Processing]
+        E1[Read base silver] --> E2[Apply Polars transforms]
+        E2 --> E3[Write enriched silver to GCS]
     end
     A3 --> B1
     B3 --> E1

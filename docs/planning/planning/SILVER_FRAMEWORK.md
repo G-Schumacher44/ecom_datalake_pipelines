@@ -7,26 +7,29 @@ This document reflects the hybrid dbt + Polars approach used in this repo.
 ## Design Goals
 - Keep orchestration in Airflow with clear task boundaries.
 - Use dbt-duckdb for Base Silver cleaning and conformance.
-- Use reusable Polars modules for enrichment logic, wrapped by dbt Python models.
+- Use reusable Polars modules for enrichment logic, called by Python runner scripts.
 - Keep data quality checks visible and traceable.
+- All heavy compute runs locally; BigQuery only for Gold SQL aggregations.
 
 ## High-Level Flow
 1) Validate bronze partition(s) and required schema.
-2) Base Silver (dbt-duckdb) cleans and standardizes bronze tables.
-3) Enriched Silver (dbt-bigquery Python models) calls `src/transforms`.
-4) Load enriched parquet to BigQuery `silver` dataset.
-5) Build Gold marts (dbt-bigquery SQL models).
+2) Base Silver (dbt-duckdb) cleans and standardizes bronze tables, writes to GCS.
+3) Enriched Silver (Polars runners in `src/runners/`) reads Base Silver from GCS, applies `src/transforms/`, writes to GCS.
+4) Load enriched parquet from GCS to BigQuery `silver` dataset.
+5) Build Gold marts (dbt-bigquery SQL models only).
 6) Emit audit metrics per table and partition.
 
 ## Module Layout
 ```
 src/
-  transforms/
+  transforms/              # Pure Polars logic (no I/O)
     cart_attribution.py
     inventory_risk.py
     churn_detection.py
     sales_velocity.py
     regional_financials.py
+  runners/                 # I/O wrappers (read GCS → transform → write GCS)
+    enriched_silver.py
   validation/
     schemas.py
   observability/
@@ -37,9 +40,7 @@ dbt_duckdb/
     stg_ecommerce__*.sql
 
 dbt_bigquery/
-  models/enriched_silver/
-    int_*.py
-  models/gold_marts/
+  models/gold_marts/       # SQL only (no Python models)
     fct_*.sql
 ```
 
@@ -48,10 +49,12 @@ dbt_bigquery/
 - Base Silver models apply schema casting, deduplication, and integrity rules.
 - Output tables remain 1:1 with bronze entities.
 
-## Enriched Silver (dbt-bigquery + Polars)
-- dbt Python models read Base Silver tables.
-- Enrichment logic lives in `src/transforms` and returns Polars DataFrames.
+## Enriched Silver (Polars Runners)
+- Python runner scripts in `src/runners/enriched_silver.py` read Base Silver parquet from GCS.
+- Enrichment logic lives in `src/transforms/` (pure functions, no I/O).
+- Runners write Enriched Silver parquet to GCS.
 - Output tables are business-aligned (attribution, risk, retention, velocity).
+- Called directly by Airflow PythonOperator tasks (not dbt).
 
 ## Validation and Quality
 - Pydantic schemas in `src/validation/schemas.py` validate key fields.
