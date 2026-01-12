@@ -1,18 +1,99 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
-from airflow import DAG
 from airflow.operators.bash import BashOperator
+from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.task_group import TaskGroup
 
+from airflow import DAG
 from src.runners.enriched_silver import (
     run_cart_attribution,
-    run_inventory_risk,
     run_customer_retention,
-    run_sales_velocity,
+    run_inventory_risk,
     run_regional_financials,
+    run_sales_velocity,
+)
+from src.settings import load_settings
+
+
+def _resolve_pipeline_env(config_env: str | None) -> str:
+    env_override = os.getenv("PIPELINE_ENV")
+    return (env_override or config_env or "local").lower()
+
+
+def _resolve_bool(env_key: str, default: bool = False) -> bool:
+    env_override = os.getenv(env_key)
+    if env_override is None:
+        return default
+    return env_override.lower() in {"true", "1", "yes"}
+
+
+def _resolve_path(
+    bucket: str,
+    prefix: str,
+    env_key: str | None = None,
+    pipeline_env: str = "local",
+) -> str:
+    if env_key:
+        override = os.getenv(env_key)
+        if override:
+            return override
+    if bucket == "local" or pipeline_env == "local":
+        return prefix
+    return f"gs://{bucket}/{prefix}"
+
+
+def _is_gcs_path(path: str) -> bool:
+    return path.startswith("gs://")
+
+
+settings = load_settings()
+pipeline = settings.pipeline
+PIPELINE_ENV = _resolve_pipeline_env(pipeline.environment)
+BRONZE_PATH = _resolve_path(
+    pipeline.bronze_bucket,
+    pipeline.bronze_prefix,
+    "BRONZE_BASE_PATH",
+    PIPELINE_ENV,
+)
+SILVER_BASE_PATH = _resolve_path(
+    pipeline.silver_bucket,
+    pipeline.silver_base_prefix,
+    "SILVER_BASE_PATH",
+    PIPELINE_ENV,
+)
+SILVER_ENRICHED_PATH = _resolve_path(
+    pipeline.silver_bucket,
+    pipeline.silver_enriched_prefix,
+    "SILVER_ENRICHED_PATH",
+    PIPELINE_ENV,
+)
+QUARANTINE_PATH = f"{SILVER_BASE_PATH.rstrip('/')}/quarantine"
+SILVER_GCS_TARGET = os.getenv(
+    "SILVER_GCS_TARGET",
+    f"gs://{pipeline.silver_bucket}/{pipeline.silver_base_prefix}",
+)
+DEFAULT_INGEST_DT = pipeline.default_ingest_dt
+GOLD_PIPELINE_ENABLED = _resolve_bool(
+    "GOLD_PIPELINE_ENABLED",
+    default=PIPELINE_ENV in {"dev", "prod"},
+)
+
+COMMON_ENV = {
+    "PIPELINE_ENV": PIPELINE_ENV,
+    "BRONZE_BASE_PATH": BRONZE_PATH,
+    "SILVER_BASE_PATH": SILVER_BASE_PATH,
+    "SILVER_QUARANTINE_PATH": QUARANTINE_PATH,
+    "SILVER_ENRICHED_PATH": SILVER_ENRICHED_PATH,
+}
+
+SHOULD_SYNC_SILVER_BASE = (
+    PIPELINE_ENV in {"dev", "prod"}
+    and not _is_gcs_path(SILVER_BASE_PATH)
+    and pipeline.silver_bucket != "local"
 )
 
 
@@ -47,10 +128,17 @@ with DAG(
     default_args={"retries": 1},
     tags=["ecom", "silver", "gold"],
 ) as dag:
-    # Phase 0: Validation
-    validate_bronze_schema = BashOperator(
-        task_id="validate_bronze_schema",
-        bash_command="python scripts/describe_parquet_samples.py --output docs/planning/BRONZE_SCHEMA_SAMPLE.md",
+    # Phase 0: Bronze Quality Validation
+    validate_bronze_quality = BashOperator(
+        task_id="validate_bronze_quality",
+        env=COMMON_ENV,
+        bash_command=(
+            "python src/validation/bronze_quality.py "
+            f"--bronze-path {BRONZE_PATH} "
+            "--output-report docs/validation_reports/BRONZE_QUALITY.md "
+            "--run-id {{ run_id }} "
+            + ("--fail-on-issues " if PIPELINE_ENV in {"dev", "prod"} else "")
+        ),
     )
 
     # Phase 1: Base Silver (8 parallel dbt-duckdb tasks)
@@ -68,15 +156,43 @@ with DAG(
 
         for table in bronze_tables:
             BashOperator(
-                task_id=f"stg_ecommerce__{table}",
-                bash_command=f"dbt run --project-dir dbt_duckdb --profiles-dir dbt_duckdb --select stg_ecommerce__{table}",
+                task_id=f"stg_ecommerce_{table}",
+                env=COMMON_ENV,
+                bash_command=(
+                    "dbt run --project-dir dbt_duckdb --profiles-dir dbt_duckdb "
+                    f"--select stg_ecommerce__{table}"
+                ),
             )
+
+    # Phase 1.5: Silver Quality Validation
+    validate_silver_quality = BashOperator(
+        task_id="validate_silver_quality",
+        env=COMMON_ENV,
+        bash_command=(
+            "python src/validation/silver_quality.py "
+            f"--bronze-path {BRONZE_PATH} "
+            f"--silver-path {SILVER_BASE_PATH} "
+            f"--quarantine-path {QUARANTINE_PATH} "
+            "--run-id {{ run_id }} "
+            + ("--fail-on-sla-breach " if PIPELINE_ENV == "prod" else "")
+            # Optional: Add --fail-on-sla-breach to stop pipeline on quality issues
+        ),
+    )
+
+    if SHOULD_SYNC_SILVER_BASE:
+        sync_silver_base = BashOperator(
+            task_id="sync_silver_base_to_gcs",
+            env=COMMON_ENV,
+            bash_command=(f"gsutil -m rsync -r {SILVER_BASE_PATH} {SILVER_GCS_TARGET}"),
+        )
+    else:
+        sync_silver_base = EmptyOperator(task_id="sync_silver_base_to_gcs")
 
     # Phase 2: Enriched Silver (5 parallel Polars runner tasks)
     with TaskGroup("enriched_silver") as enriched_silver_group:
-        BASE_PATH = "gs://acme-analytics-silver/ecom/base"
-        ENRICHED_PATH = "gs://acme-analytics-silver/ecom/enriched"
-        INGEST_DT = "2020-01-01"
+        BASE_PATH = SILVER_BASE_PATH
+        ENRICHED_PATH = SILVER_ENRICHED_PATH
+        INGEST_DT = DEFAULT_INGEST_DT
 
         cart_attr = PythonOperator(
             task_id="int_attributed_purchases",
@@ -128,37 +244,46 @@ with DAG(
             },
         )
 
-    # Phase 3: Load Enriched Silver to BigQuery
-    with TaskGroup("load_to_bigquery") as load_bigquery_group:
-        enriched_tables = [
-            "int_attributed_purchases",
-            "int_inventory_risk",
-            "int_customer_retention_signals",
-            "int_sales_velocity",
-            "int_regional_financials",
-        ]
+    if GOLD_PIPELINE_ENABLED:
+        # Phase 3: Load Enriched Silver to BigQuery
+        with TaskGroup("load_to_bigquery") as load_bigquery_group:
+            enriched_tables = [
+                "int_attributed_purchases",
+                "int_inventory_risk",
+                "int_customer_retention_signals",
+                "int_sales_velocity",
+                "int_regional_financials",
+            ]
 
-        for table in enriched_tables:
-            PythonOperator(
-                task_id=f"load_{table}",
-                python_callable=load_table_to_bigquery,
-                op_kwargs={
-                    "table_name": table,
-                    "gcs_path": f"{ENRICHED_PATH}/{table}/ingest_dt={INGEST_DT}",
-                    "dataset": "silver",
-                },
-            )
+            for table in enriched_tables:
+                PythonOperator(
+                    task_id=f"load_{table}",
+                    python_callable=load_table_to_bigquery,
+                    op_kwargs={
+                        "table_name": table,
+                        "gcs_path": f"{ENRICHED_PATH}/{table}/ingest_dt={INGEST_DT}",
+                        "dataset": "silver",
+                    },
+                )
 
-    # Phase 4: Gold Marts (dbt-bigquery SQL models)
-    gold_marts_build = BashOperator(
-        task_id="gold_marts_build",
-        bash_command="dbt run --project-dir dbt_bigquery --profiles-dir dbt_bigquery --select tag:gold",
-    )
+        # Phase 4: Gold Marts (dbt-bigquery SQL models)
+        gold_marts_build = BashOperator(
+            task_id="gold_marts_build",
+            bash_command=(
+                "dbt run --project-dir dbt_bigquery --profiles-dir dbt_bigquery "
+                "--select tag:gold"
+            ),
+        )
+    else:
+        load_bigquery_group = EmptyOperator(task_id="load_to_bigquery")
+        gold_marts_build = EmptyOperator(task_id="gold_marts_build")
 
     # Pipeline flow
     (
-        validate_bronze_schema
+        validate_bronze_quality
         >> base_silver_group
+        >> validate_silver_quality
+        >> sync_silver_base
         >> enriched_silver_group
         >> load_bigquery_group
         >> gold_marts_build

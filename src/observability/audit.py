@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -82,7 +82,9 @@ def build_audit_record(
     )
 
 
-def summarize_counts(input_rows: int, output_rows: int, reject_rows: int) -> dict[str, Any]:
+def summarize_counts(
+    input_rows: int, output_rows: int, reject_rows: int
+) -> dict[str, Any]:
     return {
         "input_rows": input_rows,
         "output_rows": output_rows,

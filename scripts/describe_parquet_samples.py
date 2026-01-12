@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -16,10 +18,47 @@ import polars as pl
 class PartitionProfile:
     table: str
     partition: str
+    partition_key: str
     files: list[Path]
     row_count: int
     schema: dict[str, str]
     column_stats: list[dict[str, object]]
+
+
+META_START = "<!-- GENERATED META -->"
+META_END = "<!-- END GENERATED META -->"
+
+
+def utc_timestamp() -> str:
+    return (
+        datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+
+
+def content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def strip_meta_block(text: str) -> str:
+    if META_START not in text or META_END not in text:
+        return text
+    before, rest = text.split(META_START, 1)
+    _, after = rest.split(META_END, 1)
+    return before + after
+
+
+def apply_markdown_meta(text: str, timestamp: str) -> tuple[str, str]:
+    body = strip_meta_block(text).rstrip() + "\n"
+    body_hash = content_hash(body)
+    meta_block = "\n".join(
+        [
+            META_START,
+            f"Last updated (UTC): {timestamp}",
+            f"Content hash (SHA-256): {body_hash}",
+            META_END,
+        ]
+    )
+    return f"{body}{meta_block}\n", body_hash
 
 
 def parse_date(value: str) -> date | None:
@@ -54,15 +93,22 @@ def find_parquet_files(
     months: set[str],
     start_date: date | None,
     end_date: date | None,
-) -> dict[str, dict[str, list[Path]]]:
-    tables: dict[str, dict[str, list[Path]]] = {}
+) -> dict[str, list[tuple[str, str, list[Path]]]]:
+    tables: dict[str, list[tuple[str, str, list[Path]]]] = {}
+    partition_globs = {
+        "customers": ("signup_date", "signup_date=*"),
+        "product_catalog": ("category", "category=*"),
+    }
     for table_dir in root.iterdir():
         if not table_dir.is_dir():
             continue
         if tables_filter and table_dir.name not in tables_filter:
             continue
-        partitions: dict[str, list[Path]] = {}
-        for partition_dir in sorted(table_dir.glob("ingest_dt=*")):
+        partition_key, partition_glob = partition_globs.get(
+            table_dir.name, ("ingest_dt", "ingest_dt=*")
+        )
+        partitions: list[tuple[str, str, list[Path]]] = []
+        for partition_dir in sorted(table_dir.glob(partition_glob)):
             if not partition_dir.is_dir():
                 continue
             partition_value = partition_dir.name.split("=", 1)[-1]
@@ -73,7 +119,9 @@ def find_parquet_files(
             parquet_files = sorted(partition_dir.glob("*.parquet"))
             if not parquet_files:
                 continue
-            partitions[partition_value] = parquet_files[:max_files]
+            partitions.append(
+                (partition_key, partition_value, parquet_files[:max_files])
+            )
         if partitions:
             tables[table_dir.name] = partitions
     return tables
@@ -112,10 +160,7 @@ def col_stats(series: pl.Series, row_count: int) -> dict[str, object]:
     elif series.dtype == pl.Utf8 and row_count > 0:
         try:
             value_counts = series.value_counts(sort=True).head(5)
-            top_values = [
-                (row[0], int(row[1]))
-                for row in value_counts.iter_rows()
-            ]
+            top_values = [(row[0], int(row[1])) for row in value_counts.iter_rows()]
         except Exception:
             top_values = None
 
@@ -149,17 +194,66 @@ def profile_partition(
     return row_count, schema, stats
 
 
-def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
+def normalize_schema_for_drift(schema: dict[str, str]) -> str:
+    """Normalize schema key by treating Null types as wildcards.
+
+    This prevents false positives when a partition has all nulls for a column
+    (causing Polars to infer Null type instead of the actual type).
+    """
+    # Build normalized schema where Null is replaced with a wildcard marker
+    normalized_pairs = []
+    for name, dtype in schema.items():
+        # Treat Null as a special marker that matches any type
+        normalized_type = "*" if dtype == "Null" else dtype
+        normalized_pairs.append(f"{name}:{normalized_type}")
+    return "|".join(normalized_pairs)
+
+
+def schemas_are_compatible(schema_key1: str, schema_key2: str) -> bool:
+    """Check if two schema keys are compatible (Null vs non-Null types)."""
+    pairs1 = schema_key1.split("|")
+    pairs2 = schema_key2.split("|")
+
+    if len(pairs1) != len(pairs2):
+        return False
+
+    for pair1, pair2 in zip(pairs1, pairs2, strict=False):
+        col1, type1 = pair1.split(":", 1)
+        col2, type2 = pair2.split(":", 1)
+
+        # Column names must match
+        if col1 != col2:
+            return False
+
+        # Types must match OR one must be Null
+        if type1 != type2 and type1 != "Null" and type2 != "Null":
+            return False
+
+    return True
+
+
+def render_markdown(
+    profiles: Iterable[PartitionProfile],
+    scope: dict[str, str],
+) -> str:
     lines = [
         "# Bronze Sample Profile Report",
         "",
         "Generated from local parquet samples in `samples/bronze/`.",
         "",
     ]
+    if scope:
+        lines.append("## Sample Scope")
+        lines.append("")
+        for key, value in scope.items():
+            lines.append(f"- **{key}**: {value}")
+        lines.append("")
     profiles_list = list(profiles)
     schema_keys: dict[tuple[str, str], str] = {}
     for profile in profiles_list:
-        schema_key = "|".join(f"{name}:{dtype}" for name, dtype in profile.schema.items())
+        schema_key = "|".join(
+            f"{name}:{dtype}" for name, dtype in profile.schema.items()
+        )
         schema_keys[(profile.table, profile.partition)] = schema_key
 
     # Build top-level summary
@@ -171,8 +265,12 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
     table_row_counts: dict[str, int] = {}
     table_partition_counts: dict[str, int] = {}
     for profile in profiles_list:
-        table_row_counts[profile.table] = table_row_counts.get(profile.table, 0) + profile.row_count
-        table_partition_counts[profile.table] = table_partition_counts.get(profile.table, 0) + 1
+        table_row_counts[profile.table] = (
+            table_row_counts.get(profile.table, 0) + profile.row_count
+        )
+        table_partition_counts[profile.table] = (
+            table_partition_counts.get(profile.table, 0) + 1
+        )
 
     lines.append("## Overview")
     lines.append("")
@@ -186,7 +284,8 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
     lines.append("| --- | --- | --- |")
     for table in sorted(table_row_counts.keys()):
         lines.append(
-            f"| {table} | {table_partition_counts[table]} | {table_row_counts[table]:,} |"
+            f"| {table} | {table_partition_counts[table]} | "
+            f"{table_row_counts[table]:,} |"
         )
     lines.append("")
 
@@ -204,14 +303,24 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
                         profile.table,
                         profile.partition,
                         f"high_nulls|{profile.table}|{stat['column']}",
-                        f"⚠️ **{profile.table}.{stat['column']}**: {stat['null_pct']}% nulls (>50%)",
+                        (
+                            f"⚠️ **{profile.table}.{stat['column']}**: "
+                            f"{stat['null_pct']}% nulls (>50%)"
+                        ),
                     )
                 )
 
     # Check for low cardinality on PRIMARY entity ID columns only
     # Exclude: metadata columns, lookup IDs (agent, region, tier, status, etc.)
     metadata_columns = {"batch_id", "ingestion_ts", "event_id", "source_file"}
-    lookup_id_patterns = {"agent_id", "region_id", "tier_id", "status_id", "warehouse_id", "store_id"}
+    lookup_id_patterns = {
+        "agent_id",
+        "region_id",
+        "tier_id",
+        "status_id",
+        "warehouse_id",
+        "store_id",
+    }
 
     for profile in profiles_list:
         for stat in profile.column_stats:
@@ -225,11 +334,16 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
 
             # Flag PRIMARY entity ID columns with suspiciously low cardinality
             # These are typically table-named IDs like customer_id, order_id, product_id
-            is_primary_id = (
-                col_name.endswith("_id") and
-                any(col_name.startswith(entity) for entity in [
-                    "customer", "order", "product", "cart", "return", "item"
-                ])
+            is_primary_id = col_name.endswith("_id") and any(
+                col_name.startswith(entity)
+                for entity in [
+                    "customer",
+                    "order",
+                    "product",
+                    "cart",
+                    "return",
+                    "item",
+                ]
             )
 
             if is_primary_id and stat["distinct"] < 10 and stat["null_pct"] < 100:
@@ -238,7 +352,11 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
                         profile.table,
                         profile.partition,
                         f"low_cardinality_id|{profile.table}|{stat['column']}",
-                        f"⚠️ **{profile.table}.{stat['column']}**: Only {stat['distinct']} distinct values (expected high cardinality for primary entity ID)",
+                        (
+                            f"⚠️ **{profile.table}.{stat['column']}**: Only "
+                            f"{stat['distinct']} distinct values "
+                            "(expected high cardinality for primary entity ID)"
+                        ),
                     )
                 )
 
@@ -255,7 +373,10 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
                         profile.table,
                         profile.partition,
                         f"cardinality_mismatch|{profile.table}|product_id_vs_product_name",
-                        f"⚠️ **{profile.table}**: More product names than product IDs (possible duplicates/variations)",
+                        (
+                            f"⚠️ **{profile.table}**: More product names than "
+                            "product IDs (possible duplicates/variations)"
+                        ),
                     )
                 )
 
@@ -277,7 +398,12 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
                             table,
                             partition,
                             f"volume_spike|{table}|{partition}",
-                            f"📊 **{table}** partition `{partition}`: {rows:,} rows (+{int((rows/avg_rows - 1) * 100)}% above average)",
+                            (
+                                f"📊 **{table}** partition `{partition}`: "
+                                f"{rows:,} rows "
+                                f"(+{int((rows/avg_rows - 1) * 100)}% above "
+                                "average)"
+                            ),
                         )
                     )
 
@@ -302,11 +428,14 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
             key=lambda item: int(item[1]["count"]),
             reverse=True,
         )
-        for issue_key, meta in sorted_flags[:10]:
+        for _issue_key, meta in sorted_flags[:10]:
             partitions = sorted(list(meta["partitions"]))[:5]
             partition_sample = ", ".join(partitions)
             lines.append(
-                f"- {meta['message']} (count={meta['count']}, samples={partition_sample})"
+                (
+                    f"- {meta['message']} (count={meta['count']}, "
+                    f"samples={partition_sample})"
+                )
             )
     else:
         lines.append("- ✅ No major data quality issues detected")
@@ -318,41 +447,122 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
     drift_found = False
     table_schemas: dict[str, dict[str, set[str]]] = {}
     table_schema_counts: dict[str, dict[str, int]] = {}
+
+    # First pass: group schemas by exact match
     for (table, partition), schema_key in schema_keys.items():
         table_schemas.setdefault(table, {}).setdefault(schema_key, set()).add(partition)
         table_schema_counts.setdefault(table, {}).setdefault(schema_key, 0)
         table_schema_counts[table][schema_key] += 1
+
+    # Second pass: merge compatible schemas (differ only by Null vs actual types)
+    for table in list(table_schemas.keys()):
+        schema_map = table_schemas[table]
+        if len(schema_map) <= 1:
+            continue
+
+        # Find groups of compatible schemas
+        schema_list = list(schema_map.keys())
+        merged_schemas: dict[str, set[str]] = {}
+        merged_counts: dict[str, int] = {}
+        processed = set()
+
+        for i, schema_key1 in enumerate(schema_list):
+            if schema_key1 in processed:
+                continue
+
+            # Start a new group with this schema as the canonical version
+            # (prefer the one without Null types)
+            canonical = schema_key1
+            group_partitions = set(schema_map[schema_key1])
+            group_count = table_schema_counts[table][schema_key1]
+
+            # Find all compatible schemas
+            for schema_key2 in schema_list[i + 1 :]:
+                if schema_key2 in processed:
+                    continue
+
+                if schemas_are_compatible(schema_key1, schema_key2):
+                    # Merge into this group
+                    group_partitions.update(schema_map[schema_key2])
+                    group_count += table_schema_counts[table][schema_key2]
+                    processed.add(schema_key2)
+
+                    # Update canonical to prefer non-Null version
+                    if "Null" not in schema_key2 and "Null" in canonical:
+                        canonical = schema_key2
+
+            merged_schemas[canonical] = group_partitions
+            merged_counts[canonical] = group_count
+            processed.add(schema_key1)
+
+        # Replace with merged version
+        table_schemas[table] = merged_schemas
+        table_schema_counts[table] = merged_counts
+
+    # Report true drift (incompatible schemas only)
     for table, schema_map in sorted(table_schemas.items()):
         if len(schema_map) <= 1:
             continue
+
+        # Only report if schemas are truly incompatible
         drift_found = True
         lines.append(f"### {table}")
         lines.append("")
-        for schema_key, partitions in sorted(schema_map.items()):
-            lines.append(f"- Schema key: `{schema_key}`")
-            lines.append(f"  - Partitions: {', '.join(sorted(partitions))}")
+        lines.append(
+            "⚠️ **True schema drift detected** (incompatible schemas, not just "
+            "null inference):"
+        )
         lines.append("")
+        for schema_key, partitions in sorted(
+            schema_map.items(), key=lambda x: len(x[1]), reverse=True
+        ):
+            partition_list = sorted(partitions)
+            if len(partition_list) <= 5:
+                partition_display = ", ".join(partition_list)
+            else:
+                partition_display = (
+                    f"{partition_list[0]} ... {partition_list[-1]} "
+                    f"({len(partition_list)} partitions)"
+                )
+            lines.append(f"- Schema key: `{schema_key}`")
+            lines.append(f"  - Partitions ({len(partition_list)}): {partition_display}")
+        lines.append("")
+
     if not drift_found:
-        lines.append("- No schema drift detected across sampled partitions.")
+        lines.append("- ✅ No schema drift detected across sampled partitions.")
+        lines.append("")
+        lines.append(
+            "_Note: Partitions with all-null values for a column may show `Null` "
+            "type instead of the actual type. These are treated as compatible "
+            "schemas, not drift._"
+        )
         lines.append("")
 
     lines.append("## Partition Coverage")
     lines.append("")
-    lines.append("Shows which partitions were sampled per table (for temporal schema drift detection).")
+    lines.append(
+        "Shows which partitions were sampled per table "
+        "(for temporal schema drift detection)."
+    )
     lines.append("")
 
     # Group partitions by table
-    table_partitions: dict[str, list[str]] = {}
+    table_partitions: dict[str, list[tuple[str, str]]] = {}
     for profile in profiles_list:
-        table_partitions.setdefault(profile.table, []).append(profile.partition)
+        table_partitions.setdefault(profile.table, []).append(
+            (profile.partition_key, profile.partition)
+        )
 
     for table, partitions in sorted(table_partitions.items()):
-        sorted_partitions = sorted(set(partitions))
-        # Group by year-month for readability
-        grouped = {}
-        for partition in sorted_partitions:
-            year_month = partition[:7]  # YYYY-MM
-            grouped.setdefault(year_month, []).append(partition)
+        sorted_partitions = sorted(set(partitions), key=lambda item: item[1])
+        grouped: dict[str, list[str]] = {}
+        non_date_partitions: list[str] = []
+        for partition_key, partition_value in sorted_partitions:
+            if parse_date(partition_value):
+                year_month = partition_value[:7]  # YYYY-MM
+                grouped.setdefault(year_month, []).append(partition_value)
+            else:
+                non_date_partitions.append(f"{partition_key}={partition_value}")
 
         lines.append(f"**{table}** ({len(sorted_partitions)} partitions):")
         for year_month in sorted(grouped.keys()):
@@ -360,7 +570,12 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
             if len(dates) <= 5:
                 lines.append(f"- `{year_month}`: {', '.join(dates)}")
             else:
-                lines.append(f"- `{year_month}`: {dates[0]} ... {dates[-1]} ({len(dates)} days)")
+                lines.append(
+                    f"- `{year_month}`: {dates[0]} ... {dates[-1]} "
+                    f"({len(dates)} days)"
+                )
+        if non_date_partitions:
+            lines.append(f"- `non-date`: {', '.join(non_date_partitions[:10])}")
         lines.append("")
 
     lines.append("## Canonical Schema Keys")
@@ -388,7 +603,10 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
     for table, profile in sorted(table_profiles.items()):
         lines.append(f"### {table}")
         lines.append("")
-        lines.append(f"**Sample**: `ingest_dt={profile.partition}` ({profile.row_count:,} rows)")
+        lines.append(
+            f"**Sample**: `{profile.partition_key}={profile.partition}` "
+            f"({profile.row_count:,} rows)"
+        )
         lines.append("")
         lines.append("| Column | Type | Null % | Distinct | Stats |")
         lines.append("| --- | --- | --- | --- | --- |")
@@ -433,10 +651,20 @@ def render_markdown(profiles: Iterable[PartitionProfile]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Profile parquet samples.")
-    parser.add_argument("--root", default="samples/bronze", help="Sample root directory")
-    parser.add_argument("--max-files", type=int, default=1, help="Max parquet files per partition")
     parser.add_argument(
-        "--max-rows", type=int, default=100000, help="Max rows per file sample (0=all)"
+        "--root", default="samples/bronze", help="Sample root directory"
+    )
+    parser.add_argument(
+        "--max-files",
+        type=int,
+        default=1,
+        help="Max parquet files per partition",
+    )
+    parser.add_argument(
+        "--max-rows",
+        type=int,
+        default=100000,
+        help="Max rows per file sample (0=all)",
     )
     parser.add_argument(
         "--tables",
@@ -460,8 +688,23 @@ def main() -> None:
     )
     parser.add_argument(
         "--output",
-        default="docs/planning/planning/BRONZE_PROFILE_REPORT.md",
+        default="docs/planning/BRONZE_PROFILE_REPORT.md",
         help="Output path for Markdown report",
+    )
+    parser.add_argument(
+        "--schema-json",
+        default="",
+        help="Optional path to write schema map JSON",
+    )
+    parser.add_argument(
+        "--update-contract",
+        default="",
+        help="Optional path to DATA_CONTRACT.md to refresh bronze->base mapping",
+    )
+    parser.add_argument(
+        "--data-dictionary",
+        default="",
+        help="Optional path to write a DATA_DICTIONARY.md from profiled schema",
     )
     args = parser.parse_args()
 
@@ -490,12 +733,15 @@ def main() -> None:
 
     profiles: list[PartitionProfile] = []
     for table_name, partitions in sorted(tables.items()):
-        for partition, files in sorted(partitions.items()):
+        for partition_key, partition_value, files in sorted(
+            partitions, key=lambda item: item[1]
+        ):
             row_count, schema, stats = profile_partition(files, args.max_rows)
             profiles.append(
                 PartitionProfile(
                     table=table_name,
-                    partition=partition,
+                    partition=partition_value,
+                    partition_key=partition_key,
                     files=files,
                     row_count=row_count,
                     schema=schema,
@@ -503,9 +749,277 @@ def main() -> None:
                 )
             )
 
-    markdown = render_markdown(profiles)
-    Path(args.output).write_text(markdown)
+    scope: dict[str, str] = {}
+    if tables_filter:
+        scope["Tables"] = ", ".join(sorted(tables_filter))
+    if ingest_dts:
+        scope["Ingest dates"] = ", ".join(sorted(ingest_dts))
+    if months:
+        scope["Months"] = ", ".join(sorted(months))
+    if start_date and end_date:
+        scope["Date range"] = f"{start_date}..{end_date}"
+    elif args.date_range:
+        scope["Date range"] = args.date_range
+
+    timestamp = utc_timestamp()
+
+    markdown_body = render_markdown(profiles, scope)
+    markdown, report_hash = apply_markdown_meta(markdown_body, timestamp)
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(markdown)
     print(f"Wrote {args.output}")
+
+    if args.schema_json:
+        schema_map: dict[str, dict[str, dict[str, str]]] = {}
+        for profile in profiles:
+            partition_id = f"{profile.partition_key}={profile.partition}"
+            schema_map.setdefault(profile.table, {})[partition_id] = profile.schema
+        schema_body = json.dumps(schema_map, indent=2, sort_keys=True)
+        schema_hash = content_hash(schema_body)
+        schema_payload = {
+            "_meta": {
+                "last_updated_utc": timestamp,
+                "content_hash_sha256": schema_hash,
+            },
+            "schemas": schema_map,
+        }
+        schema_path = Path(args.schema_json)
+        schema_path.parent.mkdir(parents=True, exist_ok=True)
+        schema_path.write_text(json.dumps(schema_payload, indent=2, sort_keys=True))
+        print(f"Wrote {args.schema_json}")
+
+    schema_by_table: dict[str, dict[str, str]] = {}
+    for profile in profiles:
+        schema_by_table[profile.table] = profile.schema
+
+    bool_fields = {
+        "is_guest",
+        "email_verified",
+        "marketing_opt_in",
+        "is_expedited",
+        "is_reactivated",
+    }
+
+    timestamp_fields = {
+        "order_date",
+        "return_date",
+        "created_at",
+        "updated_at",
+        "added_at",
+        "ingestion_ts",
+    }
+
+    date_fields = {
+        "signup_date",
+        "loyalty_enrollment_date",
+    }
+
+    bronze_to_base = {
+        "String": "string",
+        "Int64": "int64",
+        "Float64": "float64",
+        "Boolean": "bool",
+    }
+
+    if args.update_contract:
+        contract_path = Path(args.update_contract)
+        contract = contract_path.read_text()
+
+        lines: list[str] = []
+        lines.append("## Observed Bronze Types vs Base Silver Targets")
+        lines.append(
+            "Bronze source fields are string-heavy (timestamps and dates are "
+            "strings). Base Silver must"
+        )
+        lines.append(
+            "explicitly cast to target types below. Use the profile report for "
+            "observed types and"
+        )
+        lines.append("validate that casts are applied in dbt-duckdb models.")
+        lines.append("")
+
+        for table in sorted(schema_by_table.keys()):
+            lines.append(f"### {table}")
+            for col, bronze_type in schema_by_table[table].items():
+                target = bronze_to_base.get(bronze_type, bronze_type.lower())
+                if col in timestamp_fields:
+                    target = "timestamp"
+                elif col in date_fields:
+                    target = "date"
+                elif col in bool_fields:
+                    target = "bool"
+                lines.append(
+                    f"- {col}: Bronze `{bronze_type.lower()}` -> Base Silver "
+                    f"`{target}`"
+                )
+            lines.append("")
+
+        new_block = "\n".join(lines).rstrip()
+        start_marker = "## Observed Bronze Types vs Base Silver Targets"
+        end_marker = "## Base Silver Tables (Required Fields)"
+        if start_marker in contract and end_marker in contract:
+            before, rest = contract.split(start_marker, 1)
+            _, after = rest.split(end_marker, 1)
+            contract = before + new_block + "\n\n" + end_marker + after
+            contract_with_meta, _ = apply_markdown_meta(contract, timestamp)
+            contract_path.write_text(contract_with_meta)
+            print(f"Updated {args.update_contract} with bronze->base mapping.")
+        else:
+            raise SystemExit("Markers not found in DATA_CONTRACT.md")
+
+    if args.data_dictionary:
+        dict_path = Path(args.data_dictionary)
+        common_desc = {
+            "order_id": "Unique order identifier.",
+            "order_date": "Timestamp when the order was placed.",
+            "order_channel": "Channel used to place the order (e.g., Web, Phone).",
+            "customer_id": "Unique customer identifier.",
+            "email": "Customer email address.",
+            "product_id": "Unique product identifier.",
+            "product_name": "Product display name.",
+            "category": "Product category.",
+            "quantity": "Quantity of items in the line.",
+            "quantity_returned": "Quantity of items returned.",
+            "unit_price": "Unit sale price.",
+            "discount_amount": "Discount amount applied.",
+            "cost_price": "Unit cost for the item.",
+            "gross_total": "Gross order total before discounts/fees.",
+            "net_total": "Net order total after discounts.",
+            "total_discount_amount": "Total discount applied to the order.",
+            "shipping_cost": "Shipping cost charged to customer.",
+            "actual_shipping_cost": "Actual shipping cost incurred.",
+            "payment_method": "Payment method used for the order.",
+            "payment_processing_fee": "Fee charged by payment processor.",
+            "shipping_speed": "Selected shipping speed.",
+            "shipping_address": "Shipping address text.",
+            "billing_address": "Billing address text.",
+            "cart_id": "Unique cart identifier.",
+            "cart_item_id": "Unique cart item identifier.",
+            "cart_total": "Total value of items in the cart.",
+            "status": "Record status or state.",
+            "created_at": "Timestamp when the record was created.",
+            "updated_at": "Timestamp when the record was last updated.",
+            "added_at": "Timestamp when the item was added.",
+            "return_id": "Unique return identifier.",
+            "return_date": "Timestamp when the return was initiated.",
+            "return_type": "Type of return (e.g., refund, exchange).",
+            "return_channel": "Channel used to process return.",
+            "refund_method": "Refund method used.",
+            "refunded_amount": "Amount refunded to the customer.",
+            "reason": "Return reason.",
+            "customer_status": "Customer lifecycle status.",
+            "signup_date": "Date when the customer signed up.",
+            "signup_channel": "Acquisition channel for the customer.",
+            "loyalty_tier": "Customer loyalty tier.",
+            "initial_loyalty_tier": "Initial loyalty tier at signup.",
+            "loyalty_enrollment_date": "Date customer enrolled in loyalty program.",
+            "clv_bucket": "Customer lifetime value bucket.",
+            "gender": "Customer gender.",
+            "age": "Customer age.",
+            "is_guest": "Whether the customer is a guest checkout.",
+            "email_verified": "Whether the email is verified.",
+            "marketing_opt_in": "Whether the customer opted into marketing.",
+            "phone_number": "Customer phone number.",
+            "agent_id": "Sales or support agent identifier.",
+            "total_items": "Count of items in the order.",
+            "inventory_quantity": "Current inventory quantity.",
+            "batch_id": "Batch identifier for ingestion run.",
+            "ingestion_ts": "Ingestion timestamp for the record.",
+            "event_id": "Unique event identifier for lineage.",
+            "source_file": "Source file path in storage.",
+            "is_expedited": "Whether expedited shipping was selected.",
+            "is_reactivated": "Whether the customer was reactivated.",
+        }
+
+        lines: list[str] = [
+            "# Data Dictionary",
+            "",
+            "Derived from the Bronze profile report and Data Contract.",
+            "",
+        ]
+
+        # Parse required fields from contract (Base Silver section)
+        required_fields: dict[str, set[str]] = {}
+        if args.update_contract:
+            contract_text = Path(args.update_contract).read_text()
+            current = None
+            in_base = False
+            for line in contract_text.splitlines():
+                if line.startswith("## Base Silver Tables (Required Fields)"):
+                    in_base = True
+                    continue
+                if in_base and line.startswith("## "):
+                    break
+                if in_base and line.startswith("### "):
+                    current = line.replace("### ", "").strip()
+                    required_fields.setdefault(current, set())
+                    continue
+                if in_base and line.startswith("- ") and current:
+                    field = line.replace("- ", "", 1).strip()
+                    if "(" in field:
+                        field = field.split("(", 1)[0].strip()
+                    required_fields[current].add(field)
+
+        for table in sorted(schema_by_table.keys()):
+            lines.append(f"## {table}")
+            lines.append("")
+            lines.append(
+                "| Column | Bronze Type | Base Silver Type | Required | Description |"
+            )
+            lines.append("| --- | --- | --- | --- | --- |")
+            for col, bronze_type in schema_by_table[table].items():
+                base_type = bronze_to_base.get(bronze_type, bronze_type.lower())
+                if col in timestamp_fields:
+                    base_type = "timestamp"
+                elif col in date_fields:
+                    base_type = "date"
+                elif col in bool_fields:
+                    base_type = "bool"
+                required_flag = (
+                    "Yes" if col in required_fields.get(table, set()) else "No"
+                )
+                desc = common_desc.get(col, "")
+                lines.append(
+                    f"| {col} | {bronze_type.lower()} | {base_type} | "
+                    f"{required_flag} | {desc} |"
+                )
+            lines.append("")
+
+        data_dictionary, _ = apply_markdown_meta("\n".join(lines), timestamp)
+        dict_path.parent.mkdir(parents=True, exist_ok=True)
+        dict_path.write_text(data_dictionary)
+        print(f"Wrote {args.data_dictionary}")
+
+    changelog_path = Path("CHANGELOG.md")
+    if changelog_path.exists():
+        scope_parts = []
+        if tables_filter:
+            scope_parts.append(f"tables={','.join(sorted(tables_filter))}")
+        if ingest_dts:
+            scope_parts.append(f"ingest_dts={','.join(sorted(ingest_dts))}")
+        if months:
+            scope_parts.append(f"months={','.join(sorted(months))}")
+        if start_date and end_date:
+            scope_parts.append(f"date_range={start_date}..{end_date}")
+        elif args.date_range:
+            scope_parts.append(f"date_range={args.date_range}")
+        scope_text = " ".join(scope_parts) if scope_parts else "scope=all"
+        changelog_line = (
+            f"- Profile report refreshed {timestamp} {scope_text} "
+            f"hash={report_hash}"
+        )
+        changelog = changelog_path.read_text()
+        marker = "## [Unreleased]"
+        if marker in changelog:
+            before, rest = changelog.split(marker, 1)
+            rest_lines = rest.splitlines()
+            if rest_lines and rest_lines[0].strip() == "":
+                rest_lines = rest_lines[1:]
+            rest_text = "\n".join(rest_lines)
+            changelog = f"{before}{marker}\n{changelog_line}\n{rest_text.lstrip()}"
+            changelog_path.write_text(changelog)
+            print("Updated CHANGELOG.md with profile report refresh.")
 
 
 if __name__ == "__main__":

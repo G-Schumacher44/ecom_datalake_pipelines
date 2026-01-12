@@ -1,0 +1,202 @@
+"""Structured logging for pipeline observability."""
+
+from __future__ import annotations
+
+import json
+import logging
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from .config import ObservabilityConfig
+
+
+class StructuredLogger:
+    """Logger that writes JSON-formatted log entries.
+
+    Supports both standard logging and JSONL (JSON Lines) files for
+    easy ingestion by log aggregation systems.
+    """
+
+    def __init__(self, name: str, config: ObservabilityConfig):
+        self.name = name
+        self.config = config
+        self.logger = logging.getLogger(name)
+
+        # Set up handlers
+        self._setup_handlers()
+
+    def _setup_handlers(self) -> None:
+        """Set up logging handlers based on environment."""
+        # Console handler (always present)
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+
+        # Use simple format for console
+        console_formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        )
+        console_handler.setFormatter(console_formatter)
+
+        self.logger.addHandler(console_handler)
+        self.logger.setLevel(logging.INFO)
+
+        # File handler for local development
+        if self.config.is_local:
+            log_dir = Path(self.config.logs_base_path) / "debug"
+            log_dir.mkdir(parents=True, exist_ok=True)
+
+            file_handler = logging.FileHandler(log_dir / f"{self.name}.log")
+            file_handler.setLevel(logging.DEBUG)
+            file_formatter = logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s"
+            )
+            file_handler.setFormatter(file_formatter)
+            self.logger.addHandler(file_handler)
+
+    def _write_jsonl(self, log_type: str, level: str, message: str, **context) -> None:
+        """Write a JSONL log entry.
+
+        Args:
+            log_type: Type of log (errors, audit, etc.)
+            level: Log level (ERROR, WARN, INFO, etc.)
+            message: Log message
+            **context: Additional context fields
+        """
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": level,
+            "component": self.name,
+            "message": message,
+            "environment": self.config.environment.value,
+            **context,
+        }
+
+        # Determine file path
+        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+        filename = f"{log_type}_{date_str}.jsonl"
+
+        if self.config.is_local:
+            # Local: Append to file
+            log_path = Path(self.config.get_logs_path(log_type)) / filename
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(log_path, "a") as f:
+                f.write(json.dumps(log_entry, default=str) + "\n")
+        else:
+            # Production: Write to GCS
+            import fsspec
+
+            log_uri = f"{self.config.get_logs_path(log_type)}/{filename}"
+            fs = fsspec.filesystem("gcs")
+
+            # Append to existing file
+            try:
+                with fs.open(log_uri, "a") as f:
+                    f.write(json.dumps(log_entry, default=str) + "\n")
+            except FileNotFoundError:
+                with fs.open(log_uri, "w") as f:
+                    f.write(json.dumps(log_entry, default=str) + "\n")
+
+    def info(self, message: str, **context) -> None:
+        """Log info message."""
+        self.logger.info(message, extra=context)
+
+    def warning(self, message: str, **context) -> None:
+        """Log warning message."""
+        self.logger.warning(message, extra=context)
+
+    def error(
+        self,
+        message: str,
+        error_type: str | None = None,
+        exc_info: bool = True,
+        **context,
+    ) -> None:
+        """Log error message and write to errors JSONL.
+
+        Args:
+            message: Error message
+            error_type: Type of error (optional)
+            exc_info: Whether to include exception info
+            **context: Additional context
+        """
+        self.logger.error(message, exc_info=exc_info, extra=context)
+
+        # Also write to structured error log
+        error_context = {"error_type": error_type, **context}
+
+        if exc_info and sys.exc_info()[0] is not None:
+            import traceback
+
+            error_context["traceback"] = traceback.format_exc()
+
+        self._write_jsonl("errors", "ERROR", message, **error_context)
+
+    def metric(self, metric_name: str, value: Any, **tags) -> None:
+        """Log a metric value.
+
+        Args:
+            metric_name: Name of the metric
+            value: Metric value
+            **tags: Additional tags/dimensions
+        """
+        message = f"{metric_name}={value}"
+        self.logger.info(
+            message,
+            extra={"metric_name": metric_name, "value": value, **tags},
+        )
+
+        # Write to audit log
+        self._write_jsonl(
+            "audit",
+            "INFO",
+            message,
+            metric_name=metric_name,
+            value=value,
+            **tags,
+        )
+
+
+# Global logger cache
+_loggers: dict[str, StructuredLogger] = {}
+
+
+def get_logger(name: str) -> StructuredLogger:
+    """Get or create a structured logger.
+
+    Args:
+        name: Logger name (usually __name__)
+
+    Returns:
+        StructuredLogger instance
+    """
+    if name not in _loggers:
+        config = ObservabilityConfig.from_env()
+        _loggers[name] = StructuredLogger(name, config)
+    return _loggers[name]
+
+
+def log_metric(metric_name: str, value: Any, **tags) -> None:
+    """Convenience function to log a metric.
+
+    Args:
+        metric_name: Name of the metric
+        value: Metric value
+        **tags: Additional tags/dimensions
+    """
+    logger = get_logger("metrics")
+    logger.metric(metric_name, value, **tags)
+
+
+def log_error(message: str, error_type: str | None = None, **context) -> None:
+    """Convenience function to log an error.
+
+    Args:
+        message: Error message
+        error_type: Type of error
+        **context: Additional context
+    """
+    logger = get_logger("errors")
+    logger.error(message, error_type=error_type, **context)

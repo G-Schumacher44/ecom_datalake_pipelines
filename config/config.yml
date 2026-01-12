@@ -1,13 +1,37 @@
 pipeline:
+  # GCP Configuration
   project_id: "your-gcp-project"
-  bronze_bucket: "acme-analytics-raw"
-  bronze_prefix: "ecom/raw"
-  silver_bucket: "acme-analytics-silver"
-  silver_base_prefix: "ecom/base"
-  silver_enriched_prefix: "ecom/enriched"
+
+  # Data Lake Buckets (use "local" for local filesystem)
+  bronze_bucket: "local"
+  bronze_prefix: "samples/bronze"
+  silver_bucket: "local"
+  silver_base_prefix: "data/silver/base"
+  silver_enriched_prefix: "data/silver/enriched"
+
+  # BigQuery Datasets
   bigquery_dataset: "silver"
   gold_dataset: "gold_marts"
+
+  # Observability & Metrics
+  # Environment: local (default), dev, or prod
+  # - local: Writes to ./data/metrics/ and ./data/logs/
+  # - dev/prod: Writes to GCS buckets below
+  environment: "local"
+  metrics_bucket: "ecom-datalake-metrics"
+  logs_bucket: "ecom-datalake-logs"
+
+  # Business Logic Configuration
   default_ingest_dt: "2020-01-01"
   attribution_tolerance_hours: 48
   churn_danger_window_days: [30, 90]
   sales_velocity_window_days: 7
+  sla_thresholds:
+    orders: 0.95
+    customers: 0.98
+    product_catalog: 0.99
+    shopping_carts: 0.95
+    cart_items: 0.95
+    order_items: 0.95
+    returns: 0.95
+    return_items: 0.95

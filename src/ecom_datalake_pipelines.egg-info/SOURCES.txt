@@ -10,6 +10,11 @@ src/ecom_datalake_pipelines.egg-info/requires.txt
 src/ecom_datalake_pipelines.egg-info/top_level.txt
 src/observability/__init__.py
 src/observability/audit.py
+src/observability/config.py
+src/observability/metrics.py
+src/observability/structured_logging.py
+src/runners/__init__.py
+src/runners/enriched_silver.py
 src/transforms/__init__.py
 src/transforms/cart_attribution.py
 src/transforms/churn_detection.py
@@ -17,4 +22,6 @@ src/transforms/inventory_risk.py
 src/transforms/regional_financials.py
 src/transforms/sales_velocity.py
 src/validation/__init__.py
+src/validation/quality.py
 src/validation/schemas.py
+src/validation/silver_quality.py
