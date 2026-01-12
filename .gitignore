@@ -8,14 +8,24 @@ __pycache__/
 
 .venv/
 .conda/
-
+.vscode/*
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
 samples/
 
+docs/local_only/*
+
 logs/
+
+# Local data and metrics (ephemeral - don't commit)
+data/metrics/
+data/logs/
+data/silver/
+
+# BUT DO commit validation reports (self-documenting)
+!docs/validation_reports/*.md
 
 # dbt
 dbt_packages/

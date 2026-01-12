@@ -1,10 +1,19 @@
 polars>=0.20.0
+pyarrow>=15.0.0
 pydantic>=2.6.0
 pydantic-settings>=2.2.0
 pyyaml>=6.0.1
-pyarrow>=15.0.0
 fsspec>=2024.2.0
 gcsfs>=2024.2.0
+dbt-core>=1.7.0
+dbt-duckdb>=1.7.0
+
+[airflow]
+apache-airflow>=2.8.0
+apache-airflow-providers-google>=10.15.0
+
+[all]
+ecom-datalake-pipelines[airflow,dev]
 
 [dev]
 black>=24.2.0

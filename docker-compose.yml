@@ -1,16 +1,58 @@
 version: "3.8"
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.3
+  # Use custom image with pipeline dependencies baked in
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: ecom-datalake-pipeline:latest
   environment:
+    # Airflow Core Config
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+
+    # Pipeline Environment (local, dev, prod)
+    PIPELINE_ENV: "${PIPELINE_ENV:-local}"
+
+    # GCP Configuration (optional - only needed for prod/dev with GCS/BigQuery)
+    GOOGLE_CLOUD_PROJECT: "${GOOGLE_CLOUD_PROJECT:-}"
+    GCS_BUCKET: "${GCS_BUCKET:-}"
+    BQ_LOCATION: "${BQ_LOCATION:-US}"
+
+    # Path Overrides (optional - uses config.yml defaults if not set)
+    BRONZE_BASE_PATH: "${BRONZE_BASE_PATH:-samples/bronze}"
+    SILVER_BASE_PATH: "${SILVER_BASE_PATH:-data/silver/base}"
+    SILVER_ENRICHED_PATH: "${SILVER_ENRICHED_PATH:-data/silver/enriched}"
+
+    # Feature Flags
+    GOLD_PIPELINE_ENABLED: "${GOLD_PIPELINE_ENABLED:-false}"
+    BRONZE_QA_REQUIRED: "${BRONZE_QA_REQUIRED:-true}"
+    BRONZE_QA_FAIL: "${BRONZE_QA_FAIL:-false}"
+
   volumes:
+    # Mount DAGs for live reload during development
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
+
+    # Mount data directories for local runs
+    - ./samples:/opt/airflow/samples
+    - ./data:/opt/airflow/data
+    - ./docs:/opt/airflow/docs
+
+    # Mount source code for development (optional - can remove in prod)
+    # Uncomment these to enable live code reload without rebuilding image:
+    # - ./src:/opt/airflow/src
+    # - ./config:/opt/airflow/config
+    # - ./dbt_duckdb:/opt/airflow/dbt_duckdb
+    # - ./dbt_bigquery:/opt/airflow/dbt_bigquery
+
+    # Mount GCP credentials (if using service account auth)
+    # - ~/.config/gcloud:/home/airflow/.config/gcloud:ro
+    # - ./service-account-key.json:/opt/airflow/service-account-key.json:ro
+
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     - postgres

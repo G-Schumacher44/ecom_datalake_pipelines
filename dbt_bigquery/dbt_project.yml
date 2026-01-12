@@ -16,3 +16,4 @@ models:
       +materialized: table
     gold_marts:
       +materialized: table
+      +tags: ["gold"]

@@ -4,5 +4,5 @@ select
   sum(rf.total_price) as gross_revenue,
   sum(rf.tax_amount) as tax_amount,
   sum(rf.net_revenue) as net_revenue
-from {{ ref('int_regional_financials') }} rf
+from {{ source('silver', 'int_regional_financials') }} rf
 group by 1, 2

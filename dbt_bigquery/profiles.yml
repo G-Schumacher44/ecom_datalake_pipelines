@@ -3,9 +3,8 @@ ecom_dbt_bigquery:
   outputs:
     dev:
       type: bigquery
-      method: service-account
-      keyfile: "path/to/keyfile.json"
-      project: "your-gcp-project"
+      method: oauth
+      project: "gcs-automation-project"
       dataset: "silver"
       threads: 4
       location: "US"

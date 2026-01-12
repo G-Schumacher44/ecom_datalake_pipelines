@@ -4,20 +4,39 @@ sources:
   - name: bronze
     meta:
       owner: "data-eng"
+    freshness:
+      warn_after: {count: 2, period: hour}
+      error_after: {count: 24, period: hour}
     tables:
       - name: orders
-        external_location: "{{ var('bronze_base_path') }}/orders/*.parquet"
+        external:
+          location: "{{ var('bronze_base_path') }}/orders/ingest_dt=*/part-*.parquet"
+        loaded_at_field: ingestion_ts
       - name: order_items
-        external_location: "{{ var('bronze_base_path') }}/order_items/*.parquet"
+        external:
+          location: "{{ var('bronze_base_path') }}/order_items/ingest_dt=*/part-*.parquet"
+        loaded_at_field: ingestion_ts
       - name: customers
-        external_location: "{{ var('bronze_base_path') }}/customers/*.parquet"
+        external:
+          location: "{{ var('bronze_base_path') }}/customers/signup_date=*/part-*.parquet"
+        loaded_at_field: ingestion_ts
       - name: shopping_carts
-        external_location: "{{ var('bronze_base_path') }}/shopping_carts/*.parquet"
+        external:
+          location: "{{ var('bronze_base_path') }}/shopping_carts/ingest_dt=*/part-*.parquet"
+        loaded_at_field: ingestion_ts
       - name: cart_items
-        external_location: "{{ var('bronze_base_path') }}/cart_items/*.parquet"
+        external:
+          location: "{{ var('bronze_base_path') }}/cart_items/ingest_dt=*/part-*.parquet"
+        loaded_at_field: ingestion_ts
       - name: returns
-        external_location: "{{ var('bronze_base_path') }}/returns/*.parquet"
+        external:
+          location: "{{ var('bronze_base_path') }}/returns/ingest_dt=*/part-*.parquet"
+        loaded_at_field: ingestion_ts
       - name: return_items
-        external_location: "{{ var('bronze_base_path') }}/return_items/*.parquet"
+        external:
+          location: "{{ var('bronze_base_path') }}/return_items/ingest_dt=*/part-*.parquet"
+        loaded_at_field: ingestion_ts
       - name: product_catalog
-        external_location: "{{ var('bronze_base_path') }}/product_catalog/*.parquet"
+        external:
+          location: "{{ var('bronze_base_path') }}/product_catalog/category=*/*.parquet"
+        loaded_at_field: ingestion_ts

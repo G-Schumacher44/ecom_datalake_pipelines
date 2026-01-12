@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 
 def require_columns(columns: Iterable[str], required: Iterable[str]) -> list[str]:
@@ -31,11 +31,11 @@ def enforce_non_null(df, columns: Iterable[str]):
 
 def validate_table(df, config: dict[str, object]) -> list[str]:
     failures: list[str] = []
-    required = config.get("required_columns", [])
+    required = cast(Iterable[str], config.get("required_columns", []))
     missing = require_columns(df.columns, required)
     if missing:
         failures.append(f"missing_required_columns: {missing}")
-    primary_key = config.get("primary_key", [])
+    primary_key = list(cast(Iterable[str], config.get("primary_key", [])))
     if primary_key:
         missing_pk = require_columns(df.columns, primary_key)
         if missing_pk:
@@ -47,7 +47,13 @@ def validate_table(df, config: dict[str, object]) -> list[str]:
     return failures
 
 
-def split_fk(df, column: str, ref_df, ref_col: str, allow_prefixes: Iterable[str] | None = None):
+def split_fk(
+    df,
+    column: str,
+    ref_df,
+    ref_col: str,
+    allow_prefixes: Iterable[str] | None = None,
+):
     if ref_df is None or column not in df.columns or ref_col not in ref_df.columns:
         return df, df.iloc[0:0]
     mask = df[column].isin(ref_df[ref_col])
@@ -66,7 +72,9 @@ def evaluate_expectations(df, expectations: Iterable[dict[str, Any]]) -> list[st
             if columns:
                 nulls = int(df[columns].isna().any(axis=1).sum())
                 if nulls > 0:
-                    failures.append(f"expect_not_null_failed: {columns} null_rows={nulls}")
+                    failures.append(
+                        f"expect_not_null_failed: {columns} null_rows={nulls}"
+                    )
         elif exp_type == "unique":
             columns = [col for col in exp.get("columns", []) if col in df.columns]
             if columns:
@@ -82,11 +90,15 @@ def evaluate_expectations(df, expectations: Iterable[dict[str, Any]]) -> list[st
                 if min_val is not None:
                     below = int((series < min_val).sum())
                     if below > 0:
-                        failures.append(f"expect_between_failed: {column} below_min={below}")
+                        failures.append(
+                            f"expect_between_failed: {column} below_min={below}"
+                        )
                 if max_val is not None:
                     above = int((series > max_val).sum())
                     if above > 0:
-                        failures.append(f"expect_between_failed: {column} above_max={above}")
+                        failures.append(
+                            f"expect_between_failed: {column} above_max={above}"
+                        )
         elif exp_type == "in_set":
             column = exp.get("column")
             allowed = set(exp.get("allowed", []))

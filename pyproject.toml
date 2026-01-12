@@ -9,13 +9,22 @@ authors = [
   {name = "Garrett Schumacher"}
 ]
 dependencies = [
+  # Core data processing
   "polars>=0.20.0",
+  "pyarrow>=15.0.0",
+
+  # Configuration & validation
   "pydantic>=2.6.0",
   "pydantic-settings>=2.2.0",
   "pyyaml>=6.0.1",
-  "pyarrow>=15.0.0",
+
+  # File system access (local + GCS)
   "fsspec>=2024.2.0",
   "gcsfs>=2024.2.0",
+
+  # dbt & database
+  "dbt-core>=1.7.0",
+  "dbt-duckdb>=1.7.0",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +36,17 @@ dev = [
   "pylint>=3.1.0",
   "pytest>=8.0.0",
   "pre-commit>=3.6.0",
+  "types-PyYAML>=6.0.0",
+]
+
+airflow = [
+  "apache-airflow>=2.8.0",
+  "apache-airflow-providers-google>=10.15.0",
+]
+
+# All optional dependencies for full pipeline
+all = [
+  "ecom-datalake-pipelines[dev,airflow]",
 ]
 
 [tool.black]
@@ -39,13 +59,17 @@ line_length = 88
 
 [tool.ruff]
 line-length = 88
-select = ["E", "F", "I", "B"]
+lint.select = ["E", "F", "I", "B"]
 
 [tool.mypy]
 python_version = "3.12"
 warn_redundant_casts = true
 warn_unused_ignores = true
 no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["fsspec", "pyarrow", "pyarrow.parquet", "pyarrow.lib", "yaml"]
+ignore_missing_imports = true
 
 [tool.pylint.main]
 py-version = "3.12"
