@@ -11,6 +11,11 @@ Comprehensive metrics collection and structured logging for the e-commerce data 
 - **Structured Logging**: JSONL (JSON Lines) logs for aggregation systems
 - **Type-Safe**: Full type hints for IDE autocomplete
 - **Zero Configuration**: Works out of the box in local mode
+- **Run Context**: Auto-binds `run_id`, `dag_id`, and `task_id` from Airflow env vars
+
+**Portfolio note:** Metrics are stored as JSON artifacts; in production you would
+also emit key metrics to a time-series backend (Prometheus/StatsD/Cloud Monitoring)
+for alerting.
 
 ## Directory Structure
 
@@ -183,6 +188,10 @@ except Exception as e:
 # Metric logging
 logger.metric("rows_processed", 1000000, table="orders", phase="silver")
 ```
+
+**Production note:** GCS is append-unfriendly, so logs are written as small, unique
+JSONL objects per event in dev/prod. In real deployments, prefer stdout logging
+with a collector (Cloud Logging/Datadog).
 
 ### 4. Convenience Functions
 

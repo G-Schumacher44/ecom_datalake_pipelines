@@ -13,40 +13,55 @@ RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
     lsb-release \
+    && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-    | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-    | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
+    | tee /etc/apt/sources.list.d/google-cloud-sdk.list \
     && apt-get update \
     && apt-get install -y google-cloud-sdk \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Switch back to airflow user
+ENV PATH="/home/airflow/.local/bin:${PATH}"
 USER airflow
 
 # Set working directory
 WORKDIR /opt/airflow
 
 # Copy dependency files first (for layer caching)
-COPY --chown=airflow:root pyproject.toml ./
+COPY --chown=airflow:root pyproject.toml constraints.txt ./
+COPY --chown=airflow:root src/ ./src/
+COPY --chown=airflow:root config/ ./config/
+COPY --chown=airflow:root airflow/dags/ ./dags/
+COPY --chown=airflow:root samples/ ./samples/
+COPY --chown=airflow:root docs/ ./docs/
+COPY --chown=airflow:root scripts/ ./scripts/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    # Install core dependencies
-    pip install --no-cache-dir -e ".[airflow]" && \
-    # Install dbt packages for BigQuery (prod) and DuckDB (local)
-    pip install --no-cache-dir dbt-bigquery>=1.7.0
+    # Install core dependencies with constraints for deterministic builds
+    pip install --no-cache-dir -c constraints.txt -e ".[airflow,dbt]" && \
+    dbt --version
 
 # Copy application code
-COPY --chown=airflow:root src/ ./src/
-COPY --chown=airflow:root config/ ./config/
 COPY --chown=airflow:root dbt_duckdb/ ./dbt_duckdb/
 COPY --chown=airflow:root dbt_bigquery/ ./dbt_bigquery/
+
+# Samples are mounted at runtime via docker-compose (not baked into image)
+# This avoids macOS Docker build context timeout issues with many small files
 
 # Install dbt dependencies (dbt-utils, etc.)
 RUN cd dbt_duckdb && dbt deps --project-dir . --profiles-dir . && \
     cd ../dbt_bigquery && dbt deps --project-dir . --profiles-dir .
+
+# Switch to root to create global symlinks (fixes PATH/Entrypoint issues)
+USER root
+RUN ln -s /home/airflow/.local/bin/airflow /usr/local/bin/airflow && \
+    ln -s /home/airflow/.local/bin/dbt /usr/local/bin/dbt
+
+# Switch back to airflow user for safety
+USER airflow
 
 # Create necessary directories for local runs
 RUN mkdir -p \

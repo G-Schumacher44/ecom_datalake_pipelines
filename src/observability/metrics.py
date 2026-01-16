@@ -228,7 +228,7 @@ def write_data_quality_metric(
 
 
 def write_silver_quality_metric(
-    run_id: str, table_metrics: list[dict], overall_status: str
+    run_id: str, table_metrics: list[dict], overall_status: str, **extra_fields
 ) -> str:
     """Write Silver layer quality metrics.
 
@@ -248,6 +248,27 @@ def write_silver_quality_metric(
             "run_id": run_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "dbt_project_version": "0.1.0",  # TODO: Read from dbt_project.yml
+            **extra_fields,
+        },
+        "table_metrics": table_metrics,
+        "overall_status": overall_status,
+    }
+
+    return writer.write_metric(data, run_id=run_id)
+
+
+def write_enriched_quality_metric(
+    run_id: str, table_metrics: list[dict], overall_status: str, **extra_fields
+) -> str:
+    """Write Enriched Silver layer quality metrics."""
+    config = ObservabilityConfig.from_env()
+    writer = MetricsWriter(config, MetricType.ENRICHED_SILVER.value)
+
+    data = {
+        "transformation_metadata": {
+            "run_id": run_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **extra_fields,
         },
         "table_metrics": table_metrics,
         "overall_status": overall_status,

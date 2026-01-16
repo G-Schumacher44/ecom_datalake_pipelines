@@ -68,7 +68,7 @@ ___
    dbt build --target dev
 
    # Enriched Silver (Polars)
-   python src/runners/enriched_silver.py --partition 2020-01-01
+   python scripts/run_enriched_all_samples.py --base-path data/silver/base --output-path data/silver/enriched
 
    # Gold marts (BigQuery)
    cd dbt_bigquery
@@ -101,6 +101,15 @@ ___
 
 ### 🧭 Orientation & Getting Started
 
+<details><summary><strong>⚠️ Limitations & Constraints (Portfolio Scope)</strong></summary>
+<br>
+
+- **DuckDB single-writer**: Base Silver runs as a single dbt task to avoid file locks. In a warehouse-backed prod setup, split into per-model tasks for retries and observability.
+- **GCS sync idempotency**: `gsutil rsync` is not atomic. For production, sync to a staging prefix and publish via manifest or versioned run folder.
+- **Batch-only assumptions**: The pipeline expects static Bronze partitions per run. Streaming/async ingestion could introduce "ghost" FK misses unless you snapshot or pin partitions.
+
+</details>
+
 <details>
 <summary><strong>🧠 Notes from the Dev Team</strong></summary>
 <br>
@@ -109,7 +118,7 @@ This pipeline was built to showcase end-to-end lakehouse best practices for port
 
 Everything is designed for modularity and reusability: swap out buckets, adjust partition keys, or replace transformation engines—no rewrites needed. Data contracts define expectations, quality gates enforce them, and audit trails ensure visibility into every transformation.
 
-**Self-Documenting Profiling System**: One of the coolest features is the Bronze profiling script that doesn't just analyze data—it auto-generates documentation artifacts. Point it at your Bronze samples and it produces a comprehensive quality report, schema drift detection, a JSON schema map for programmatic use, updates your data contract with observed types, and even generates a data dictionary with field descriptions. Run it once and get your entire Bronze layer documented with real stats—no manual spreadsheet work required.
+**Self-Documenting Profiling System**: The Bronze profiling script doesn't just analyze data—it auto-generates documentation artifacts. Point it at your Bronze samples and it produces a comprehensive quality report, schema drift detection, a JSON schema map for programmatic use, updates your data contract with observed types, and even generates a data dictionary with field descriptions. Run it once and get your entire Bronze layer documented with real stats—no manual spreadsheet work required.
 
 </details>
 
@@ -121,16 +130,16 @@ Everything is designed for modularity and reusability: swap out buckets, adjust 
 - **Planning & Architecture**
   - [Silver Transformation Plan](docs/planning/SILVER_PLAN.md)
   - [Silver Framework Overview](docs/planning/SILVER_FRAMEWORK.md)
-  - [Data Contract (Bronze → Silver)](docs/planning/DATA_CONTRACT.md)
-  - [Data Dictionary](docs/planning/DATA_DICTIONARY.md)
+  - [Data Contract (Bronze → Silver)](docs/resources/DATA_CONTRACT.md)
+  - [Data Dictionary](docs/data/DATA_DICTIONARY.md)
   - [SLA & Quality Gates](docs/planning/SLA_AND_QUALITY.md)
   - [Audit Schema](docs/planning/AUDIT_SCHEMA.md)
 - **Testing & Operations**
   - [Testing Runbook](docs/planning/TESTING_RUNBOOK.md)
   - [BigQuery Migration Guide](docs/planning/BQ_MIGRATION.md)
 - **Sample Artifacts**
-  - [Bronze Profile Report](docs/planning/BRONZE_PROFILE_REPORT.md)
-  - [Bronze Schema Map](docs/planning/BRONZE_SCHEMA_MAP.json)
+  - [Bronze Profile Report](docs/data/BRONZE_PROFILE_REPORT.md)
+  - [Bronze Schema Map](docs/data/BRONZE_SCHEMA_MAP.json)
 
 </details>
 
@@ -166,7 +175,6 @@ This repository is part of a larger data engineering portfolio demonstrating end
 - 🚧 dbt-bigquery Gold mart aggregations (planned)
 - 🚧 Airflow DAG orchestration (planned)
 - 🚧 Audit record loading and SLA dashboards (planned)
-
 </details>
 
 <details>
@@ -178,6 +186,10 @@ This repository is part of a larger data engineering portfolio demonstrating end
 - **CI/CD for dbt**: Automated testing, schema validation, and deployment via GitHub Actions.
 - **dbt docs hosting**: Publish dbt lineage graphs and data dictionary to GitHub Pages.
 - **Cost optimization**: Partition pruning, clustering, and query optimization for BigQuery.
+- **Per-model orchestration**: Replace the DuckDB single-task run with per-model dbt tasks when using BigQuery/Snowflake.
+- **Atomic GCS publishes**: Add a staging + manifest publish step for GCS syncs.
+- **Validation severity**: Introduce warn vs drop semantics in enriched data quality checks.
+- **Workload Identity**: Document and optionally wire production-grade auth (GKE/Composer/Cloud Run).
 
 </details>
 
@@ -328,18 +340,18 @@ python scripts/describe_parquet_samples.py --tables orders,customers --months 20
 # Generate schema JSON map for programmatic use
 python scripts/describe_parquet_samples.py \
   --date-range 2020-01-01..2020-12-31 \
-  --schema-json docs/planning/BRONZE_SCHEMA_MAP.json
+  --schema-json docs/data/BRONZE_SCHEMA_MAP.json
 
 # Auto-update data contract with observed Bronze → Silver type mappings
 python scripts/describe_parquet_samples.py \
   --date-range 2020-01-01..2020-12-31 \
-  --update-contract docs/planning/DATA_CONTRACT.md
+  --update-contract docs/resources/DATA_CONTRACT.md
 
 # Generate data dictionary with field descriptions
 python scripts/describe_parquet_samples.py \
   --date-range 2020-01-01..2020-12-31 \
-  --data-dictionary docs/planning/DATA_DICTIONARY.md \
-  --update-contract docs/planning/DATA_CONTRACT.md
+  --data-dictionary docs/data/DATA_DICTIONARY.md \
+  --update-contract docs/resources/DATA_CONTRACT.md
 ```
 
 **Outputs**: Quality report (markdown), schema map (JSON), updated data contract, and data dictionary—all generated from real data, no manual editing required.
@@ -357,9 +369,9 @@ dbt deps
 dbt build --target dev --select base_silver.*
 
 # Enriched Silver (Polars runners)
-python src/runners/enriched_silver.py \
-  --partition 2020-01-01 \
-  --transforms customer_cohorts,product_velocity
+python scripts/run_enriched_all_samples.py \
+  --base-path data/silver/base \
+  --output-path data/silver/enriched
 
 # Gold marts (BigQuery)
 cd dbt_bigquery
@@ -517,13 +529,13 @@ ___
   &nbsp;·&nbsp;
   <a href="docs/planning/SILVER_PLAN.md">🗺️ <b>Architecture</b></a>
   &nbsp;·&nbsp;
-  <a href="docs/planning/DATA_CONTRACT.md">📋 <b>Data Contract</b></a>
+  <a href="docs/resources/DATA_CONTRACT.md">📋 <b>Data Contract</b></a>
   &nbsp;·&nbsp;
   <a href="docs/planning/TESTING_RUNBOOK.md">🧪 <b>Testing</b></a>
   &nbsp;·&nbsp;
-  <a href="docs/planning/BRONZE_PROFILE_REPORT.md">📊 <b>Bronze Profile</b></a>
+  <a href="docs/data/BRONZE_PROFILE_REPORT.md">📊 <b>Bronze Profile</b></a>
   &nbsp;·&nbsp;
-  <a href="docs/planning/DATA_DICTIONARY.md">📖 <b>Data Dictionary</b></a>
+  <a href="docs/data/DATA_DICTIONARY.md">📖 <b>Data Dictionary</b></a>
 </p>
 
 <p align="center">

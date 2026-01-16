@@ -29,9 +29,14 @@ src/
     sales_velocity.py
     regional_financials.py
   runners/                 # I/O wrappers (read GCS → transform → write GCS)
-    enriched_silver.py
+    enriched/
+      commerce.py
+      customer.py
+      finance.py
+      ops.py
+      shared.py
   validation/
-    schemas.py
+    base_silver_schemas.py
   observability/
     audit.py
 
@@ -50,7 +55,7 @@ dbt_bigquery/
 - Output tables remain 1:1 with bronze entities.
 
 ## Enriched Silver (Polars Runners)
-- Python runner scripts in `src/runners/enriched_silver.py` read Base Silver parquet from GCS.
+- Domain runner scripts in `src/runners/enriched/` read Base Silver parquet from GCS.
 - Enrichment logic lives in `src/transforms/` (pure functions, no I/O).
 - Runners write Enriched Silver parquet to GCS.
 - Output tables are business-aligned (attribution, risk, retention, velocity).
@@ -58,7 +63,7 @@ dbt_bigquery/
 
 ## Validation and Quality
 - Pydantic schemas in `src/validation/schemas.py` validate key fields.
-- SLA and quality thresholds live in `docs/planning/planning/SLA_AND_QUALITY.md`.
+- SLA and quality thresholds live in `docs/planning/SLA_AND_QUALITY.md`.
 - Audit logs written via `src/observability/audit.py`.
 
 ## Outputs
@@ -67,6 +72,6 @@ dbt_bigquery/
 - Audit logs: `gs://<silver-bucket>/silver/ecom/_audit/run_id=.../summary.json`
 
 ## Notes
-- Keep table list aligned with `docs/planning/planning/DATA_CONTRACT.md`.
-- Keep quality checks aligned with `docs/planning/planning/SLA_AND_QUALITY.md`.
+- Keep table list aligned with `docs/resources/DATA_CONTRACT.md`.
+- Keep quality checks aligned with `docs/planning/SLA_AND_QUALITY.md`.
 - dbt lineage covers both Base and Enriched Silver outputs.

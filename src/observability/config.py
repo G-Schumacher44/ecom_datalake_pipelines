@@ -55,12 +55,17 @@ class ObservabilityConfig:
             config_env = settings.pipeline.environment
             config_metrics_bucket = settings.pipeline.metrics_bucket
             config_logs_bucket = settings.pipeline.logs_bucket
-        except Exception:
-            # Config file not found or invalid - use defaults
-            pass
-
+        except Exception as exc:
+                    # Fallback to local defaults if config.yml is missing or invalid
+                    import sys
+                    print(f"WARNING: Observability falling back to defaults. Reason: {exc}", file=sys.stderr)
+                    pass
         # Environment variable overrides config file
-        env_str = os.getenv("PIPELINE_ENV", config_env).lower()
+        env_override = os.getenv("OBSERVABILITY_ENV")
+        if env_override:
+            env_str = env_override.lower()
+        else:
+            env_str = os.getenv("PIPELINE_ENV", config_env).lower()
         environment = Environment(env_str)
 
         # In production, use GCS buckets
@@ -82,14 +87,16 @@ class ObservabilityConfig:
     def metrics_base_path(self) -> str:
         """Base path for metrics storage."""
         if self.environment == Environment.LOCAL:
-            return str(self.project_root / "data" / "metrics")
+            # Use /tmp in Docker to avoid macOS bind mount Errno 35 locking issues
+            return os.getenv("METRICS_BASE_PATH", str(self.project_root / "data" / "metrics"))
         return f"gs://{self.metrics_bucket}/pipeline_metrics"
 
     @property
     def logs_base_path(self) -> str:
         """Base path for logs storage."""
         if self.environment == Environment.LOCAL:
-            return str(self.project_root / "data" / "logs")
+            # Use /tmp in Docker to avoid macOS bind mount Errno 35 locking issues
+            return os.getenv("LOGS_BASE_PATH", str(self.project_root / "data" / "logs"))
         return f"gs://{self.logs_bucket}/pipeline_logs"
 
     def get_metrics_path(self, metric_type: str) -> str:

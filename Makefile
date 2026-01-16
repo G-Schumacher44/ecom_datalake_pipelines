@@ -4,6 +4,9 @@
 
 .PHONY: help build up down restart logs shell test lint format type-check clean
 .PHONY: dbt-deps dbt-build dbt-test local-silver push-image
+.PHONY: strict-mode easy-mode run-sample run-sample-strict run-sample-bq backfill-easy backfill-strict run-dims backfill-dims
+
+RUN_ID_OPT = $(if $(RUN_ID),--run-id $(RUN_ID),)
 
 # Default target
 help:
@@ -32,6 +35,17 @@ help:
 	@echo ""
 	@echo "Deployment:"
 	@echo "  make push-image  - Build and push to Artifact Registry (set PROJECT_ID)"
+	@echo ""
+	@echo "Pipeline Runs:"
+	@echo "  make strict-mode - Restart Airflow in strict validation mode (prod-like)"
+	@echo "  make easy-mode   - Restart Airflow in easy validation mode (local)"
+	@echo "  make run-sample DATE=YYYY-MM-DD        - Trigger DAG for a single date"
+	@echo "  make run-sample-strict DATE=YYYY-MM-DD - Strict run + single date trigger"
+	@echo "  make run-sample-bq DATE=YYYY-MM-DD     - Enable BQ load + single date trigger"
+	@echo "  make run-dims DATE=YYYY-MM-DD          - Trigger dimension refresh DAG"
+	@echo "  make backfill-dims START=YYYY-MM-DD END=YYYY-MM-DD - Backfill dimension refresh DAG"
+	@echo "  make backfill-easy START=YYYY-MM-DD END=YYYY-MM-DD   - Backfill in easy mode"
+	@echo "  make backfill-strict START=YYYY-MM-DD END=YYYY-MM-DD - Backfill in strict mode"
 	@echo ""
 	@echo "Access Airflow UI: http://localhost:8080 (airflow/airflow)"
 
@@ -70,6 +84,101 @@ clean:
 		docker rmi ecom-datalake-pipeline:latest 2>/dev/null || true; \
 		echo "Cleanup complete!"; \
 	fi
+
+# ==============================================================================
+# Pipeline Runs
+# ==============================================================================
+
+strict-mode:
+	PIPELINE_ENV=prod \
+	OBSERVABILITY_ENV=local \
+	BRONZE_QA_FAIL=true \
+	BQ_LOAD_ENABLED=false \
+	GOLD_PIPELINE_ENABLED=false \
+	docker-compose up -d --force-recreate airflow-scheduler airflow-webserver
+
+easy-mode:
+	PIPELINE_ENV=local \
+	BRONZE_QA_FAIL=false \
+	BQ_LOAD_ENABLED=false \
+	GOLD_PIPELINE_ENABLED=false \
+	docker-compose up -d --force-recreate airflow-scheduler airflow-webserver
+
+run-sample:
+ifndef DATE
+	@echo "ERROR: DATE not set. Usage: make run-sample DATE=YYYY-MM-DD"
+	@exit 1
+endif
+	docker-compose exec airflow-scheduler \
+		airflow dags trigger ecom_silver_to_gold_pipeline --exec-date $(DATE) $(RUN_ID_OPT)
+
+run-sample-strict: strict-mode run-sample
+
+run-sample-bq:
+ifndef DATE
+	@echo "ERROR: DATE not set. Usage: make run-sample-bq DATE=YYYY-MM-DD"
+	@exit 1
+endif
+ifndef GOOGLE_CLOUD_PROJECT
+	@echo "ERROR: GOOGLE_CLOUD_PROJECT not set"
+	@exit 1
+endif
+ifndef GCS_BUCKET
+	@echo "ERROR: GCS_BUCKET not set"
+	@exit 1
+endif
+	PIPELINE_ENV=prod \
+	OBSERVABILITY_ENV=local \
+	BRONZE_QA_FAIL=true \
+	BQ_LOAD_ENABLED=true \
+	GOLD_PIPELINE_ENABLED=false \
+	docker-compose up -d --force-recreate airflow-scheduler airflow-webserver
+	docker-compose exec airflow-scheduler \
+		airflow dags trigger ecom_silver_to_gold_pipeline --exec-date $(DATE)
+
+run-dims:
+ifndef DATE
+	@echo "ERROR: DATE not set. Usage: make run-dims DATE=YYYY-MM-DD"
+	@exit 1
+endif
+	docker-compose exec airflow-scheduler \
+		airflow dags trigger ecom_dim_refresh_pipeline --exec-date $(DATE) $(RUN_ID_OPT)
+
+backfill-dims:
+ifndef START
+	@echo "ERROR: START not set. Usage: make backfill-dims START=YYYY-MM-DD END=YYYY-MM-DD"
+	@exit 1
+endif
+ifndef END
+	@echo "ERROR: END not set. Usage: make backfill-dims START=YYYY-MM-DD END=YYYY-MM-DD"
+	@exit 1
+endif
+	docker-compose exec airflow-scheduler \
+		airflow dags backfill ecom_dim_refresh_pipeline -s $(START) -e $(END)
+
+backfill-easy: easy-mode
+ifndef START
+	@echo "ERROR: START not set. Usage: make backfill-easy START=YYYY-MM-DD END=YYYY-MM-DD"
+	@exit 1
+endif
+ifndef END
+	@echo "ERROR: END not set. Usage: make backfill-easy START=YYYY-MM-DD END=YYYY-MM-DD"
+	@exit 1
+endif
+	docker-compose exec airflow-scheduler \
+		airflow dags backfill ecom_silver_to_gold_pipeline -s $(START) -e $(END)
+
+backfill-strict: strict-mode
+ifndef START
+	@echo "ERROR: START not set. Usage: make backfill-strict START=YYYY-MM-DD END=YYYY-MM-DD"
+	@exit 1
+endif
+ifndef END
+	@echo "ERROR: END not set. Usage: make backfill-strict START=YYYY-MM-DD END=YYYY-MM-DD"
+	@exit 1
+endif
+	docker-compose exec airflow-scheduler \
+		airflow dags backfill ecom_silver_to_gold_pipeline -s $(START) -e $(END)
 
 # ==============================================================================
 # Testing & Code Quality

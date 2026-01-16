@@ -1,0 +1,498 @@
+# Deployment Guide
+
+Complete guide for deploying the e-commerce data pipeline in containerized environments.
+
+## Limitations & Constraints (Portfolio Scope)
+
+- **DuckDB single-writer**: Base Silver runs as a single dbt task to avoid file locks. In a warehouse-backed prod setup, split into per-model tasks for retries and observability.
+- **GCS sync idempotency**: `gsutil rsync` is not atomic. For production, sync to a staging prefix and publish via manifest or versioned run folder.
+- **Batch-only assumptions**: The pipeline expects static Bronze partitions per run. Streaming/async ingestion could introduce FK misses unless you snapshot or pin partitions.
+
+## Future Improvements
+
+- Replace the DuckDB single-task run with per-model dbt tasks when using BigQuery/Snowflake (better retries and lineage).
+- Add a staging + manifest publish step for GCS syncs to guarantee atomic reads.
+- Introduce enriched-level validation severity (warn vs drop) for nuanced business rules.
+- Document and optionally wire Workload Identity for production-grade auth.
+
+## Table of Contents
+
+1. [Local Development](#local-development)
+2. [Production Deployment](#production-deployment)
+3. [Environment Variables](#environment-variables)
+4. [Troubleshooting](#troubleshooting)
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Docker & Docker Compose installed
+- 8GB RAM minimum (16GB recommended)
+- Bronze sample data in `samples/bronze/`
+
+### Quick Start
+
+```bash
+# 1. Build the custom Airflow image
+docker-compose build
+
+# 2. Initialize Airflow database + admin user
+docker-compose up airflow-init
+
+# 3. Start Airflow services
+docker-compose up -d
+
+# 4. Access Airflow UI
+open http://localhost:8080
+# Username: airflow
+# Password: airflow
+
+# 5. Trigger the DAG
+# In Airflow UI: DAGs -> ecom_silver_to_gold_pipeline -> Trigger DAG
+```
+
+### Local Configuration
+
+**Default behavior** (no `.env` file needed):
+- `PIPELINE_ENV=local`
+- Bronze: `samples/bronze/`
+- Silver: `data/silver/base/`
+- Enriched: `data/silver/enriched/`
+- Gold pipeline: **disabled** (no BigQuery)
+
+**Create `.env` to override** (optional):
+
+```bash
+# Local development with custom paths
+PIPELINE_ENV=local
+BRONZE_BASE_PATH=samples/bronze
+SILVER_BASE_PATH=data/silver/base
+GOLD_PIPELINE_ENABLED=false
+```
+
+### Development Workflow
+
+**Option A: Code baked into image** (current default)
+- Edit code locally
+- Rebuild image: `docker-compose build`
+- Restart services: `docker-compose up -d`
+- Slower iteration, matches production
+
+**Option B: Live code reload** (faster iteration)
+1. Edit `docker-compose.yml` - uncomment these volume mounts:
+   ```yaml
+   - ./src:/opt/airflow/src
+   - ./config:/opt/airflow/config
+   - ./dbt_duckdb:/opt/airflow/dbt_duckdb
+   ```
+2. Restart: `docker-compose restart airflow-scheduler airflow-webserver`
+3. Code changes reflected immediately (no rebuild)
+
+### Logs & Debugging
+
+```bash
+# View scheduler logs (task execution)
+docker-compose logs -f airflow-scheduler
+
+# View webserver logs
+docker-compose logs -f airflow-webserver
+
+# Check validation reports
+cat docs/validation_reports/BRONZE_QUALITY.md
+cat docs/validation_reports/SILVER_QUALITY.md
+
+# Shell into container
+docker-compose exec airflow-scheduler bash
+python -c "from src.settings import load_settings; print(load_settings())"
+```
+
+### Teardown
+
+```bash
+# Stop services
+docker-compose down
+
+# Remove volumes (reset database)
+docker-compose down -v
+
+# Remove image
+docker rmi ecom-datalake-pipeline:latest
+```
+
+---
+
+## Production Deployment
+
+### Architecture Options
+
+**Option A: Cloud Composer (Recommended)**
+- Managed Airflow on GCP
+- Auto-scaling workers
+- Integrated with GCS/BigQuery
+- $300-500/month (small environment)
+
+**Option B: Self-Hosted Kubernetes**
+- Use official Airflow Helm chart
+- More control, more complexity
+- Good for multi-cloud or on-prem
+
+**Option C: Docker on VM**
+- Single GCE instance with docker-compose
+- Cheapest option (~$50/month)
+- No auto-scaling, manual maintenance
+
+### Dimension Refresh Strategy
+
+- **Customers**: full refresh on a daily cadence (simple, reliable for small/medium volumes).
+- **Product catalog**: full refresh on change (or daily if the source is small and stable).
+- **Facts**: partitioned by business date and backfilled by date ranges.
+
+### Cloud Composer Deployment
+
+#### 1. Build & Push Image
+
+```bash
+# Set variables
+export PROJECT_ID="your-gcp-project"
+export REGION="us-central1"
+export IMAGE_NAME="ecom-datalake-pipeline"
+export IMAGE_TAG="v0.1.0"
+export ARTIFACT_REPO="airflow-images"
+
+# Create Artifact Registry repository (one-time)
+gcloud artifacts repositories create $ARTIFACT_REPO \
+  --repository-format=docker \
+  --location=$REGION \
+  --project=$PROJECT_ID
+
+# Build and tag image
+docker build -t $IMAGE_NAME:$IMAGE_TAG .
+docker tag $IMAGE_NAME:$IMAGE_TAG \
+  $REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REPO/$IMAGE_NAME:$IMAGE_TAG
+
+# Authenticate and push
+gcloud auth configure-docker $REGION-docker.pkg.dev
+docker push $REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REPO/$IMAGE_NAME:$IMAGE_TAG
+```
+
+#### 2. Create Cloud Composer Environment
+
+```bash
+# Create environment with custom image
+gcloud composer environments create ecom-pipeline \
+  --location=$REGION \
+  --image-version=composer-2.9.3-airflow-2.9.3 \
+  --environment-size=small \
+  --python-version=3.12 \
+  --service-account=composer-sa@$PROJECT_ID.iam.gserviceaccount.com
+```
+
+#### 3. Configure Environment Variables
+
+```bash
+# Set pipeline environment to prod
+gcloud composer environments update ecom-pipeline \
+  --location=$REGION \
+  --update-env-variables=PIPELINE_ENV=prod,\
+GOOGLE_CLOUD_PROJECT=$PROJECT_ID,\
+GCS_BUCKET=ecom-datalake-bronze,\
+BRONZE_BASE_PATH=gs://ecom-datalake-bronze/bronze,\
+SILVER_BASE_PATH=gs://ecom-datalake-silver/base,\
+SILVER_ENRICHED_PATH=gs://ecom-datalake-silver/enriched,\
+GOLD_PIPELINE_ENABLED=true,\
+BRONZE_QA_FAIL=true
+```
+
+#### 4. Upload DAG
+
+```bash
+# Get DAG bucket
+export DAG_BUCKET=$(gcloud composer environments describe ecom-pipeline \
+  --location=$REGION \
+  --format="value(config.dagGcsPrefix)")
+
+# Upload DAG
+gsutil cp airflow/dags/ecom_silver_to_gold.py $DAG_BUCKET/
+```
+
+#### 5. Create GCS Buckets
+
+```bash
+# Bronze bucket (input data)
+gsutil mb -l $REGION gs://ecom-datalake-bronze
+gsutil cp -r samples/bronze/* gs://ecom-datalake-bronze/bronze/
+
+# Silver bucket (output data)
+gsutil mb -l $REGION gs://ecom-datalake-silver
+
+# Metrics bucket (observability)
+gsutil mb -l $REGION gs://ecom-datalake-metrics
+```
+
+#### 6. Create BigQuery Datasets
+
+```bash
+# Silver dataset (for enriched tables)
+bq mk --location=$REGION --dataset $PROJECT_ID:silver
+
+# Gold dataset (for marts)
+bq mk --location=$REGION --dataset $PROJECT_ID:gold_marts
+```
+
+#### 7. Grant Service Account Permissions
+
+```bash
+export SA_EMAIL="composer-sa@$PROJECT_ID.iam.gserviceaccount.com"
+
+# GCS buckets
+gsutil iam ch serviceAccount:$SA_EMAIL:roles/storage.objectAdmin \
+  gs://ecom-datalake-bronze
+gsutil iam ch serviceAccount:$SA_EMAIL:roles/storage.objectAdmin \
+  gs://ecom-datalake-silver
+gsutil iam ch serviceAccount:$SA_EMAIL:roles/storage.objectAdmin \
+  gs://ecom-datalake-metrics
+
+# BigQuery datasets
+bq add-iam-policy-binding --member=serviceAccount:$SA_EMAIL \
+  --role=roles/bigquery.dataEditor $PROJECT_ID:silver
+bq add-iam-policy-binding --member=serviceAccount:$SA_EMAIL \
+  --role=roles/bigquery.dataEditor $PROJECT_ID:gold_marts
+```
+
+### Self-Hosted Docker Deployment
+
+#### 1. Provision GCE Instance
+
+```bash
+# Create VM with Docker
+gcloud compute instances create airflow-vm \
+  --zone=us-central1-a \
+  --machine-type=n2-standard-4 \
+  --boot-disk-size=100GB \
+  --image-family=cos-stable \
+  --image-project=cos-cloud \
+  --scopes=cloud-platform \
+  --service-account=airflow-vm-sa@$PROJECT_ID.iam.gserviceaccount.com
+```
+
+#### 2. SSH and Setup
+
+```bash
+# SSH into VM
+gcloud compute ssh airflow-vm --zone=us-central1-a
+
+# Clone repo
+git clone https://github.com/your-org/ecom-datalake-pipelines.git
+cd ecom-datalake-pipelines
+
+# Create production .env
+cat > .env <<EOF
+PIPELINE_ENV=prod
+GOOGLE_CLOUD_PROJECT=$PROJECT_ID
+GCS_BUCKET=ecom-datalake-bronze
+BRONZE_BASE_PATH=gs://ecom-datalake-bronze/bronze
+SILVER_BASE_PATH=gs://ecom-datalake-silver/base
+SILVER_ENRICHED_PATH=gs://ecom-datalake-silver/enriched
+GOLD_PIPELINE_ENABLED=true
+BRONZE_QA_FAIL=true
+AIRFLOW_UID=1000
+EOF
+
+# Build and start
+docker-compose build
+docker-compose up airflow-init
+docker-compose up -d
+```
+
+#### 3. Access Airflow UI
+
+```bash
+# Create firewall rule (one-time)
+gcloud compute firewall-rules create allow-airflow \
+  --allow tcp:8080 \
+  --source-ranges 0.0.0.0/0 \
+  --target-tags airflow-vm
+
+# Get external IP
+gcloud compute instances describe airflow-vm \
+  --zone=us-central1-a \
+  --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
+
+# Access UI at http://<EXTERNAL_IP>:8080
+```
+
+---
+
+## Environment Variables
+
+### Required for Production
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `PIPELINE_ENV` | Environment: local, dev, prod | `prod` |
+| `GOOGLE_CLOUD_PROJECT` | GCP project ID | `my-project-123` |
+| `GCS_BUCKET` | Bronze data bucket | `ecom-datalake-bronze` |
+| `BRONZE_BASE_PATH` | Path to Bronze data | `gs://ecom-datalake-bronze/bronze` |
+| `SILVER_BASE_PATH` | Path to Base Silver output | `gs://ecom-datalake-silver/base` |
+| `SILVER_ENRICHED_PATH` | Path to Enriched Silver output | `gs://ecom-datalake-silver/enriched` |
+
+### Optional
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GOLD_PIPELINE_ENABLED` | `false` (local), `true` (prod) | Enable BigQuery Gold layer |
+| `BQ_LOAD_ENABLED` | `false` (local), `true` (prod) | Enable Enriched Silver BigQuery loads |
+| `BRONZE_QA_REQUIRED` | `true` | Require Bronze QA phase |
+| `BRONZE_QA_FAIL` | `false` (local), `true` (prod) | Fail pipeline on Bronze issues |
+| `STRICT_FK` | `false` (local), `true` (prod) | Enforce FK validation in Silver |
+| `SILVER_PROFILE_ENABLED` | `false` | Generate Silver profiling reports |
+| `BQ_LOCATION` | `US` | BigQuery dataset location |
+
+### Authentication
+
+**Cloud Composer**: Uses environment's service account (automatic)
+
+**Docker local/VM**: Two options:
+
+1. **Application Default Credentials** (recommended):
+   ```bash
+   gcloud auth application-default login
+   # Or on GCE: attach service account to VM
+   ```
+
+2. **Service Account Key** (not recommended):
+   ```yaml
+   # In docker-compose.yml
+   volumes:
+     - ./service-account-key.json:/opt/airflow/service-account-key.json:ro
+   environment:
+     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/service-account-key.json
+   ```
+
+---
+
+## Troubleshooting
+
+### "Module 'src' not found"
+
+**Cause**: Image not built with custom code
+
+**Fix**:
+```bash
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### "Permission denied: gs://..."
+
+**Cause**: Service account lacks GCS permissions
+
+**Fix**:
+```bash
+# Check current SA
+gcloud composer environments describe ecom-pipeline \
+  --location=us-central1 \
+  --format="value(config.nodeConfig.serviceAccount)"
+
+# Grant storage.objectAdmin
+gsutil iam ch serviceAccount:SA_EMAIL:roles/storage.objectAdmin gs://BUCKET
+```
+
+### "BQ load failed: Not found: Dataset"
+
+**Cause**: BigQuery dataset doesn't exist
+
+**Fix**:
+```bash
+bq mk --location=US --dataset PROJECT_ID:silver
+bq mk --location=US --dataset PROJECT_ID:gold_marts
+```
+
+### "dbt deps failed: packages not found"
+
+**Cause**: dbt packages not installed during build
+
+**Fix**: Check Dockerfile includes:
+```dockerfile
+RUN cd dbt_duckdb && dbt deps --project-dir . --profiles-dir .
+```
+
+### DAG import errors
+
+**Check logs**:
+```bash
+# Local
+docker-compose logs airflow-scheduler | grep "ecom_silver_to_gold"
+
+# Cloud Composer
+gcloud composer environments run ecom-pipeline \
+  --location=us-central1 dags list
+```
+
+**Validate DAG syntax**:
+```bash
+docker-compose exec airflow-scheduler bash
+python airflow/dags/ecom_silver_to_gold.py
+```
+
+### Out of memory
+
+**Cause**: Polars processing large data on small instance
+
+**Fix**:
+- Increase instance size (Cloud Composer: `--environment-size=medium`)
+- Use streaming: `pl.scan_parquet()` instead of `pl.read_parquet()`
+- Partition data by ingest_dt
+
+### Slow builds
+
+**Cause**: Large build context or cache issues
+
+**Fix**:
+```bash
+# Check context size
+du -sh .
+
+# Verify .dockerignore excludes data/
+cat .dockerignore | grep "^data/"
+
+# Clean build cache
+docker builder prune
+docker-compose build --no-cache
+```
+
+---
+
+## Cost Optimization
+
+### Local Development
+- **Cost**: $0 (runs on your machine)
+- **Best for**: Testing, development, learning
+
+### Docker on GCE VM
+- **Compute**: n2-standard-4 = ~$120/month
+- **Storage**: 100GB disk = ~$10/month
+- **Total**: ~$130/month
+- **Best for**: Small production workloads
+
+### Cloud Composer
+- **Small environment**: ~$300/month base + usage
+- **GCS storage**: ~$8/month (400GB)
+- **BigQuery**: Pay per query (~$30/month for daily runs)
+- **Total**: ~$340/month
+- **Best for**: Production with SLA requirements
+
+**Savings tip**: Use Polars runners instead of dbt-BigQuery Python models (saves ~$200/month). See [docs/local_only/COST_ANALYSIS.md](../local_only/COST_ANALYSIS.md) for details.
+
+---
+
+## Next Steps
+
+1. **Local validation**: Run full pipeline locally first
+2. **Deploy to dev**: Test with real GCS/BigQuery
+3. **Production**: Enable monitoring, alerting, SLA enforcement
+4. **Schedule**: Set `schedule="0 2 * * *"` for daily 2am runs
+
+For questions or issues, see [CONTRIBUTING.md](../CONTRIBUTING.md).

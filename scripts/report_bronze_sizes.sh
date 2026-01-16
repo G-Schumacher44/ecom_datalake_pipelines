@@ -44,7 +44,7 @@ fi
 
 BUCKET="${1:-${default_bucket}}"
 PREFIX="${2:-${default_prefix}}"
-OUTPUT="${3:-docs/planning/BRONZE_BUCKET_SIZES.md}"
+OUTPUT="${3:-docs/data/BRONZE_BUCKET_SIZES.md}"
 
 bucket_uri="gs://${BUCKET}"
 prefix_uri="${bucket_uri}/${PREFIX}"

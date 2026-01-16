@@ -25,19 +25,19 @@ query-ready Base Silver layer and a Rich (Enriched) Silver layer for downstream 
 - Metadata: row counts, schema version, and run ID per partition
 
 ## Current Bronze Tables (Reference)
-See `docs/planning/planning/BRONZE_SCHEMA_SAMPLE.md` for the current table list and schemas.
+See `docs/data/BRONZE_SCHEMA_MAP.json` for the current table list and schemas.
 
 ## Silver Table Shape
 - Base Silver stays 1:1 with bronze tables (no split/merge).
 - Enriched Silver introduces new business-aligned tables (attribution, risk, retention, velocity).
 
 ## Data Contract and SLAs
-- Data contract: `docs/planning/planning/DATA_CONTRACT.md`
-- SLAs and quality checks: `docs/planning/planning/SLA_AND_QUALITY.md`
-- BigQuery migration: `docs/planning/planning/BQ_MIGRATION.md`
-- Transform framework: `docs/planning/planning/SILVER_FRAMEWORK.md`
-- Testing runbook: `docs/planning/planning/TESTING_RUNBOOK.md`
-- Decision log: `docs/planning/planning/DECISIONS.md`
+- Data contract: `docs/resources/DATA_CONTRACT.md`
+- SLAs and quality checks: `docs/planning/SLA_AND_QUALITY.md`
+- BigQuery migration: `docs/planning/BQ_MIGRATION.md`
+- Transform framework: `docs/planning/SILVER_FRAMEWORK.md`
+- Testing runbook: `docs/planning/TESTING_RUNBOOK.md`
+- Decision log: `docs/planning/DECISIONS.md`
 
 ## Cleaning + Integrity Rules (Draft)
 General
@@ -167,15 +167,20 @@ Each task processes one Bronze table independently using dbt-duckdb:
 
 **Peak memory**: ~9.6GB (cart_items table)
 
-### Phase 2: Enriched Silver (5 parallel tasks)
+### Phase 2: Enriched Silver (10 parallel tasks)
 
 Each task reads only required Base Silver tables and produces one enriched table:
 
 1. `int_attributed_purchases` (reads: carts, orders) - Cart attribution via `join_asof`
-2. `int_inventory_risk` (reads: products, order_items, returns) - Stock risk scoring
-3. `int_customer_retention_signals` (reads: customers, orders) - Churn signals
-4. `int_sales_velocity` (reads: orders, order_items) - Rolling 7-day velocity
-5. `int_regional_financials` (reads: orders, customers) - Tax + FX calculations
+2. `int_cart_attribution` (reads: carts, cart_items, orders) - Cart conversion + abandonment
+3. `int_inventory_risk` (reads: products, order_items, returns) - Stock risk scoring
+4. `int_customer_retention_signals` (reads: customers, orders) - Churn signals
+5. `int_customer_lifetime_value` (reads: customers, orders, returns) - CLV and segments
+6. `int_daily_business_metrics` (reads: orders, carts, returns) - KPI rollups
+7. `int_product_performance` (reads: products, order_items, returns, carts) - Profitability
+8. `int_sales_velocity` (reads: orders, order_items) - Rolling 7-day velocity
+9. `int_regional_financials` (reads: orders, customers) - Tax + FX calculations
+10. `int_shipping_economics` (reads: orders) - Shipping margin analysis
 
 **Processing pattern per task**:
 

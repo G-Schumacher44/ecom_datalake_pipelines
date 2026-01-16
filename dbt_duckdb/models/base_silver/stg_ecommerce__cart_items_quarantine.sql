@@ -1,94 +1,9 @@
 {{ config(
-    materialized='table',
-    post_hook=[
-        "COPY (SELECT * FROM {{ this }}) TO '{{ var('silver_base_path') }}/quarantine/cart_items' (FORMAT PARQUET, PARTITION_BY (added_dt), OVERWRITE_OR_IGNORE)"
-    ]
+    materialized='external',
+    location=var('silver_base_path') ~ '/quarantine/cart_items',
+    options={'format': 'parquet', 'partition_by': 'added_dt', 'overwrite': true}
 ) }}
 
-{#
-QUARANTINE PATTERN: cart_items
-Captures all INVALID cart item records with reasons
-#}
-
-with raw as (
-    select *
-    from {{ source_parquet('bronze', 'cart_items') }}
-),
-
-dim_shopping_carts as (
-    select distinct
-        {{ normalize_string('cart_id') }} as cart_id
-    from {{ source_parquet('bronze', 'shopping_carts') }}
-    where {{ normalize_string('cart_id') }} is not null
-),
-
-dim_products as (
-    select distinct
-        {{ safe_cast_integer('product_id') }} as product_id
-    from {{ source_parquet('bronze', 'product_catalog') }}
-    where {{ safe_cast_integer('product_id') }} is not null
-),
-
-cleaned as (
-    select
-        {{ safe_cast_integer('cart_item_id') }} as cart_item_id,
-        {{ normalize_string('cart_id') }} as cart_id,
-        {{ safe_cast_integer('product_id') }} as product_id,
-        {{ normalize_string('product_name') }} as product_name,
-        {{ normalize_string_lower('category') }} as category,
-        {{ safe_cast_timestamp('added_at') }} as added_at,
-        {{ safe_cast_timestamp('ingestion_ts') }} as ingestion_ts,
-        {{ safe_cast_integer('quantity') }} as quantity,
-        {{ safe_cast_decimal('unit_price', 18, 2) }} as unit_price,
-        {{ normalize_string('batch_id') }} as batch_id,
-        {{ normalize_string('event_id') }} as event_id,
-        {{ normalize_string('source_file') }} as source_file,
-        cast({{ safe_cast_timestamp('added_at') }} as date) as added_dt
-    from raw
-),
-
-validated as (
-    select
-        cleaned.*,
-        dim_shopping_carts.cart_id is not null as cart_fk_valid,
-        dim_products.product_id is not null as product_fk_valid,
-        row_number() over (
-            partition by cleaned.cart_id, cleaned.product_id, cleaned.added_at
-            order by cleaned.ingestion_ts desc nulls last, cleaned.event_id desc
-        ) as row_num
-    from cleaned
-    left join dim_shopping_carts on cleaned.cart_id = dim_shopping_carts.cart_id
-    left join dim_products on cleaned.product_id = dim_products.product_id
-),
-
-scored as (
-    select
-        *,
-        (
-            {{ is_positive_number('cart_item_id') }}
-            and {{ is_valid_id('cart_id') }}
-            and {{ is_positive_number('product_id') }}
-            and {{ is_positive_number('quantity') }}
-            and {{ is_non_negative_number('unit_price') }}
-            and (cart_id is null or cart_fk_valid)
-            and (product_id is null or product_fk_valid)
-            and row_num = 1
-        ) as is_valid,
-        trim(concat_ws(' | ',
-            case when cart_item_id is null or cart_item_id <= 0 then 'invalid_cart_item_id' end,
-            case when not {{ is_valid_id('cart_id') }} then 'missing_cart_id' end,
-            case when product_id is null or product_id <= 0 then 'invalid_product_id' end,
-            case when quantity is null or quantity <= 0 then 'invalid_quantity' end,
-            case when unit_price is null then 'missing_unit_price' end,
-            case when unit_price < 0 then 'negative_unit_price' end,
-            case when cart_id is not null and not cart_fk_valid then 'cart_fk_invalid' end,
-            case when product_id is not null and not product_fk_valid then 'product_fk_invalid' end,
-            case when row_num > 1 then 'duplicate_cart_item_line' end
-        )) as invalid_reason
-    from validated
-)
-
--- Quarantine: Return only INVALID records
 select
     cart_item_id,
     cart_id,
@@ -105,5 +20,5 @@ select
     added_dt,
     invalid_reason,
     row_num
-from scored
+from {{ ref('int_cart_items_scored') }}
 where not is_valid

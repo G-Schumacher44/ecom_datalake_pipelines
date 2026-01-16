@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Spot checks refreshed 2026-01-13T17:16:06Z scope=all spot_hash=e2546433be9a7524afdb3e9f0c748e3d3a7c67d54b134fbb16ddc13c72e600c8 profile_hash=7a45617d90ee8cdec879b2874db9896853bd5f3eaadf06fc0fb9490ffc019c56
+- Profile report refreshed 2026-01-12T19:47:22Z months=2020-03,2023-01,2025-10 hash=7a45617d90ee8cdec879b2874db9896853bd5f3eaadf06fc0fb9490ffc019c56
 - Profile report refreshed 2026-01-11T17:17:15Z scope=all hash=d3f5b16e97cb29af3d0bdb09396ae84be4bb0d494038d24425e90beec89d7b7c
 - Spot checks refreshed 2026-01-11T15:57:19Z scope=all spot_hash=0f9df0f79bbf36ed485c65e96b69c6539c5290d805fe00f36de5b8cc3c768d33 profile_hash=6f86ddd7997da133b7380023b9efa456146be9bba8279ffc0be37ec6c0c5c02f
 - Profile report refreshed 2026-01-11T15:50:12Z months=2020-03,2023-01,2025-10 hash=6f86ddd7997da133b7380023b9efa456146be9bba8279ffc0be37ec6c0c5c02f

@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,12 @@ from pyarrow.lib import ArrowInvalid, ArrowTypeError
 from src.observability import get_logger
 from src.observability.metrics import write_silver_quality_metric
 from src.settings import load_settings
+from src.validation.common import (
+    ValidationStatus,
+    resolve_layer_paths,
+    get_overall_status,
+    handle_exit,
+)
 
 logger = get_logger(__name__)
 
@@ -56,6 +62,7 @@ class SilverQualityReport:
     timestamp: str
     table_metrics: list[TableQualityMetrics]
     fk_mismatch_summary: list[dict[str, Any]]
+    contract_issues: list[dict[str, Any]]
     overall_status: str
     tables_passing: int
     tables_warning: int
@@ -63,18 +70,6 @@ class SilverQualityReport:
     total_quarantined: int
     total_processed: int
 
-
-# SLA thresholds per table (from docs/planning/SLA_AND_QUALITY.md)
-DEFAULT_SLA_THRESHOLDS = {
-    "orders": 0.95,
-    "customers": 0.98,
-    "product_catalog": 0.99,
-    "shopping_carts": 0.95,
-    "cart_items": 0.95,
-    "order_items": 0.95,
-    "returns": 0.95,
-    "return_items": 0.95,
-}
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,9 +102,19 @@ def parse_args() -> argparse.Namespace:
         help="Run ID for this validation (auto-generated if not provided).",
     )
     parser.add_argument(
+        "--tables",
+        default=None,
+        help="Comma-separated list of tables to validate (default: all).",
+    )
+    parser.add_argument(
         "--fail-on-sla-breach",
         action="store_true",
-        help="Exit with error code if any table fails SLA (default: warn only).",
+        help="Legacy: use --enforce-quality instead.",
+    )
+    parser.add_argument(
+        "--enforce-quality",
+        action="store_true",
+        help="Exit with non-zero code on any failures (standard gate).",
     )
     parser.add_argument(
         "--output-report",
@@ -117,48 +122,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to write Markdown report.",
     )
     return parser.parse_args()
-
-
-def resolve_paths(args: argparse.Namespace) -> tuple[Path, Path, Path]:
-    """Resolve bronze/silver/quarantine paths from args, env, and config."""
-    settings = load_settings(args.config)
-
-    def resolve_path(
-        arg_value: str | None,
-        env_var: str,
-        bucket: str,
-        prefix: str,
-    ) -> str:
-        if arg_value:
-            return arg_value
-        env_value = os.getenv(env_var)
-        if env_value:
-            return env_value
-        if bucket == "local":
-            return prefix
-        return f"gs://{bucket}/{prefix}"
-
-    bronze_path = resolve_path(
-        args.bronze_path,
-        "BRONZE_BASE_PATH",
-        settings.pipeline.bronze_bucket,
-        settings.pipeline.bronze_prefix,
-    )
-    silver_path = resolve_path(
-        args.silver_path,
-        "SILVER_BASE_PATH",
-        settings.pipeline.silver_bucket,
-        settings.pipeline.silver_base_prefix,
-    )
-
-    if args.quarantine_path:
-        quarantine_path = args.quarantine_path
-    else:
-        quarantine_path = os.getenv(
-            "SILVER_QUARANTINE_PATH", f"{silver_path}/quarantine"
-        )
-
-    return Path(bronze_path), Path(silver_path), Path(quarantine_path)
 
 
 def count_parquet_rows(path: Path) -> int:
@@ -225,6 +188,14 @@ def get_quarantine_breakdown(quarantine_path: Path, top_n: int = 5) -> list[dict
             logger.warning(f"No invalid_reason column in {quarantine_path}")
             return []
 
+        # Filter out completely null rows (dbt-duckdb artifact from empty partition writes)
+        # These rows have all fields NULL including computed fields like row_num
+        if "row_num" in df.columns:
+            df = df.filter(pl.col("row_num").is_not_null())
+
+        if df.height == 0:
+            return []
+
         # Count by reason
         reason_counts = (
             df.group_by("invalid_reason")
@@ -255,6 +226,62 @@ def get_quarantine_breakdown(quarantine_path: Path, top_n: int = 5) -> list[dict
             error=str(e),
         )
         return []
+
+
+def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
+    if not table_path.exists():
+        return {
+            "total_rows": 0,
+            "non_null_rows": 0,
+            "distinct_count": 0,
+            "distinct_ratio": 0.0,
+        }
+
+    parquet_files = collect_parquet_files(table_path)
+    if not parquet_files:
+        return {
+            "total_rows": 0,
+            "non_null_rows": 0,
+            "distinct_count": 0,
+            "distinct_ratio": 0.0,
+        }
+
+    try:
+        df = pl.read_parquet(
+            parquet_files,
+            columns=[key],
+            memory_map=False,
+            low_memory=True,
+            use_pyarrow=True,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed key cardinality scan",
+            table=str(table_path),
+            key=key,
+            error_type=type(exc).__name__,
+            error=str(exc),
+        )
+        return {
+            "total_rows": 0,
+            "non_null_rows": 0,
+            "distinct_count": 0,
+            "distinct_ratio": 0.0,
+        }
+
+    total_rows = df.height
+    non_null_rows = df.select(pl.col(key).is_not_null().sum()).item()
+    distinct_count = df.select(pl.col(key).drop_nulls().n_unique()).item()
+    distinct_ratio = (
+        distinct_count / non_null_rows if non_null_rows > 0 else 0.0
+    )
+
+    return {
+        "total_rows": total_rows,
+        "non_null_rows": non_null_rows,
+        "distinct_count": distinct_count,
+        "distinct_ratio": distinct_ratio,
+    }
 
 
 def validate_table(
@@ -513,6 +540,9 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
                 f"- **Top Reason:** {top_reason['reason']} "
                 f"({top_reason['percentage']}%)"
             )
+        else:
+            # No breakdown means only dbt-duckdb placeholder rows (all NULL)
+            lines.append("- **Top Reason:** empty partition placeholder (no real failures)")
 
         lines.append("")
 
@@ -532,6 +562,14 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
                 f"| {row['child_table']} | {row['child_key']} | "
                 f"{row['parent_table']} | {row['parent_key']} | "
                 f"{row['missing_rows']:,} |"
+            )
+        lines.append("")
+
+    if report.contract_issues:
+        lines.extend(["---", "", "## Contract Issues", ""])
+        for issue in report.contract_issues:
+            lines.append(
+                f"- **{issue['check']}**: {issue['message']}"
             )
         lines.append("")
 
@@ -745,6 +783,43 @@ def is_parquet_file(path: Path) -> bool:
         return False
 
 
+def list_ingest_partitions(path: Path) -> set[str]:
+    """Return ingest_dt partition values (YYYY-MM-DD) for a table path."""
+    partitions = set()
+    for part_dir in path.glob("ingest_dt=*"):
+        if not part_dir.is_dir():
+            continue
+        partitions.add(part_dir.name.split("=", 1)[-1])
+    return partitions
+
+
+def expand_partition_ranges(values: list[str]) -> list[str]:
+    """Expand YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD range strings into dates."""
+    expanded: list[str] = []
+    for value in values:
+        item = value.strip()
+        if not item:
+            continue
+        if ".." not in item:
+            expanded.append(item)
+            continue
+        start_str, end_str = item.split("..", 1)
+        try:
+            start = date.fromisoformat(start_str.strip())
+            end = date.fromisoformat(end_str.strip())
+        except ValueError:
+            logger.warning("Invalid partition range ignored", range=item)
+            continue
+        if end < start:
+            logger.warning("Partition range end before start", range=item)
+            continue
+        current = start
+        while current <= end:
+            expanded.append(current.isoformat())
+            current = current.fromordinal(current.toordinal() + 1)
+    return expanded
+
+
 def read_parquet_safe(path: Path) -> pl.DataFrame | None:
     """Read a parquet file, returning None on failure."""
     try:
@@ -767,23 +842,30 @@ def main() -> int:
     """Run Silver quality validation."""
     args = parse_args()
     settings = load_settings(args.config)
-    sla_thresholds = settings.pipeline.sla_thresholds or DEFAULT_SLA_THRESHOLDS
+    sla_thresholds = settings.pipeline.sla_thresholds or {}
+    pipeline_env = os.getenv("PIPELINE_ENV", settings.pipeline.environment).lower()
+    
+    # Resolve paths using shared library
+    paths = resolve_layer_paths(
+        args.config, 
+        bronze_over=args.bronze_path, 
+        silver_over=args.silver_path
+    )
+    bronze_path = paths["bronze"]
+    silver_path = paths["silver"]
+    quarantine_path = paths["quarantine"]
 
-    # Generate run ID if not provided
-    if args.run_id:
-        run_id = args.run_id
-    else:
-        run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-
+    run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     logger.info(f"Starting Silver quality validation (run_id={run_id})")
 
-    # Resolve paths
-    bronze_path, silver_path, quarantine_path = resolve_paths(args)
-
     # Validate all tables
-    tables = list(sla_thresholds.keys())
+    if args.tables:
+        requested_tables = [t.strip() for t in args.tables.split(",") if t.strip()]
+        tables = [t for t in requested_tables if t in sla_thresholds]
+    else:
+        tables = list(sla_thresholds.keys())
+    
     table_metrics = []
-
     for table in tables:
         metrics = validate_table(
             table,
@@ -795,26 +877,136 @@ def main() -> int:
         table_metrics.append(metrics)
 
     # Calculate overall status
-    tables_passing = sum(1 for m in table_metrics if m.status == "PASS")
-    tables_warning = sum(1 for m in table_metrics if m.status == "WARN")
-    tables_failing = sum(1 for m in table_metrics if m.status == "FAIL")
-
-    if tables_failing > 0:
-        overall_status = "FAIL"
-    elif tables_warning > 0:
-        overall_status = "WARN"
-    else:
-        overall_status = "PASS"
+    overall_status = get_overall_status([m.status for m in table_metrics])
 
     # Create report
     total_processed = sum(m.silver_rows + m.quarantine_rows for m in table_metrics)
     total_quarantined = sum(m.quarantine_rows for m in table_metrics)
+    total_bronze_rows = sum(m.bronze_rows for m in table_metrics)
+    total_row_loss = sum(m.row_loss for m in table_metrics)
+    total_quarantine_pct = (
+        (total_quarantined / total_processed * 100)
+        if total_processed > 0
+        else 0.0
+    )
+    total_row_loss_pct = (
+        (total_row_loss / total_bronze_rows * 100)
+        if total_bronze_rows > 0
+        else 0.0
+    )
+
+    contract_issues: list[dict[str, Any]] = []
+    if total_quarantine_pct > settings.pipeline.max_quarantine_pct:
+        contract_issues.append(
+            {
+                "check": "max_quarantine_pct",
+                "message": (
+                    f"Quarantine rate {total_quarantine_pct:.2f}% exceeds "
+                    f"threshold {settings.pipeline.max_quarantine_pct:.2f}%"
+                ),
+            }
+        )
+    if total_row_loss_pct > settings.pipeline.max_row_loss_pct:
+        contract_issues.append(
+            {
+                "check": "max_row_loss_pct",
+                "message": (
+                    f"Row loss {total_row_loss_pct:.2f}% exceeds "
+                    f"threshold {settings.pipeline.max_row_loss_pct:.2f}%"
+                ),
+            }
+        )
+
+    if settings.pipeline.expected_bronze_partitions:
+        expected_set = set(expand_partition_ranges(settings.pipeline.expected_bronze_partitions))
+        for table in tables:
+            bronze_parts = list_ingest_partitions(bronze_path / table)
+            missing = sorted(expected_set - bronze_parts)
+            if missing:
+                sample = ", ".join(missing[:5])
+                contract_issues.append(
+                    {
+                        "check": "missing_bronze_partitions",
+                        "table": table,
+                        "message": (
+                            f"Missing {len(missing)} ingest_dt partitions "
+                            f"for {table}: {sample}"
+                        ),
+                    }
+                )
+
+    if settings.pipeline.min_table_rows:
+        for metrics in table_metrics:
+            min_rows = settings.pipeline.min_table_rows.get(metrics.table)
+            if min_rows is None:
+                continue
+            total_processed = metrics.silver_rows + metrics.quarantine_rows
+            if total_processed < min_rows:
+                contract_issues.append(
+                    {
+                        "check": "min_table_rows",
+                        "table": metrics.table,
+                        "message": (
+                            f"Processed {total_processed:,} rows for "
+                            f"{metrics.table}, below minimum {min_rows:,}"
+                        ),
+                    }
+                )
+
+    if "returns" in tables:
+        returns_cardinality = compute_key_cardinality(
+            silver_path / "returns", "return_id"
+        )
+        if (
+            returns_cardinality["non_null_rows"] > 0
+            and returns_cardinality["distinct_ratio"] < settings.pipeline.min_return_id_distinct_ratio
+        ):
+            contract_issues.append(
+                {
+                    "check": "returns_return_id_distinct_ratio",
+                    "message": (
+                        f"Distinct ratio {returns_cardinality['distinct_ratio']:.6f} "
+                        f"below minimum {settings.pipeline.min_return_id_distinct_ratio:.6f}"
+                    ),
+                }
+            )
+
+    if "return_items" in tables:
+        return_items_cardinality = compute_key_cardinality(
+            silver_path / "return_items", "return_id"
+        )
+        if (
+            return_items_cardinality["non_null_rows"] > 0
+            and return_items_cardinality["distinct_ratio"] < settings.pipeline.min_return_id_distinct_ratio
+        ):
+            contract_issues.append(
+                {
+                    "check": "return_items_return_id_distinct_ratio",
+                    "message": (
+                        "Distinct ratio "
+                        f"{return_items_cardinality['distinct_ratio']:.6f} "
+                        f"below minimum {settings.pipeline.min_return_id_distinct_ratio:.6f}"
+                    ),
+                }
+            )
+
+    if contract_issues:
+        overall_status = "FAIL" if pipeline_env == "prod" else "WARN"
+
+    tables_passing = sum(1 for m in table_metrics if m.status == "PASS")
+    tables_warning = sum(1 for m in table_metrics if m.status == "WARN")
+    tables_failing = sum(1 for m in table_metrics if m.status == "FAIL")
 
     report = SilverQualityReport(
         run_id=run_id,
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         table_metrics=table_metrics,
-        fk_mismatch_summary=compute_fk_mismatch_summary(silver_path),
+        fk_mismatch_summary=(
+            compute_fk_mismatch_summary(silver_path)
+            if not args.tables
+            else []
+        ),
+        contract_issues=contract_issues,
         overall_status=overall_status,
         tables_passing=tables_passing,
         tables_warning=tables_warning,
@@ -846,7 +1038,10 @@ def main() -> int:
     ]
 
     write_silver_quality_metric(
-        run_id=run_id, table_metrics=metrics_dicts, overall_status=overall_status
+        run_id=run_id,
+        table_metrics=metrics_dicts,
+        overall_status=overall_status,
+        contract_issues=contract_issues,
     )
 
     # Write Markdown report
@@ -880,18 +1075,11 @@ def main() -> int:
     print("=" * 70 + "\n")
 
     # Determine exit code
-    if args.fail_on_sla_breach and tables_failing > 0:
-        logger.error(
-            f"Exiting with error: {tables_failing} table(s) failed SLA thresholds"
-        )
-        return 1
-
-    if overall_status == "FAIL":
-        logger.warning("Quality validation completed with failures (soft fail mode)")
-        return 0  # Don't fail pipeline by default
-
-    logger.info("✅ Silver quality validation PASSED")
-    return 0
+    return handle_exit(
+        overall_status=overall_status,
+        enforce=args.enforce_quality or args.fail_on_sla_breach,
+        env=pipeline_env
+    )
 
 
 if __name__ == "__main__":

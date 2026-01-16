@@ -21,7 +21,7 @@ Location: [scripts/describe_parquet_samples.py](../../../scripts/describe_parque
 
 **Usage**:
 ```bash
-python scripts/describe_parquet_samples.py --output docs/planning/planning/BRONZE_PROFILE_REPORT.md
+python scripts/describe_parquet_samples.py --output docs/data/BRONZE_PROFILE_REPORT.md
 ```
 
 ### Sampling Strategy: Stratified Temporal Sampling
@@ -39,7 +39,7 @@ Instead of profiling the full 6-year dataset (~17GB) or a single random sample, 
   - Representative of dataset characteristics
 
 ### Profile Output Structure
-The generated [BRONZE_PROFILE_REPORT.md](BRONZE_PROFILE_REPORT.md) includes:
+The generated [BRONZE_PROFILE_REPORT.md](../data/BRONZE_PROFILE_REPORT.md) includes:
 
 1. **Table Summaries**: Row counts, partition counts, column counts per table
 2. **Column Statistics**: Per column:
@@ -129,7 +129,7 @@ The profiling script includes context-aware data quality checks:
 - Any error logs or rejected row samples.
 
 ## Test Categories and Success Criteria
-Use the SLAs and quality thresholds from `docs/planning/planning/SLA_AND_QUALITY.md` as pass/fail gates.
+Use the SLAs and quality thresholds from `docs/planning/SLA_AND_QUALITY.md` as pass/fail gates.
 
 Schema/Contract
 - Required columns present.

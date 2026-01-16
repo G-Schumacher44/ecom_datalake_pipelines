@@ -3,7 +3,8 @@ ecom_dbt_duckdb:
   outputs:
     dev:
       type: duckdb
-      path: "dbt_duckdb/target/ecom.duckdb"
+      # Use /tmp for the database to avoid Docker volume locking (Errno 35)
+      path: "{{ env_var('DBT_DUCKDB_PATH', '/tmp/dbt_duckdb/ecom.duckdb') }}"
       threads: 4
       extensions:
         - httpfs

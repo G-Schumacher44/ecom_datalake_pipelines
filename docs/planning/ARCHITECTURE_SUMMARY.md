@@ -86,7 +86,12 @@ src/
 │   ├── sales_velocity.py
 │   └── regional_financials.py
 ├── runners/              # I/O wrappers (read GCS → transform → write GCS)
-│   └── enriched_silver.py
+│   └── enriched/
+│       ├── commerce.py
+│       ├── customer.py
+│       ├── finance.py
+│       ├── ops.py
+│       └── shared.py
 ├── validation/           # Pydantic schemas
 └── observability/        # Audit logging
 
