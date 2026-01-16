@@ -22,6 +22,7 @@ src/transforms/inventory_risk.py
 src/transforms/regional_financials.py
 src/transforms/sales_velocity.py
 src/validation/__init__.py
+src/validation/bronze_quality.py
 src/validation/quality.py
 src/validation/schemas.py
 src/validation/silver_quality.py

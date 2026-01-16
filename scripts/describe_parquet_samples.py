@@ -688,7 +688,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output",
-        default="docs/planning/BRONZE_PROFILE_REPORT.md",
+        default="docs/data/BRONZE_PROFILE_REPORT.md",
         help="Output path for Markdown report",
     )
     parser.add_argument(

@@ -23,26 +23,21 @@ from typing import Any, Iterable
 
 from src.observability import get_logger
 from src.observability.metrics import write_data_quality_metric
+from src.runners.enriched.shared import get_table_partitions
+from src.validation.common import (
+    ValidationStatus,
+    resolve_layer_paths,
+    get_overall_status,
+    handle_exit,
+)
 
 logger = get_logger(__name__)
 
+def get_partition_glob(table: str) -> str:
+    """Get the partition glob for a table from centralized config."""
+    key = get_table_partitions().get(table, "ingest_dt")
+    return f"{key}=*"
 
-EXPECTED_TABLES = [
-    "orders",
-    "order_items",
-    "customers",
-    "product_catalog",
-    "shopping_carts",
-    "cart_items",
-    "returns",
-    "return_items",
-]
-
-
-PARTITION_GLOBS = {
-    "customers": ("signup_date", "signup_date=*"),
-    "product_catalog": ("category", "category=*"),
-}
 
 
 @dataclass
@@ -63,13 +58,28 @@ def parse_args() -> argparse.Namespace:
         help="Path to Bronze data (local path or gs:// bucket).",
     )
     parser.add_argument(
+        "--tables",
+        default=None,
+        help="Comma-separated list of tables to validate (default: all).",
+    )
+    parser.add_argument(
         "--fail-on-issues",
         action="store_true",
-        help="Exit non-zero if missing manifests or empty partitions are found.",
+        help="Legacy: use --enforce-quality instead.",
+    )
+    parser.add_argument(
+        "--enforce-quality",
+        action="store_true",
+        help="Exit with non-zero code on any failures (standard gate).",
     )
     parser.add_argument(
         "--run-id",
         help="Run ID for this validation (auto-generated if not provided).",
+    )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to config.yml (optional)",
     )
     parser.add_argument(
         "--output-report",
@@ -123,9 +133,7 @@ def list_tables(root: str) -> list[str]:
 
 
 def list_partitions(root: str, table: str) -> list[str]:
-    partition_key, partition_glob = PARTITION_GLOBS.get(
-        table, ("ingest_dt", "ingest_dt=*")
-    )
+    partition_glob = get_partition_glob(table)
     if is_gcs_path(root):
         import fsspec
 
@@ -150,7 +158,11 @@ def read_manifest(path: str) -> dict[str, Any] | None:
     manifest_file = Path(path) / manifest_name
     if not manifest_file.exists():
         return None
-    return json.loads(manifest_file.read_text())
+    try:
+        return json.loads(manifest_file.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning(f"Failed to read manifest {manifest_file}: {exc}")
+        return None
 
 
 def validate_table(root: str, table: str) -> TableMetrics:
@@ -234,38 +246,53 @@ def generate_report(
 
 def main() -> int:
     args = parse_args()
+    
+    from src.settings import load_settings
+    settings = load_settings(args.config)
+    pipeline_env = os.getenv("PIPELINE_ENV", settings.pipeline.environment).lower()
 
     run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    bronze_root = args.bronze_path
+    
+    # Resolve paths using shared library
+    paths = resolve_layer_paths(args.config, bronze_over=args.bronze_path)
+    bronze_root = str(paths["bronze"])
 
     logger.info(f"Starting Bronze quality validation (run_id={run_id})")
 
     available_tables = list_tables(bronze_root)
-    tables = [t for t in EXPECTED_TABLES if t in available_tables]
+    expected_tables = list(get_table_partitions().keys())
+    
+    if args.tables:
+        requested = [t.strip() for t in args.tables.split(",") if t.strip()]
+        tables = [t for t in requested if t in available_tables]
+    else:
+        tables = [t for t in expected_tables if t in available_tables]
 
     metrics = [validate_table(bronze_root, table) for table in tables]
 
-    # Overall status: WARN if any missing manifests or empty partitions.
-    overall_status = "PASS"
+    # Overall status: FAIL if any critical issues found (missing manifests/empty)
     total_missing = sum(m.missing_manifests for m in metrics)
     total_empty = sum(m.empty_partitions for m in metrics)
+    
     if total_missing > 0 or total_empty > 0:
-        overall_status = "WARN"
+        overall_status = ValidationStatus.FAIL
+    else:
+        overall_status = ValidationStatus.PASS
 
     metric_payloads = [
         {
             "table": m.table,
             "row_count": {
                 "actual": m.rows,
-                "status": "PASS" if m.rows > 0 else "WARN",
+                "status": "PASS" if m.rows > 0 else "FAIL",
             },
             "manifest_check": {
                 "missing": m.missing_manifests,
-                "status": "PASS" if m.missing_manifests == 0 else "WARN",
+                "status": "PASS" if m.missing_manifests == 0 else "FAIL",
             },
             "empty_partitions": {
                 "count": m.empty_partitions,
-                "status": "PASS" if m.empty_partitions == 0 else "WARN",
+                "status": "PASS" if m.empty_partitions == 0 else "FAIL",
             },
         }
         for m in metrics
@@ -279,15 +306,13 @@ def main() -> int:
     )
 
     generate_report(metrics, Path(args.output_report), run_id)
-    logger.info("✅ Bronze quality validation completed")
+    logger.info(f"✅ Bronze quality validation completed: {overall_status}")
 
-    fail_on_issues = args.fail_on_issues or bronze_qa_fail()
-    if fail_on_issues and (total_missing > 0 or total_empty > 0):
-        logger.error(
-            "Bronze quality validation failed due to missing manifests or empty partitions"
-        )
-        return 1
-    return 0
+    return handle_exit(
+        overall_status=overall_status,
+        enforce=args.enforce_quality or args.fail_on_issues,
+        env=pipeline_env
+    )
 
 
 if __name__ == "__main__":

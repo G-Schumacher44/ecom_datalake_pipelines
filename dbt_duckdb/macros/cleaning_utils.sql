@@ -83,12 +83,31 @@
      and length({{ column_name }}) >= 5)
 {%- endmacro %}
 
+{% macro is_guest_customer_id(column_name) %}
+    ({{ column_name }} is not null and {{ column_name }} like 'GUEST-%')
+{%- endmacro %}
+
 {% macro is_positive_number(column_name) %}
     ({{ column_name }} is not null and {{ column_name }} > 0)
 {%- endmacro %}
 
 {% macro is_non_negative_number(column_name) %}
     ({{ column_name }} is not null and {{ column_name }} >= 0)
+{%- endmacro %}
+
+-- ============================================================================
+-- Partition Window Filter
+-- ============================================================================
+
+{% macro run_date_filter(column_name) %}
+    {%- set run_date = var('run_date', '') -%}
+    {%- set lookback_days = var('lookback_days', 0) -%}
+    {%- if run_date -%}
+        ({{ column_name }} is not null and cast({{ column_name }} as date) between
+         (date '{{ run_date }}' - interval '{{ lookback_days }}' day) and date '{{ run_date }}')
+    {%- else -%}
+        true
+    {%- endif -%}
 {%- endmacro %}
 
 -- ============================================================================

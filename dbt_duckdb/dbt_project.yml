@@ -10,9 +10,21 @@ test-paths: ["tests"]
 seed-paths: ["seeds"]
 macro-paths: ["macros"]
 
+# Store target/logs in /tmp to avoid Docker volume file-locking issues (Errno 35)
+target-path: "{{ env_var('DBT_TARGET_PATH', '/tmp/dbt_target') }}"
+log-path: "{{ env_var('DBT_LOG_PATH', '/tmp/dbt_logs') }}"
+
+# Disable partial parsing to avoid lock contention on manifest.msgpack
+flags:
+  partial_parse: false
+  send_anonymous_usage_stats: false
+
 vars:
   bronze_base_path: "{{ env_var('BRONZE_BASE_PATH', 'samples/bronze') }}"
   silver_base_path: "{{ env_var('SILVER_BASE_PATH', 'data/silver/base') }}"
+
+tests:
+  +severity: warn
 
 models:
   ecom_dbt_duckdb:

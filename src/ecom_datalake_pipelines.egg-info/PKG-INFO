@@ -45,6 +45,7 @@ Requires-Dist: mypy>=1.8.0; extra == "dev"
 Requires-Dist: pylint>=3.1.0; extra == "dev"
 Requires-Dist: pytest>=8.0.0; extra == "dev"
 Requires-Dist: pre-commit>=3.6.0; extra == "dev"
+Requires-Dist: types-PyYAML>=6.0.0; extra == "dev"
 Provides-Extra: airflow
 Requires-Dist: apache-airflow>=2.8.0; extra == "airflow"
 Requires-Dist: apache-airflow-providers-google>=10.15.0; extra == "airflow"

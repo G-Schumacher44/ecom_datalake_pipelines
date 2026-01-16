@@ -1,0 +1,122 @@
+"""Daily business KPI calculations."""
+
+from __future__ import annotations
+
+import polars as pl
+
+
+def _resolve_date_column(frame: pl.DataFrame, candidates: list[str]) -> str:
+    for candidate in candidates:
+        if candidate in frame.columns:
+            return candidate
+    raise ValueError(f"Missing date column, tried: {candidates}")
+
+
+def compute_daily_business_metrics(
+    orders: pl.LazyFrame,
+    returns: pl.LazyFrame,
+    carts: pl.LazyFrame,
+    ratio_epsilon: float = 0.0001,
+) -> pl.LazyFrame:
+    """Aggregate high-level business performance daily."""
+    # Ensure inputs are lazy
+    orders = orders.lazy() if isinstance(orders, pl.DataFrame) else orders
+    returns = returns.lazy() if isinstance(returns, pl.DataFrame) else returns
+    carts = carts.lazy() if isinstance(carts, pl.DataFrame) else carts
+
+    order_date_col = _resolve_date_column(orders, ["order_dt", "order_date"])
+    cart_date_col = _resolve_date_column(carts, ["created_dt", "created_at"])
+    return_date_col = _resolve_date_column(returns, ["return_dt", "return_date"])
+
+    orders_daily = (
+        orders.with_columns(date=pl.col(order_date_col).cast(pl.Date))
+        .group_by("date")
+        .agg(
+            pl.len().alias("orders_count"),
+            pl.col("gross_total").sum().alias("gross_revenue"),
+            pl.col("net_total").sum().alias("net_revenue"),
+        )
+    )
+
+    carts_daily = (
+        carts.with_columns(date=pl.col(cart_date_col).cast(pl.Date))
+        .group_by("date")
+        .agg(pl.len().alias("carts_created"))
+    )
+
+    returns_daily = (
+        returns.with_columns(date=pl.col(return_date_col).cast(pl.Date))
+        .group_by("date")
+        .agg(
+            pl.len().alias("returns_count"),
+            pl.col("refunded_amount").sum().alias("refund_total"),
+        )
+    )
+
+    combined = (
+        orders_daily.join(carts_daily, on="date", how="full", coalesce=True)
+        .join(returns_daily, on="date", how="full", coalesce=True)
+        .filter(pl.col("date").is_not_null())
+        .sort("date")
+        .with_columns(
+            pl.col("orders_count").fill_null(0),
+            pl.col("carts_created").fill_null(0),
+            pl.col("returns_count").fill_null(0),
+            pl.col("gross_revenue").fill_null(0.0),
+            pl.col("net_revenue").fill_null(0.0),
+            pl.col("refund_total").fill_null(0.0),
+        )
+    )
+
+    combined = combined.with_columns(
+        avg_order_value=pl.when(pl.col("orders_count") > 0)
+        .then(pl.col("net_revenue") / pl.col("orders_count"))
+        .otherwise(0.0),
+        cart_conversion_rate=pl.when(pl.col("carts_created") > 0)
+        .then(pl.col("orders_count") / pl.col("carts_created"))
+        .otherwise(0.0),
+        return_rate=pl.when(pl.col("orders_count") > 0)
+        .then(pl.col("returns_count") / pl.col("orders_count"))
+        .otherwise(0.0),
+    )
+
+    combined = combined.with_columns(
+        orders_7d_avg=pl.col("orders_count").rolling_mean(window_size=7),
+        revenue_7d_avg=pl.col("net_revenue").rolling_mean(window_size=7),
+        revenue_30d_avg=pl.col("net_revenue").rolling_mean(window_size=30),
+        revenue_30d_std=pl.col("net_revenue").rolling_std(window_size=30),
+    )
+
+    combined = combined.with_columns(
+        revenue_anomaly_flag=pl.when(
+            pl.col("net_revenue")
+            > (pl.col("revenue_30d_avg") + pl.col("revenue_30d_std") * 2)
+        )
+        .then(pl.lit("HIGH"))
+        .when(
+            pl.col("net_revenue")
+            < (pl.col("revenue_30d_avg") - pl.col("revenue_30d_std") * 2)
+        )
+        .then(pl.lit("LOW"))
+        .otherwise(pl.lit("NORMAL"))
+    )
+
+    return combined.select(
+        [
+            "date",
+            "orders_count",
+            "gross_revenue",
+            "net_revenue",
+            "avg_order_value",
+            "carts_created",
+            "cart_conversion_rate",
+            "returns_count",
+            "return_rate",
+            "refund_total",
+            "orders_7d_avg",
+            "revenue_7d_avg",
+            "revenue_30d_avg",
+            "revenue_30d_std",
+            "revenue_anomaly_flag",
+        ]
+    )

@@ -1,0 +1,160 @@
+"""Polars schemas for Base Silver parquet reads."""
+
+from __future__ import annotations
+
+import polars as pl
+
+ORDERS_SCHEMA = {
+    "order_id": pl.Utf8,
+    "total_items": pl.Int64,
+    "order_date": pl.Datetime,
+    "customer_id": pl.Utf8,
+    "email": pl.Utf8,
+    "order_channel": pl.Utf8,
+    "is_expedited": pl.Boolean,
+    "customer_tier": pl.Utf8,
+    "gross_total": pl.Decimal(18, 2),
+    "net_total": pl.Decimal(18, 2),
+    "total_discount_amount": pl.Decimal(18, 2),
+    "payment_method": pl.Utf8,
+    "shipping_speed": pl.Utf8,
+    "shipping_cost": pl.Decimal(18, 2),
+    "agent_id": pl.Utf8,
+    "actual_shipping_cost": pl.Decimal(18, 2),
+    "payment_processing_fee": pl.Decimal(18, 2),
+    "shipping_address": pl.Utf8,
+    "billing_address": pl.Utf8,
+    "clv_bucket": pl.Utf8,
+    "is_reactivated": pl.Boolean,
+    "batch_id": pl.Utf8,
+    "ingestion_ts": pl.Datetime,
+    "event_id": pl.Utf8,
+    "source_file": pl.Utf8,
+}
+
+ORDER_ITEMS_SCHEMA = {
+    "order_id": pl.Utf8,
+    "product_id": pl.Int64,
+    "product_name": pl.Utf8,
+    "category": pl.Utf8,
+    "quantity": pl.Int64,
+    "unit_price": pl.Decimal(18, 2),
+    "discount_amount": pl.Decimal(18, 2),
+    "cost_price": pl.Decimal(18, 2),
+    "batch_id": pl.Utf8,
+    "ingestion_ts": pl.Datetime,
+    "event_id": pl.Utf8,
+    "source_file": pl.Utf8,
+}
+
+CART_ITEMS_SCHEMA = {
+    "cart_item_id": pl.Int64,
+    "cart_id": pl.Utf8,
+    "product_id": pl.Int64,
+    "product_name": pl.Utf8,
+    "category": pl.Utf8,
+    "added_at": pl.Datetime,
+    "quantity": pl.Int64,
+    "unit_price": pl.Decimal(18, 2),
+    "batch_id": pl.Utf8,
+    "ingestion_ts": pl.Datetime,
+    "event_id": pl.Utf8,
+    "source_file": pl.Utf8,
+}
+
+CUSTOMERS_SCHEMA = {
+    "customer_id": pl.Utf8,
+    "email": pl.Utf8,
+    "signup_date": pl.Date,
+    "first_name": pl.Utf8,
+    "last_name": pl.Utf8,
+    "phone_number": pl.Utf8,
+    "gender": pl.Utf8,
+    "age": pl.Decimal(10, 2),
+    "is_guest": pl.Boolean,
+    "customer_status": pl.Utf8,
+    "signup_channel": pl.Utf8,
+    "loyalty_tier": pl.Utf8,
+    "initial_loyalty_tier": pl.Utf8,
+    "email_verified": pl.Boolean,
+    "marketing_opt_in": pl.Boolean,
+    "mailing_address": pl.Utf8,
+    "billing_address": pl.Utf8,
+    "loyalty_enrollment_date": pl.Date,
+    "clv_bucket": pl.Utf8,
+    "batch_id": pl.Utf8,
+    "ingestion_ts": pl.Datetime,
+    "event_id": pl.Utf8,
+    "source_file": pl.Utf8,
+}
+
+PRODUCT_CATALOG_SCHEMA = {
+    "product_id": pl.Int64,
+    "product_name": pl.Utf8,
+    "unit_price": pl.Decimal(18, 2),
+    "cost_price": pl.Decimal(18, 2),
+    "inventory_quantity": pl.Int64,
+    "batch_id": pl.Utf8,
+    "ingestion_ts": pl.Datetime,
+    "event_id": pl.Utf8,
+    "source_file": pl.Utf8,
+}
+
+SHOPPING_CARTS_SCHEMA = {
+    "cart_id": pl.Utf8,
+    "customer_id": pl.Utf8,
+    "created_at": pl.Datetime,
+    "updated_at": pl.Datetime,
+    "cart_total": pl.Decimal(18, 2),
+    "status": pl.Utf8,
+    "batch_id": pl.Utf8,
+    "ingestion_ts": pl.Datetime,
+    "event_id": pl.Utf8,
+    "source_file": pl.Utf8,
+}
+
+RETURNS_SCHEMA = {
+    "return_id": pl.Utf8,
+    "order_id": pl.Utf8,
+    "customer_id": pl.Utf8,
+    "email": pl.Utf8,
+    "return_date": pl.Datetime,
+    "reason": pl.Utf8,
+    "return_type": pl.Utf8,
+    "refunded_amount": pl.Decimal(18, 2),
+    "return_channel": pl.Utf8,
+    "agent_id": pl.Utf8,
+    "refund_method": pl.Utf8,
+    "batch_id": pl.Utf8,
+    "ingestion_ts": pl.Datetime,
+    "event_id": pl.Utf8,
+    "source_file": pl.Utf8,
+}
+
+RETURN_ITEMS_SCHEMA = {
+    "return_item_id": pl.Int64,
+    "return_id": pl.Utf8,
+    "order_id": pl.Utf8,
+    "product_id": pl.Int64,
+    "product_name": pl.Utf8,
+    "category": pl.Utf8,
+    "quantity_returned": pl.Int64,
+    "unit_price": pl.Decimal(18, 2),
+    "cost_price": pl.Decimal(18, 2),
+    "refunded_amount": pl.Decimal(18, 2),
+    "batch_id": pl.Utf8,
+    "ingestion_ts": pl.Datetime,
+    "event_id": pl.Utf8,
+    "source_file": pl.Utf8,
+}
+
+BASE_SILVER_SCHEMAS = {
+    "orders": ORDERS_SCHEMA,
+    "order_items": ORDER_ITEMS_SCHEMA,
+    "cart_items": CART_ITEMS_SCHEMA,
+    "customers": CUSTOMERS_SCHEMA,
+    "product_catalog": PRODUCT_CATALOG_SCHEMA,
+    "shopping_carts": SHOPPING_CARTS_SCHEMA,
+    "returns": RETURNS_SCHEMA,
+    "return_items": RETURN_ITEMS_SCHEMA,
+}

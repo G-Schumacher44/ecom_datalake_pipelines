@@ -35,12 +35,10 @@ env/
 *.swo
 *~
 
-# Data directories (mount these as volumes instead)
+# Data directories (mount these as volumes instead if not baking)
 data/
-samples/bronze/
-samples/silver/
-docs/validation_reports/
-docs/local_only/
+# samples/  <-- Allowed for baked image
+# docs/     <-- Allowed for baked image
 
 # Logs
 *.log
@@ -88,4 +86,4 @@ docker-compose.yml
 .dockerignore
 
 # Scripts (not needed in runtime)
-scripts/
+# scripts/  <-- Allowed for baked image
