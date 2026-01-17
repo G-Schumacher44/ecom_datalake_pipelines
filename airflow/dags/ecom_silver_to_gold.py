@@ -154,7 +154,7 @@ with DAG(
             f"ENV=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}}}\" "
             f'SILVER_GCS_TARGET="gs://$BUCKET/data/silver/base" '
             '&& if [[ "$ENV" =~ ^(dev|prod)$ ]] && [[ "$SILVER_BASE_PATH" != gs://* ]] && [[ "$BUCKET" != "local" ]]; then '
-            'gsutil -m rsync -r "$SILVER_BASE_PATH" "$SILVER_GCS_TARGET"; '
+            'gcloud storage rsync -r --delete-unmatched-destination-objects "$SILVER_BASE_PATH" "$SILVER_GCS_TARGET"; '
             "else echo 'sync skipped'; fi"
         ),
     )
@@ -237,7 +237,7 @@ with DAG(
             f"ENV=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}}}\" "
             f'SILVER_ENRICHED_GCS_TARGET="gs://$BUCKET/data/silver/enriched" '
             '&& if [[ "$ENV" =~ ^(dev|prod)$ ]] && [[ "$SILVER_ENRICHED_PATH" != gs://* ]] && [[ "$BUCKET" != "local" ]]; then '
-            'gsutil -m rsync -r "$SILVER_ENRICHED_PATH" "$SILVER_ENRICHED_GCS_TARGET"; '
+            'gcloud storage rsync -r --delete-unmatched-destination-objects "$SILVER_ENRICHED_PATH" "$SILVER_ENRICHED_GCS_TARGET"; '
             "else echo 'sync skipped'; fi"
         ),
     )
