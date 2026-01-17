@@ -37,6 +37,19 @@ from src.validation.common import (
 
 logger = get_logger(__name__)
 
+DEFAULT_ENRICHED_TABLES = [
+    "int_attributed_purchases",
+    "int_cart_attribution",
+    "int_churn_detection",
+    "int_customer_lifetime_value",
+    "int_daily_business_metrics",
+    "int_inventory_risk",
+    "int_product_performance",
+    "int_regional_financials",
+    "int_sales_velocity",
+    "int_shipping_economics",
+]
+
 
 @dataclass
 class EnrichedTableMetrics:
@@ -588,13 +601,11 @@ def main() -> int:
         output_path=Path(args.output_report),
     )
 
-    if args.fail_on_issues and overall_status == "FAIL":
-        return 1
-
-    if pipeline_env == "prod" and overall_status == "FAIL":
-        return 1
-
-    return 0
+    return handle_exit(
+        overall_status=overall_status,
+        enforce=args.enforce_quality or args.fail_on_issues,
+        env=pipeline_env,
+    )
 
 
 if __name__ == "__main__":

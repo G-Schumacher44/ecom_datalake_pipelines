@@ -4,13 +4,7 @@ from __future__ import annotations
 
 import polars as pl
 
-
-def _date_or_null(frame: pl.DataFrame, primary: str, fallback: str) -> pl.Expr:
-    if primary in frame.columns:
-        return pl.col(primary).cast(pl.Date)
-    if fallback in frame.columns:
-        return pl.col(fallback).cast(pl.Date)
-    return pl.lit(None)
+from src.transforms.common import _date_or_null
 
 
 def compute_product_performance(
@@ -26,8 +20,13 @@ def compute_product_performance(
     return_items = return_items.lazy() if isinstance(return_items, pl.DataFrame) else return_items
     cart_items = cart_items.lazy() if isinstance(cart_items, pl.DataFrame) else cart_items
 
+    product_cols = products.collect_schema().names()
+    order_cols = order_items.collect_schema().names()
+    return_cols = return_items.collect_schema().names()
+    cart_cols = cart_items.collect_schema().names()
+
     category_expr = (
-        pl.col("category") if "category" in products.columns else pl.lit(None)
+        pl.col("category") if "category" in product_cols else pl.lit(None)
     ).alias("category")
 
     products_trim = products.select(
@@ -41,7 +40,7 @@ def compute_product_performance(
 
     order_items = (
         order_items.with_columns(
-            product_dt=_date_or_null(order_items, "order_dt", "ingestion_ts")
+            product_dt=_date_or_null(order_cols, "order_dt", "ingestion_ts")
         )
         .join(products_trim.select("product_id", "catalog_cost_price"), on="product_id", how="left")
         .with_columns(
@@ -51,10 +50,10 @@ def compute_product_performance(
         )
     )
     return_items = return_items.with_columns(
-        product_dt=_date_or_null(return_items, "return_dt", "ingestion_ts")
+        product_dt=_date_or_null(return_cols, "return_dt", "ingestion_ts")
     )
     cart_items = cart_items.with_columns(
-        product_dt=_date_or_null(cart_items, "added_dt", "ingestion_ts")
+        product_dt=_date_or_null(cart_cols, "added_dt", "ingestion_ts")
     )
 
     order_agg = (

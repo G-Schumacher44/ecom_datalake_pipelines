@@ -20,13 +20,18 @@ jobs:
       - name: Lint with Ruff
         run: ruff check .
       - name: Type check
-        run: mypy src
+        run: mypy src tests
       - name: Unit tests
         run: pytest -q
       - name: dbt validation
         run: |
           pip install -e ".[dbt]"
-          export BRONZE_BASE_PATH=samples/bronze
-          export SILVER_BASE_PATH=data/silver/base
-          cd dbt_duckdb && dbt deps && dbt parse
-          cd ../dbt_bigquery && dbt deps && dbt parse
+          export BRONZE_BASE_PATH=$(pwd)/samples/bronze
+          export SILVER_BASE_PATH=$(pwd)/data/silver/base
+          mkdir -p /tmp/dbt_duckdb
+          cd dbt_duckdb
+          dbt deps
+          dbt build --target dev --project-dir . --profiles-dir .
+          cd ../dbt_bigquery
+          dbt deps
+          dbt parse

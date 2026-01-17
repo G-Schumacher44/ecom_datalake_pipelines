@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from functools import wraps
+import logging
 import os
 from typing import Any, Callable, Dict, Sequence
 
@@ -11,6 +12,8 @@ import polars as pl
 
 from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
 from src.settings import load_settings, PipelineConfig
+
+logger = logging.getLogger(__name__)
 
 
 def enriched_runner(
@@ -138,8 +141,20 @@ def read_partitioned(
         dt for dt in partition_range(ingest_dt, lookback_days) if dt in available
     ]
     if not desired:
+        # If no partitions match the requested date range, return an empty
+        # DataFrame with the correct schema. This prevents pipeline failure
+        # when data is legitimately missing (e.g. gaps in source data).
+        logger.warning(
+            f"No {partition_key} partitions found for {table} at {base_path} "
+            f"matching range for {ingest_dt}. Returning empty DataFrame."
+        )
+        schema = BASE_SILVER_SCHEMAS.get(table)
+        if schema:
+            return pl.DataFrame(schema=schema).lazy()
+        # Fallback if schema is missing (should not happen given imports)
         raise FileNotFoundError(
-            f"No {partition_key} partitions found for {table} at {base_path}"
+            f"No {partition_key} partitions found for {table} at {base_path} "
+            f"matching range for {ingest_dt}"
         )
 
     paths = [f"{base_path}/{table}/{partition_key}={dt}/**/*.parquet" for dt in desired]

@@ -52,6 +52,10 @@ x-airflow-common: &airflow-common
     # - ./airflow/dags:/opt/airflow/dags
 
     # Mount data directories for local runs
+    # NOTE: If you hit "Resource deadlock avoided" (Errno 35) on macOS:
+    #   1. Docker Desktop → Settings → General → Change VirtioFS to gRPC FUSE
+    #   2. Ensure project is NOT in a cloud-synced folder (iCloud, OneDrive, etc.)
+    #   3. Restart Docker Desktop
     - ./samples:/opt/airflow/samples
     - ./data:/opt/airflow/data
     - ./docs:/opt/airflow/docs

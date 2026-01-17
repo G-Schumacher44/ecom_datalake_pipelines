@@ -36,7 +36,7 @@ def test_compute_daily_business_metrics_basic_kpis() -> None:
         orders=orders,
         carts=carts,
         returns=returns,
-    )
+    ).collect()
 
     day1 = result.filter(pl.col("date") == date(2020, 1, 1)).row(0, named=True)
 

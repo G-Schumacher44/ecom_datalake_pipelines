@@ -20,7 +20,7 @@ def test_compute_sales_velocity_flags_trend() -> None:
         }
     )
 
-    result = compute_sales_velocity(orders, order_items, window_days=2)
+    result = compute_sales_velocity(orders, order_items, window_days=2).collect()
     row = result.filter(pl.col("order_dt") == date(2020, 1, 2)).row(0, named=True)
 
     assert row["velocity_avg"] == 15
