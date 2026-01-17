@@ -79,7 +79,7 @@ with DAG(
             f"cd {AIRFLOW_HOME} && "
             f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
             f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
-            f"&& ./scripts/run_base_silver.sh "
+            f"&& python -m src.runners.base_silver "
             "--select stg_ecommerce__customers stg_ecommerce__customers_quarantine"
         ),
     )
@@ -92,7 +92,7 @@ with DAG(
             f"cd {AIRFLOW_HOME} && "
             f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
             f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
-            f"&& ./scripts/run_base_silver.sh "
+            f"&& python -m src.runners.base_silver "
             "--select stg_ecommerce__product_catalog stg_ecommerce__product_catalog_quarantine"
         ),
     )
@@ -102,7 +102,7 @@ with DAG(
         task_id="validate_dim_quality",
         env=COMMON_ENV,
         bash_command=(
-            f"cd {AIRFLOW_HOME} && python -m src.validation.silver_quality "
+            f"cd {AIRFLOW_HOME} && python -m src.validation.silver "
             f"--bronze-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}} "
             f"--silver-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}} "
             f"--quarantine-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}/quarantine "
