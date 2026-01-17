@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from datetime import timedelta
 
-from src.settings import load_settings
+from src.settings import load_settings, RetryConfig
 
 # --- Configuration Helper (Lazy Loading) ---
 
@@ -98,3 +98,35 @@ def make_runner_callable(runner_func):
     def wrapper(**kwargs):
         return run_enriched_runner(runner_func, **kwargs)
     return wrapper
+
+def get_retry_config(environment: str | None = None) -> dict:
+    """Get Airflow retry configuration for the current environment.
+
+    Args:
+        environment: Environment name (local/dev/prod). If None, resolves from PIPELINE_ENV
+                    or config.
+
+    Returns:
+        Dictionary with Airflow default_args retry settings:
+        - retries: Number of retry attempts
+        - retry_delay: timedelta for initial delay
+        - retry_exponential_backoff: Whether to use exponential backoff
+        - max_retry_delay: timedelta for maximum retry delay
+    """
+    config = SettingsConfig()
+    env = environment or config.resolve_pipeline_env()
+
+    # Get retry config for this environment
+    retry_cfg: RetryConfig = config.pipeline.retry_config.get(env)
+    if not retry_cfg:
+        raise ValueError(
+            f"No retry_config found for environment '{env}'. "
+            f"Available: {list(config.pipeline.retry_config.keys())}"
+        )
+
+    return {
+        "retries": retry_cfg.retries,
+        "retry_delay": timedelta(minutes=retry_cfg.retry_delay_minutes),
+        "retry_exponential_backoff": retry_cfg.retry_exponential_backoff,
+        "max_retry_delay": timedelta(minutes=retry_cfg.max_retry_delay_minutes),
+    }

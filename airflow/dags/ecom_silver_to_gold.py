@@ -15,6 +15,7 @@ from common import (
     SettingsConfig,
     make_runner_callable,
     resolve_bool,
+    get_retry_config,
 )
 
 from airflow import DAG
@@ -76,7 +77,7 @@ with DAG(
     start_date=pendulum.datetime(2024, 1, 1, tz="UTC"),
     schedule=None,
     catchup=False,
-    default_args={"retries": 1},
+    default_args=get_retry_config(),
     tags=["ecom", "silver", "gold"],
 ) as dag:
 
