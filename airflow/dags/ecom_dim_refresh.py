@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import os
-
-from airflow import DAG
+import pendulum
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
-import pendulum
-
 from common import (
     AIRFLOW_HOME,
     COMMON_ENV,
     PIPELINE_ENV,
     SettingsConfig,
 )
+
+from airflow import DAG
 
 # --- Task Callables ---
 

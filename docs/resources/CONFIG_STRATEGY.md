@@ -151,20 +151,47 @@ pipeline:
 
 ### Environment Variable Overrides
 
-**See `.env.example` for all options.**
+**See `.envrc` and `.env.example` for all options.**
 
 Key overrides:
-- `PIPELINE_ENV` → Overrides `pipeline.environment`
+
+#### Pipeline & Environment
+
+- `PIPELINE_ENV` → Overrides `pipeline.environment` (local, dev, prod)
 - `GOOGLE_CLOUD_PROJECT` → Overrides `pipeline.project_id`
+- `GCS_BUCKET` → Bronze data bucket for GCS operations
+
+#### Observability
+
 - `METRICS_BUCKET` → Overrides observability metrics bucket (observability only)
 - `LOGS_BUCKET` → Overrides observability logs bucket (observability only)
 - `OBSERVABILITY_ENV` → Overrides observability environment (observability only)
+- `METRICS_BASE_PATH` → Local path for metrics output (default: `/tmp/metrics` in Docker)
+- `LOGS_BASE_PATH` → Local path for logs output (default: `/tmp/logs` in Docker)
+
+#### Data Paths
+
 - `BRONZE_BASE_PATH` → Overrides dbt var (for dbt models)
 - `SILVER_BASE_PATH` → Overrides dbt var (for dbt models)
 - `SILVER_QUARANTINE_PATH` → Overrides silver quarantine output path
 - `SILVER_ENRICHED_PATH` → Overrides silver enriched output path
 - `SILVER_GCS_TARGET` → Overrides silver base GCS sync target
 - `SILVER_ENRICHED_GCS_TARGET` → Overrides silver enriched GCS sync target
+
+#### dbt / DuckDB (Docker paths)
+
+- `DBT_TARGET_PATH` → dbt compiled artifacts (default: `/tmp/dbt_target`)
+- `DBT_LOG_PATH` → dbt log files (default: `/tmp/dbt_logs`)
+- `DBT_DUCKDB_PATH` → DuckDB database file (default: `/tmp/dbt_duckdb/ecom.duckdb`)
+- `DBT_PARTIAL_PARSE` → Enable/disable dbt partial parsing (default: `false`)
+
+#### Feature Flags
+
+- `GOLD_PIPELINE_ENABLED` → Enable BigQuery Gold layer (default: `false`)
+- `BQ_LOAD_ENABLED` → Enable Enriched Silver BigQuery loads (default: `false`)
+- `BRONZE_QA_REQUIRED` → Require Bronze QA phase (default: `true`)
+- `BRONZE_QA_FAIL` → Fail pipeline on Bronze issues (default: `false`)
+- `STRICT_FK` → Enforce FK validation in Silver (default: `false`)
 
 ---
 

@@ -1,44 +1,47 @@
 # Enriched Silver Quality Report
 
-**Last Updated:** 2026-01-16 16:19:13 UTC
-**Run ID:** `manual__2025-10-10T00:00:00+00:00`
+**Last Updated:** 2026-01-17 05:11:10 UTC
+**Run ID:** `manual__2025-10-03T00:00:00+00:00`
 **Overall Status:** ⚠️ WARN
 
 ## Summary
 
 | Table | Partition | Value | Rows | Min Rows | Δ vs prior | Status | Notes |
 |-------|-----------|-------|------|----------|-----------|--------|-------|
-| int_attributed_purchases | order_dt | 2025-10-10 | 815 | 1 | - | ✅ PASS | - |
-| int_cart_attribution | cart_dt | 2025-10-10 | 6,230 | 1 | - | ⚠️ WARN | semantic_checks_failed |
-| int_inventory_risk | ingest_dt | 2025-10-10 | 3,000 | 1 | - | ✅ PASS | - |
-| int_customer_retention_signals | ingest_dt | 2025-10-10 | 6,412 | 1 | - | ✅ PASS | - |
-| int_customer_lifetime_value | ingest_dt | 2025-10-10 | 6,412 | 1 | - | ✅ PASS | - |
-| int_daily_business_metrics | date | 2025-10-10 | 1 | 1 | - | ⚠️ WARN | semantic_checks_failed |
-| int_product_performance | product_dt | 2025-10-10 | 2,999 | 1 | - | ⚠️ WARN | sanity_checks_failed, semantic_checks_failed |
-| int_sales_velocity | order_dt | 2025-10-10 | 2,142 | 1 | - | ✅ PASS | - |
-| int_regional_financials | order_dt | 2025-10-10 | 815 | 1 | - | ✅ PASS | - |
-| int_shipping_economics | order_dt | 2025-10-10 | 815 | 1 | - | ✅ PASS | - |
+| int_attributed_purchases | order_dt | 2025-10-03 | 727 | 1 | +14.49% | ✅ PASS | - |
+| int_cart_attribution | cart_dt | 2025-10-03 | 5,241 | 1 | +3.97% | ⚠️ WARN | semantic_checks_failed |
+| int_inventory_risk | ingest_dt | 2025-10-03 | 6,000 | 1 | +100.00% | ✅ PASS | - |
+| int_customer_retention_signals | ingest_dt | 2025-10-03 | 6,412 | 1 | -19.37% | ✅ PASS | - |
+| int_customer_lifetime_value | ingest_dt | 2025-10-03 | 6,412 | 1 | -19.37% | ✅ PASS | - |
+| int_daily_business_metrics | date | 2025-10-03 | 1 | 1 | +0.00% | ⚠️ WARN | semantic_checks_failed |
+| int_product_performance | product_dt | 2025-10-03 | 5,990 | 1 | +99.80% | ⚠️ WARN | sanity_checks_failed, semantic_checks_failed |
+| int_sales_velocity | order_dt | 2025-10-03 | 2,032 | 1 | +4.21% | ✅ PASS | - |
+| int_regional_financials | order_dt | 2025-10-03 | 727 | 1 | +14.49% | ✅ PASS | - |
+| int_shipping_economics | order_dt | 2025-10-03 | 727 | 1 | +14.49% | ✅ PASS | - |
 
 ---
 
 ## Issues Detected
 
 ### ⚠️ int_cart_attribution
-- **Partition:** cart_dt=2025-10-10
-- **Rows:** 6,230
+- **Partition:** cart_dt=2025-10-03
+- **Rows:** 5,241
 - **Min Rows:** 1
+- **Row Delta vs prior:** +3.97%
 - **Notes:** semantic_checks_failed
 
 ### ⚠️ int_daily_business_metrics
-- **Partition:** date=2025-10-10
+- **Partition:** date=2025-10-03
 - **Rows:** 1
 - **Min Rows:** 1
+- **Row Delta vs prior:** +0.00%
 - **Notes:** semantic_checks_failed
 
 ### ⚠️ int_product_performance
-- **Partition:** product_dt=2025-10-10
-- **Rows:** 2,999
+- **Partition:** product_dt=2025-10-03
+- **Rows:** 5,990
 - **Min Rows:** 1
+- **Row Delta vs prior:** +99.80%
 - **Notes:** sanity_checks_failed, semantic_checks_failed
 
 ---
@@ -74,6 +77,7 @@
 | is_reactivated | bool |
 | batch_id | large_string |
 | ingestion_ts | timestamp[us] |
+| ingestion_dt | date32[day] |
 | event_id | large_string |
 | source_file | large_string |
 | order_dt | large_string |
@@ -85,6 +89,7 @@
 | status | large_string |
 | batch_id_right | large_string |
 | ingestion_ts_right | timestamp[us] |
+| ingestion_dt_right | date32[day] |
 | event_id_right | large_string |
 | source_file_right | large_string |
 | created_dt | date32[day] |
@@ -128,7 +133,7 @@
 | cart_id | 0.00% |
 | customer_id | 0.00% |
 
-**Semantic Issues:** abandoned_value_positive_for_abandoned: 852 rows
+**Semantic Issues:** abandoned_value_positive_for_abandoned: 652 rows
 
 ### int_inventory_risk
 
@@ -143,6 +148,7 @@
 | inventory_quantity | int64 |
 | batch_id | large_string |
 | ingestion_ts | timestamp[us] |
+| ingestion_dt | date32[day] |
 | event_id | large_string |
 | source_file | large_string |
 | category | large_string |
@@ -188,6 +194,7 @@
 | clv_bucket | large_string |
 | batch_id | large_string |
 | ingestion_ts | timestamp[us] |
+| ingestion_dt | date32[day] |
 | event_id | large_string |
 | source_file | large_string |
 | signup_dt | date32[day] |
@@ -298,9 +305,9 @@
 | product_id | 0.00% |
 | product_dt | 0.00% |
 
-**Sanity Issues:** return_rate: 8 outside_0_1, cart_to_order_rate: 1 outside_0_1
+**Sanity Issues:** return_rate: 10 outside_0_1, cart_to_order_rate: 228 outside_0_1
 
-**Semantic Issues:** units_returned_le_units_sold: 49 rows, return_rate_le_one: 8 rows, cart_to_order_rate_le_one: 1 rows
+**Semantic Issues:** units_returned_le_units_sold: 26 rows, return_rate_le_one: 10 rows, cart_to_order_rate_le_one: 228 rows
 
 ### int_sales_velocity
 
@@ -351,10 +358,14 @@
 | is_reactivated | bool |
 | batch_id | large_string |
 | ingestion_ts | timestamp[us] |
+| ingestion_dt | date32[day] |
 | event_id | large_string |
 | source_file | large_string |
 | order_dt | large_string |
 | region | large_string |
+| tax_rate | double |
+| tax_amount | double |
+| net_revenue | double |
 | ingest_dt | large_string |
 
 **Key Field Null Rates:**
