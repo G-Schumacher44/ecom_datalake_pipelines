@@ -180,6 +180,7 @@ class StructuredLogger:
 # Global logger cache
 _loggers: dict[str, StructuredLogger] = {}
 
+
 def _context_from_env() -> dict[str, str]:
     context: dict[str, str] = {}
     run_id = os.getenv("AIRFLOW_CTX_DAG_RUN_ID") or os.getenv("ECOM_RUN_ID")

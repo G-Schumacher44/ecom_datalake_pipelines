@@ -56,10 +56,14 @@ class ObservabilityConfig:
             config_metrics_bucket = settings.pipeline.metrics_bucket
             config_logs_bucket = settings.pipeline.logs_bucket
         except Exception as exc:
-                    # Fallback to local defaults if config.yml is missing or invalid
-                    import sys
-                    print(f"WARNING: Observability falling back to defaults. Reason: {exc}", file=sys.stderr)
-                    pass
+            # Fallback to local defaults if config.yml is missing or invalid
+            import sys
+
+            print(
+                f"WARNING: Observability falling back to defaults. Reason: {exc}",
+                file=sys.stderr,
+            )
+            pass
         # Environment variable overrides config file
         env_override = os.getenv("OBSERVABILITY_ENV")
         if env_override:
@@ -88,7 +92,9 @@ class ObservabilityConfig:
         """Base path for metrics storage."""
         if self.environment == Environment.LOCAL:
             # Use /tmp in Docker to avoid macOS bind mount Errno 35 locking issues
-            return os.getenv("METRICS_BASE_PATH", str(self.project_root / "data" / "metrics"))
+            return os.getenv(
+                "METRICS_BASE_PATH", str(self.project_root / "data" / "metrics")
+            )
         return f"gs://{self.metrics_bucket}/pipeline_metrics"
 
     @property

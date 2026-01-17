@@ -1,11 +1,14 @@
 from __future__ import annotations
+
 import os
 import tempfile
 from pathlib import Path
+
 from src.observability import get_logger
 from src.validation.enriched.models import EnrichedTableMetrics
 
 logger = get_logger(__name__)
+
 
 def generate_markdown_report(
     run_id: str,
@@ -22,11 +25,12 @@ def generate_markdown_report(
         "",
         f"**Last Updated:** {timestamp}",
         f"**Run ID:** `{run_id}`",
-        f"**Overall Status:** {status_emoji.get(overall_status, '❓')} {overall_status}",
+        f"**Overall Status:** {status_emoji.get(overall_status, '❓')} "
+        f"{overall_status}",
         "",
         "## Summary",
         "",
-        "| Table | Partition | Value | Rows | Min Rows | Δ vs prior | Status | Notes |
+        "| Table | Partition | Value | Rows | Min Rows | Δ vs prior | Status | Notes |",
         "|-------|-----------|-------|------|----------|-----------|--------|-------|",
     ]
 
@@ -37,7 +41,8 @@ def generate_markdown_report(
         if metrics.row_delta_pct is not None:
             delta_display = f"{metrics.row_delta_pct:+.2f}%"
         lines.append(
-            f"| {metrics.table} | {metrics.partition_key} | {metrics.ingest_dt or '-'} | "
+            f"| {metrics.table} | {metrics.partition_key} | "
+            f"{metrics.ingest_dt or '-'} | "
             f"{metrics.row_count:,} | {min_rows} | {delta_display} | "
             f"{status_emoji.get(metrics.status, '❓')} {metrics.status} | {notes} |"
         )

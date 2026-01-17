@@ -212,6 +212,7 @@ test:
 
 lint:
 	ruff check src/ tests/
+	yamllint .
 
 format:
 	black src/ tests/

@@ -161,6 +161,7 @@ pipeline:
           expr: "carts_created > 0 and abs(cart_conversion_rate - (orders_count / carts_created)) > {ratio_epsilon}"
       int_shipping_economics:
         - name: "shipping_margin_matches_components"
-          expr: "abs((shipping_cost - actual_shipping_cost) - shipping_margin) > 0.01"
+          expr: >-
+            abs((shipping_cost - actual_shipping_cost) - shipping_margin) > 0.01
         - name: "shipping_margin_pct_null_when_zero_cost"
           expr: "shipping_cost == 0 and shipping_margin_pct is not null"

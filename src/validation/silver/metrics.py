@@ -17,6 +17,7 @@ from src.validation.silver.models import TableQualityMetrics
 
 logger = logging.getLogger(__name__)
 
+
 def validate_table(
     table: str,
     bronze_path: Path,
@@ -83,6 +84,7 @@ def validate_table(
         row_loss=row_loss,
         row_loss_pct=row_loss_pct,
     )
+
 
 def compute_fk_mismatch_summary(silver_path: Path) -> list[dict[str, Any]]:
     fk_pairs = [

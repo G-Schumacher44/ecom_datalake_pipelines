@@ -9,6 +9,7 @@ from src.validation.common import collect_parquet_files
 
 logger = logging.getLogger(__name__)
 
+
 def get_quarantine_breakdown(quarantine_path: Path, top_n: int = 5) -> list[dict]:
     """Analyze quarantine reasons and return top failures."""
     if not quarantine_path.exists():
@@ -64,13 +65,24 @@ def get_quarantine_breakdown(quarantine_path: Path, top_n: int = 5) -> list[dict
         )
         return []
 
+
 def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
     if not table_path.exists():
-        return {"total_rows": 0, "non_null_rows": 0, "distinct_count": 0, "distinct_ratio": 0.0}
+        return {
+            "total_rows": 0,
+            "non_null_rows": 0,
+            "distinct_count": 0,
+            "distinct_ratio": 0.0,
+        }
 
     parquet_files = collect_parquet_files(table_path)
     if not parquet_files:
-        return {"total_rows": 0, "non_null_rows": 0, "distinct_count": 0, "distinct_ratio": 0.0}
+        return {
+            "total_rows": 0,
+            "non_null_rows": 0,
+            "distinct_count": 0,
+            "distinct_ratio": 0.0,
+        }
 
     try:
         df = pl.read_parquet(
@@ -88,12 +100,17 @@ def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
             error_type=type(exc).__name__,
             error=str(exc),
         )
-        return {"total_rows": 0, "non_null_rows": 0, "distinct_count": 0, "distinct_ratio": 0.0}
+        return {
+            "total_rows": 0,
+            "non_null_rows": 0,
+            "distinct_count": 0,
+            "distinct_ratio": 0.0,
+        }
 
     total_rows = df.height
     non_null_rows = df.select(pl.col(key).is_not_null().sum()).item()
     distinct_count = df.select(pl.col(key).drop_nulls().n_unique()).item()
-    distinct_ratio = (distinct_count / non_null_rows if non_null_rows > 0 else 0.0)
+    distinct_ratio = distinct_count / non_null_rows if non_null_rows > 0 else 0.0
 
     return {
         "total_rows": total_rows,
@@ -101,6 +118,7 @@ def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
         "distinct_count": distinct_count,
         "distinct_ratio": distinct_ratio,
     }
+
 
 def list_ingest_partitions(path: Path) -> set[str]:
     """Return ingest_dt partition values (YYYY-MM-DD) for a table path."""

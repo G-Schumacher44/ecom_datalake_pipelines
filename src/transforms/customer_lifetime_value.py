@@ -23,12 +23,8 @@ def compute_customer_lifetime_value(
     orders = orders.lazy() if isinstance(orders, pl.DataFrame) else orders
     returns = returns.lazy() if isinstance(returns, pl.DataFrame) else returns
 
-    orders_dates = orders.with_columns(
-        order_dt=pl.col("order_date").cast(pl.Date)
-    )
-    returns_dates = returns.with_columns(
-        return_dt=pl.col("return_date").cast(pl.Date)
-    )
+    orders_dates = orders.with_columns(order_dt=pl.col("order_date").cast(pl.Date))
+    returns_dates = returns.with_columns(return_dt=pl.col("return_date").cast(pl.Date))
 
     if reference_date is None:
         # Note: height is not available on LazyFrame without collecting.
@@ -62,9 +58,7 @@ def compute_customer_lifetime_value(
         .with_columns(
             net_clv=pl.col("total_spent") - pl.col("total_refunded"),
             days_since_last_order=pl.when(pl.col("last_order_date").is_not_null())
-            .then(
-                (pl.lit(reference_date) - pl.col("last_order_date")).dt.total_days()
-            )
+            .then((pl.lit(reference_date) - pl.col("last_order_date")).dt.total_days())
             .otherwise(None),
         )
         .with_columns(

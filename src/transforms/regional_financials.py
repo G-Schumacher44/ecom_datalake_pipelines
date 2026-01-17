@@ -24,15 +24,15 @@ def compute_regional_financials(
             on="customer_id",
             how="left",
         )
-    
+
     current_cols = enriched.collect_schema().names()
-    
+
     address_parts = []
     if "shipping_address" in current_cols:
         address_parts.append(pl.col("shipping_address"))
     if "billing_address" in current_cols:
         address_parts.append(pl.col("billing_address"))
-    
+
     if address_parts:
         address = pl.coalesce(address_parts)
         state = address.str.extract(r",\s*([A-Z]{2})\s\d{5}", 1)
@@ -51,12 +51,14 @@ def compute_regional_financials(
         enriched = enriched.with_columns(region_expr.alias("region"))
 
     # Add financial metrics
-    enriched = enriched.with_columns(
-        tax_rate=pl.lit(0.0),
-    ).with_columns(
-        tax_amount=pl.col("gross_total") * pl.col("tax_rate"),
-    ).with_columns(
-        net_revenue=pl.col("gross_total") - pl.col("tax_amount")
+    enriched = (
+        enriched.with_columns(
+            tax_rate=pl.lit(0.0),
+        )
+        .with_columns(
+            tax_amount=pl.col("gross_total") * pl.col("tax_rate"),
+        )
+        .with_columns(net_revenue=pl.col("gross_total") - pl.col("tax_amount"))
     )
 
     return enriched

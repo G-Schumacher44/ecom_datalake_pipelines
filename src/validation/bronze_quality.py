@@ -33,11 +33,11 @@ from src.validation.common import (
 
 logger = get_logger(__name__)
 
+
 def get_partition_glob(table: str) -> str:
     """Get the partition glob for a table from centralized config."""
     key = get_table_partitions().get(table, "ingest_dt")
     return f"{key}=*"
-
 
 
 @dataclass
@@ -242,13 +242,14 @@ def generate_report(
 
 def main() -> int:
     args = parse_args()
-    
+
     from src.settings import load_settings
+
     settings = load_settings(args.config)
     pipeline_env = os.getenv("PIPELINE_ENV", settings.pipeline.environment).lower()
 
     run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    
+
     # Resolve paths using shared library
     paths = resolve_layer_paths(args.config, bronze_over=args.bronze_path)
     bronze_root = str(paths["bronze"])
@@ -257,7 +258,7 @@ def main() -> int:
 
     available_tables = list_tables(bronze_root)
     expected_tables = list(get_table_partitions().keys())
-    
+
     if args.tables:
         requested = [t.strip() for t in args.tables.split(",") if t.strip()]
         tables = [t for t in requested if t in available_tables]
@@ -269,7 +270,7 @@ def main() -> int:
     # Overall status: FAIL if any critical issues found (missing manifests/empty)
     total_missing = sum(m.missing_manifests for m in metrics)
     total_empty = sum(m.empty_partitions for m in metrics)
-    
+
     if total_missing > 0 or total_empty > 0:
         overall_status = ValidationStatus.FAIL
     else:
@@ -307,7 +308,7 @@ def main() -> int:
     return handle_exit(
         overall_status=overall_status,
         enforce=args.enforce_quality or args.fail_on_issues,
-        env=pipeline_env
+        env=pipeline_env,
     )
 
 

@@ -23,7 +23,7 @@ def enriched_runner(
     """Decorator to standardize Enriched Silver runner boilerplate."""
 
     def decorator(
-        func: Callable[[Dict[str, pl.LazyFrame], PipelineConfig, str], pl.LazyFrame]
+        func: Callable[[Dict[str, pl.LazyFrame], PipelineConfig, str], pl.LazyFrame],
     ):
         @wraps(func)
         def wrapper(

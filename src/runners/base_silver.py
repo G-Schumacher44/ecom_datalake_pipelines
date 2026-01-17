@@ -98,7 +98,7 @@ def run_dbt(
     ] + dbt_args
 
     logger.info(f"Executing: {' '.join(cmd)}")
-    
+
     try:
         # Stream output to stdout/stderr
         subprocess.run(cmd, env=env, check=True)
@@ -110,8 +110,8 @@ def run_dbt(
 def main() -> None:
     """Main entry point."""
     # Load settings to resolve defaults if env vars missing
-    settings = load_settings()
-    
+    load_settings()
+
     # Resolve paths (Env vars take precedence over config)
     bronze_path = Path(os.getenv("BRONZE_BASE_PATH", "samples/bronze"))
     silver_path = Path(os.getenv("SILVER_BASE_PATH", "data/silver/base"))
@@ -128,7 +128,7 @@ def main() -> None:
     # Pass remaining CLI arguments to dbt
     # sys.argv[0] is the script name, so we take everything after
     dbt_extra_args = sys.argv[1:]
-    
+
     run_dbt(dbt_args=dbt_extra_args)
 
 
