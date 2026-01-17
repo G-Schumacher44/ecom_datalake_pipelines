@@ -1,0 +1,149 @@
+from __future__ import annotations
+import logging
+from pathlib import Path
+from typing import Any
+
+import polars as pl
+
+from src.validation.silver.models import TableQualityMetrics
+from src.validation.silver.data import (
+    count_parquet_rows,
+    get_quarantine_breakdown,
+    collect_parquet_files,
+)
+
+logger = logging.getLogger(__name__)
+
+def validate_table(
+    table: str,
+    bronze_path: Path,
+    silver_path: Path,
+    quarantine_path: Path,
+    sla_thresholds: dict[str, float],
+) -> TableQualityMetrics:
+    """Validate quality for a single table."""
+    logger.info(f"Validating {table}...")
+
+    bronze_rows = count_parquet_rows(bronze_path / table)
+    silver_rows = count_parquet_rows(silver_path / table)
+    quarantine_rows = count_parquet_rows(quarantine_path / table)
+
+    total_processed = silver_rows + quarantine_rows
+
+    if total_processed > 0:
+        pass_rate = silver_rows / total_processed
+    else:
+        pass_rate = 0.0
+        logger.warning(f"{table}: No rows processed!")
+
+    sla_threshold = sla_thresholds.get(table, 0.95)
+
+    if pass_rate >= sla_threshold:
+        status = "PASS"
+    elif pass_rate >= (sla_threshold * 0.9):
+        status = "WARN"
+    else:
+        status = "FAIL"
+
+    quarantine_breakdown = get_quarantine_breakdown(quarantine_path / table)
+    row_loss = bronze_rows - total_processed
+    row_loss_pct = (row_loss / bronze_rows * 100) if bronze_rows > 0 else 0.0
+
+    logger.info(
+        f"{table}: {status}",
+        bronze_rows=bronze_rows,
+        silver_rows=silver_rows,
+        quarantine_rows=quarantine_rows,
+        pass_rate=f"{pass_rate:.2%}",
+        sla=f"{sla_threshold:.2%}",
+    )
+
+    if status in ("WARN", "FAIL"):
+        logger.warning(
+            f"{table}: Pass rate {pass_rate:.2%} "
+            f"{'below' if status == 'FAIL' else 'near'} "
+            f"SLA {sla_threshold:.2%}"
+        )
+
+    if row_loss_pct > 1.0:
+        logger.warning(f"{table}: Lost {row_loss_pct:.2%} of rows ({row_loss:,} rows)")
+
+    return TableQualityMetrics(
+        table=table,
+        bronze_rows=bronze_rows,
+        silver_rows=silver_rows,
+        quarantine_rows=quarantine_rows,
+        pass_rate=pass_rate,
+        sla_threshold=sla_threshold,
+        status=status,
+        quarantine_breakdown=quarantine_breakdown,
+        row_loss=row_loss,
+        row_loss_pct=row_loss_pct,
+    )
+
+def compute_fk_mismatch_summary(silver_path: Path) -> list[dict[str, Any]]:
+    fk_pairs = [
+        ("order_items", "order_id", "orders", "order_id"),
+        ("return_items", "order_id", "orders", "order_id"),
+        ("return_items", "return_id", "returns", "return_id"),
+        ("cart_items", "cart_id", "shopping_carts", "cart_id"),
+    ]
+
+    summary: list[dict[str, Any]] = []
+
+    for child_table, child_key, parent_table, parent_key in fk_pairs:
+        child_path = silver_path / child_table
+        parent_path = silver_path / parent_table
+        if not child_path.exists() or not parent_path.exists():
+            continue
+
+        try:
+            child_files = collect_parquet_files(child_path)
+            parent_files = collect_parquet_files(parent_path)
+            if not child_files or not parent_files:
+                continue
+            child_keys = pl.read_parquet(
+                child_files,
+                memory_map=False,
+                low_memory=True,
+                use_pyarrow=True,
+            ).select(pl.col(child_key).alias("key"))
+            parent_keys = (
+                pl.read_parquet(
+                    parent_files,
+                    memory_map=False,
+                    low_memory=True,
+                    use_pyarrow=True,
+                )
+                .select(pl.col(parent_key).alias("key"))
+                .filter(pl.col("key").is_not_null())
+                .unique()
+            )
+            missing_rows = (
+                child_keys.filter(pl.col("key").is_not_null())
+                .join(parent_keys, on="key", how="anti")
+                .select(pl.len())
+                .item()
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed FK mismatch summary",
+                child_table=child_table,
+                parent_table=parent_table,
+                error_type=type(exc).__name__,
+                error=str(exc),
+            )
+            continue
+
+        if missing_rows > 0:
+            summary.append(
+                {
+                    "child_table": child_table,
+                    "child_key": child_key,
+                    "parent_table": parent_table,
+                    "parent_key": parent_key,
+                    "missing_rows": missing_rows,
+                }
+            )
+
+    return summary
