@@ -13,6 +13,7 @@ select
     status,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     created_dt

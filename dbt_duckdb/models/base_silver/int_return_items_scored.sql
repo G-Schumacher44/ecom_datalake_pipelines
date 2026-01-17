@@ -49,7 +49,8 @@ cleaned as (
         {{ safe_cast_decimal('refunded_amount', 18, 2) }} as refunded_amount,
         {{ normalize_string('batch_id') }} as batch_id,
         {{ normalize_string('event_id') }} as event_id,
-        {{ normalize_string('source_file') }} as source_file
+        {{ normalize_string('source_file') }} as source_file,
+        {{ get_ingestion_dt() }} as ingestion_dt
     from raw
 ),
 
@@ -122,6 +123,7 @@ select
     refunded_amount,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     return_dt,

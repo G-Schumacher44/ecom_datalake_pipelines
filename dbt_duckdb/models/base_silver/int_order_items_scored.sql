@@ -40,7 +40,8 @@ cleaned as (
         {{ safe_cast_decimal('cost_price', 18, 2) }} as cost_price,
         {{ normalize_string('batch_id') }} as batch_id,
         {{ normalize_string('event_id') }} as event_id,
-        {{ normalize_string('source_file') }} as source_file
+        {{ normalize_string('source_file') }} as source_file,
+        {{ get_ingestion_dt() }} as ingestion_dt
     from raw
 ),
 
@@ -103,6 +104,7 @@ select
     cost_price,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     order_dt,

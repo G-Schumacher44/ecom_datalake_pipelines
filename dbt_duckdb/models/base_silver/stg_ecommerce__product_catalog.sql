@@ -14,6 +14,7 @@ select
     batch_id,
     ingestion_ts,
     event_id,
-    source_file
+    source_file,
+    ingestion_dt
 from {{ ref('int_product_catalog_scored') }}
 where is_valid
