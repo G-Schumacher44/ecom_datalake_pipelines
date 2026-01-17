@@ -225,7 +225,7 @@ local-silver:
 	BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 	SILVER_BASE_PATH="$(PWD)/data/silver/base" \
 	dbt build --project-dir dbt_duckdb --profiles-dir dbt_duckdb --select "base_silver.*"
-	python -m src.validation.silver_quality \
+	python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
 		--quarantine-path data/silver/base/quarantine \

@@ -10,71 +10,14 @@ from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobO
 from airflow.utils.task_group import TaskGroup
 import pendulum
 
-from src.settings import load_settings
-
-# --- Configuration Helper (Lazy Loading) ---
-
-
-class SettingsConfig:
-    """Lazy configuration loader for Airflow DAGs."""
-
-    def __init__(self):
-        self._settings = None
-        self._airflow_home = os.getenv("AIRFLOW_HOME", "/opt/airflow")
-        self._config_path = os.getenv(
-            "ECOM_CONFIG_PATH", f"{self._airflow_home}/config/config.yml"
-        )
-
-    @property
-    def settings(self):
-        if self._settings is None:
-            self._settings = load_settings(self._config_path)
-        return self._settings
-
-    @property
-    def pipeline(self):
-        return self.settings.pipeline
-
-    @property
-    def airflow_home(self):
-        return self._airflow_home
-
-    def resolve_pipeline_env(self) -> str:
-        env_override = os.getenv("PIPELINE_ENV")
-        return (env_override or self.pipeline.environment or "local").lower()
-
-    def resolve_path(self, bucket: str, prefix: str, env_key: str | None = None) -> str:
-        pipeline_env = self.resolve_pipeline_env()
-        if env_key:
-            override = os.getenv(env_key)
-            if override:
-                return (
-                    self._resolve_local_path(override)
-                    if bucket == "local" or pipeline_env == "local"
-                    else override
-                )
-        if bucket == "local" or pipeline_env == "local":
-            return self._resolve_local_path(prefix)
-        return f"gs://{bucket}/{prefix}"
-
-    def _resolve_local_path(self, path: str) -> str:
-        if path.startswith("gs://") or os.path.isabs(path):
-            return path
-        return os.path.join(self.airflow_home, path)
-
-
-# --- Top-Level Constants (Lightweight Only) ---
-
-PIPELINE_ENV = os.getenv("PIPELINE_ENV", "local").lower()
-AIRFLOW_HOME = os.getenv("AIRFLOW_HOME", "/opt/airflow")
-
-COMMON_ENV = {
-    "PIPELINE_ENV": PIPELINE_ENV,
-    "OBSERVABILITY_ENV": os.getenv("OBSERVABILITY_ENV", ""),
-    "PYTHONPATH": os.getenv("PYTHONPATH", AIRFLOW_HOME),
-    "PATH": f"{os.getenv('PATH', '')}:/home/airflow/.local/bin",
-    "HOME": os.getenv("HOME", "/home/airflow"),
-}
+from common import (
+    AIRFLOW_HOME,
+    COMMON_ENV,
+    PIPELINE_ENV,
+    SettingsConfig,
+    make_runner_callable,
+    resolve_bool,
+)
 
 # --- Task Callables ---
 
@@ -101,88 +44,29 @@ def load_config_to_xcom(**kwargs):
     }
 
 
-def _resolve_bool(env_key: str, default: bool = False) -> bool:
-    env_override = os.getenv(env_key)
-    if env_override is None:
-        return default
-    return env_override.lower() in {"true", "1", "yes"}
+from src.runners.enriched import (
+    run_cart_attribution,
+    run_cart_attribution_summary,
+    run_customer_lifetime_value,
+    run_customer_retention,
+    run_daily_business_metrics,
+    run_inventory_risk,
+    run_product_performance,
+    run_regional_financials,
+    run_sales_velocity,
+    run_shipping_economics,
+)
 
-
-def _run_enriched_runner(func, **kwargs):
-    # Resolve paths at runtime via helper (avoids top-level load)
-    config = SettingsConfig()
-    pl = config.pipeline
-
-    kwargs["base_silver_path"] = config.resolve_path(
-        pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
-    )
-    kwargs["output_path"] = config.resolve_path(
-        pl.silver_bucket, pl.silver_enriched_prefix, "SILVER_ENRICHED_PATH"
-    )
-
-    allowed_keys = {"base_silver_path", "output_path", "ingest_dt"}
-    filtered = {key: value for key, value in kwargs.items() if key in allowed_keys}
-    return func(**filtered)
-
-
-def _run_cart_attribution(**kwargs):
-    from src.runners.enriched import run_cart_attribution
-
-    return _run_enriched_runner(run_cart_attribution, **kwargs)
-
-
-def _run_cart_attribution_summary(**kwargs):
-    from src.runners.enriched import run_cart_attribution_summary
-
-    return _run_enriched_runner(run_cart_attribution_summary, **kwargs)
-
-
-def _run_inventory_risk(**kwargs):
-    from src.runners.enriched import run_inventory_risk
-
-    return _run_enriched_runner(run_inventory_risk, **kwargs)
-
-
-def _run_customer_retention(**kwargs):
-    from src.runners.enriched import run_customer_retention
-
-    return _run_enriched_runner(run_customer_retention, **kwargs)
-
-
-def _run_sales_velocity(**kwargs):
-    from src.runners.enriched import run_sales_velocity
-
-    return _run_enriched_runner(run_sales_velocity, **kwargs)
-
-
-def _run_product_performance(**kwargs):
-    from src.runners.enriched import run_product_performance
-
-    return _run_enriched_runner(run_product_performance, **kwargs)
-
-
-def _run_regional_financials(**kwargs):
-    from src.runners.enriched import run_regional_financials
-
-    return _run_enriched_runner(run_regional_financials, **kwargs)
-
-
-def _run_customer_lifetime_value(**kwargs):
-    from src.runners.enriched import run_customer_lifetime_value
-
-    return _run_enriched_runner(run_customer_lifetime_value, **kwargs)
-
-
-def _run_daily_business_metrics(**kwargs):
-    from src.runners.enriched import run_daily_business_metrics
-
-    return _run_enriched_runner(run_daily_business_metrics, **kwargs)
-
-
-def _run_shipping_economics(**kwargs):
-    from src.runners.enriched import run_shipping_economics
-
-    return _run_enriched_runner(run_shipping_economics, **kwargs)
+_run_cart_attribution = make_runner_callable(run_cart_attribution)
+_run_cart_attribution_summary = make_runner_callable(run_cart_attribution_summary)
+_run_inventory_risk = make_runner_callable(run_inventory_risk)
+_run_customer_retention = make_runner_callable(run_customer_retention)
+_run_sales_velocity = make_runner_callable(run_sales_velocity)
+_run_product_performance = make_runner_callable(run_product_performance)
+_run_regional_financials = make_runner_callable(run_regional_financials)
+_run_customer_lifetime_value = make_runner_callable(run_customer_lifetime_value)
+_run_daily_business_metrics = make_runner_callable(run_daily_business_metrics)
+_run_shipping_economics = make_runner_callable(run_shipping_economics)
 
 
 # --- DAG Definition ---
@@ -249,7 +133,7 @@ with DAG(
         task_id="validate_silver_quality",
         env=COMMON_ENV,
         bash_command=(
-            f"cd {AIRFLOW_HOME} && python -m src.validation.silver_quality "
+            f"cd {AIRFLOW_HOME} && python -m src.validation.silver "
             f"--bronze-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}} "
             f"--silver-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}} "
             f"--quarantine-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}/quarantine "
@@ -361,14 +245,14 @@ with DAG(
     # 9. Gates
     should_run_gold = ShortCircuitOperator(
         task_id="should_run_gold",
-        python_callable=lambda: _resolve_bool(
+        python_callable=lambda: resolve_bool(
             "GOLD_PIPELINE_ENABLED", PIPELINE_ENV in {"dev", "prod"}
         ),
     )
 
     should_load_bigquery = ShortCircuitOperator(
         task_id="should_load_bigquery",
-        python_callable=lambda: _resolve_bool(
+        python_callable=lambda: resolve_bool(
             "BQ_LOAD_ENABLED", PIPELINE_ENV in {"dev", "prod"}
         ),
     )
