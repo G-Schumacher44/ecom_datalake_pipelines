@@ -55,7 +55,7 @@ class ObservabilityConfig:
             config_env = settings.pipeline.environment
             config_metrics_bucket = settings.pipeline.metrics_bucket
             config_logs_bucket = settings.pipeline.logs_bucket
-        except Exception as exc:
+        except (OSError, ValueError, ImportError) as exc:
             # Fallback to local defaults if config.yml is missing or invalid
             import sys
 
@@ -63,7 +63,6 @@ class ObservabilityConfig:
                 f"WARNING: Observability falling back to defaults. Reason: {exc}",
                 file=sys.stderr,
             )
-            pass
         # Environment variable overrides config file
         env_override = os.getenv("OBSERVABILITY_ENV")
         if env_override:

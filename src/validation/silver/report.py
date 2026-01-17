@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import polars as pl
+from polars.exceptions import ComputeError, SchemaError
+from pyarrow.lib import ArrowInvalid, ArrowTypeError
 
 from src.validation.silver.models import SilverQualityReport
 
@@ -252,15 +254,26 @@ def build_profile_report(
             col_names = list(schema.keys())
             row_count = df.height
             null_counts = df.null_count().to_dicts()[0]
-        except Exception as exc:
+        except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
             logger.warning(
-                "Failed to profile table",
+                "Failed to profile table: parquet read error",
                 table=table,
                 error_type=type(exc).__name__,
                 error=str(exc),
             )
             lines.extend(
-                [f"### {table}", "", "- **Status:** Failed to profile table", ""]
+                [f"### {table}", "", "- **Status:** Failed to read parquet files", ""]
+            )
+            continue
+        except (SchemaError, ComputeError) as exc:
+            logger.warning(
+                "Failed to profile table: schema error",
+                table=table,
+                error_type=type(exc).__name__,
+                error=str(exc),
+            )
+            lines.extend(
+                [f"### {table}", "", "- **Status:** Failed to profile table schema", ""]
             )
             continue
 

@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 
 import polars as pl
+from polars.exceptions import ColumnNotFoundError, ComputeError, SchemaError
+from pyarrow.lib import ArrowInvalid, ArrowTypeError
 
 from src.validation.common import collect_parquet_files
 
@@ -57,9 +59,16 @@ def get_quarantine_breakdown(quarantine_path: Path, top_n: int = 5) -> list[dict
 
         return breakdown
 
-    except Exception as e:
+    except (ArrowInvalid, ArrowTypeError, OSError) as e:
         logger.error(
-            f"Failed to analyze quarantine for {quarantine_path}",
+            f"Failed to read quarantine parquet at {quarantine_path}",
+            error_type=type(e).__name__,
+            error=str(e),
+        )
+        return []
+    except (ColumnNotFoundError, SchemaError, ComputeError) as e:
+        logger.error(
+            f"Failed to analyze quarantine schema for {quarantine_path}",
             error_type=type(e).__name__,
             error=str(e),
         )
@@ -92,13 +101,24 @@ def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
             low_memory=True,
             use_pyarrow=True,
         )
-    except Exception as exc:
+    except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
         logger.warning(
             "Failed key cardinality scan",
             table=str(table_path),
             key=key,
             error_type=type(exc).__name__,
             error=str(exc),
+        )
+        return {
+            "total_rows": 0,
+            "non_null_rows": 0,
+            "distinct_count": 0,
+            "distinct_ratio": 0.0,
+        }
+    except ColumnNotFoundError as exc:
+        logger.warning(
+            f"Key column '{key}' not found in {table_path}",
+            error_type=type(exc).__name__,
         )
         return {
             "total_rows": 0,

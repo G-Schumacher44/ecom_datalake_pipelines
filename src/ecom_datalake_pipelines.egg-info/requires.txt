@@ -9,18 +9,19 @@ dbt-core>=1.7.0
 dbt-duckdb>=1.7.0
 
 [airflow]
-apache-airflow>=2.8.0
 apache-airflow-providers-google>=10.15.0
 
 [all]
 ecom-datalake-pipelines[airflow,dev]
 
+[dbt]
+dbt-core>=1.8.0
+dbt-duckdb>=1.8.0
+dbt-bigquery>=1.8.0
+
 [dev]
-black>=24.2.0
-isort>=5.13.0
-ruff>=0.3.0
-mypy>=1.8.0
-pylint>=3.1.0
 pytest>=8.0.0
-pre-commit>=3.6.0
-types-PyYAML>=6.0.0
+pytest-cov>=4.1.0
+mypy>=1.9.0
+ruff>=0.3.0
+yamllint>=1.35.0

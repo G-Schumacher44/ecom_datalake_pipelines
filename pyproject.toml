@@ -62,6 +62,37 @@ line_length = 88
 line-length = 88
 lint.select = ["E", "F", "I", "B"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: Unit tests for individual functions",
+    "integration: Integration tests for full pipeline flows",
+]
+addopts = [
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html:coverage_html",
+    "--cov-fail-under=50",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "src/__init__.py",
+    "src/*/__init__.py",
+    "src/*/*/__init__.py",
+]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+show_missing = true
+
 [tool.mypy]
 python_version = "3.12"
 warn_redundant_casts = true

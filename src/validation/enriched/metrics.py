@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import polars as pl
+from polars.exceptions import ComputeError, SQLInterfaceError, SQLSyntaxError
 
 from src.settings import PipelineConfig, ValidationConfig
 from src.validation.common import read_parquet_safe
@@ -63,7 +64,10 @@ def evaluate_semantic_checks(
         expr = check["expr"].format(ratio_epsilon=ratio_epsilon)
         try:
             failures = df.filter(pl.sql_expr(expr)).height
-        except Exception as exc:
+        except (SQLSyntaxError, SQLInterfaceError) as exc:
+            issues.append(f"{name}: invalid_sql_expression ({type(exc).__name__})")
+            continue
+        except ComputeError as exc:
             issues.append(f"{name}: failed_to_evaluate ({type(exc).__name__})")
             continue
         if failures:
