@@ -21,6 +21,25 @@ pipeline:
   metrics_bucket: "ecom-datalake-metrics"
   logs_bucket: "ecom-datalake-logs"
 
+  # Airflow Retry Configuration
+  # Environment-appropriate task retry settings with exponential backoff
+  retry_config:
+    local:
+      retries: 1
+      retry_delay_minutes: 1
+      retry_exponential_backoff: false
+      max_retry_delay_minutes: 5
+    dev:
+      retries: 2
+      retry_delay_minutes: 2
+      retry_exponential_backoff: true
+      max_retry_delay_minutes: 10
+    prod:
+      retries: 3
+      retry_delay_minutes: 5
+      retry_exponential_backoff: true
+      max_retry_delay_minutes: 30
+
   # Business Logic Configuration
   default_ingest_dt: "2020-01-01"
   attribution_tolerance_hours: 48
