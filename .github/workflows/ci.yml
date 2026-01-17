@@ -49,3 +49,11 @@ jobs:
             --quarantine-path data/silver/base/quarantine \
             --output-report silver_ci.md
 
+          # Test Enriched Validation (Schema Only - no data yet but should run)
+          # We create the dir to avoid FileNotFoundError on path resolution
+          mkdir -p data/silver/enriched
+          python -m src.validation.enriched \
+            --enriched-path data/silver/enriched \
+            --ingest-dt 2020-01-01 \
+            --output-report enriched_ci.md
+

@@ -1,18 +1,19 @@
 from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Any
 
 import polars as pl
 
-from src.validation.silver.models import TableQualityMetrics
+from src.validation.common import (
+    collect_parquet_files,
+    count_parquet_rows,
+)
 from src.validation.silver.data import (
     get_quarantine_breakdown,
 )
-from src.validation.common import (
-    count_parquet_rows,
-    collect_parquet_files,
-)
+from src.validation.silver.models import TableQualityMetrics
 
 logger = logging.getLogger(__name__)
 

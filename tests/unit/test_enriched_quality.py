@@ -1,9 +1,8 @@
-from datetime import date
 from unittest.mock import MagicMock
 
 import polars as pl
 
-from src.validation.enriched_quality import evaluate_semantic_checks
+from src.validation.enriched.metrics import evaluate_semantic_checks
 
 
 def test_semantic_checks_cart_attribution() -> None:
