@@ -51,8 +51,8 @@ def test_compute_regional_financials_extracts_from_address() -> None:
     )
 
     result = compute_regional_financials(orders, customers).collect()
-    
+
     rows = result.sort("order_id").to_dicts()
-    
+
     assert rows[0]["region"] == "US-NY"
     assert rows[1]["region"] == "US-CA"

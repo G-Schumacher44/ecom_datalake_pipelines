@@ -33,16 +33,40 @@ DEFAULT_ENRICHED_TABLES = [
     "int_shipping_economics",
 ]
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate Enriched Silver outputs.")
-    parser.add_argument("--config", default="config/config.yml", help="Path to pipeline config YAML.")
-    parser.add_argument("--enriched-path", default=None, help="Path to Enriched Silver data (overrides env/config).")
-    parser.add_argument("--run-id", help="Run ID for this validation (auto-generated if not provided).")
-    parser.add_argument("--ingest-dt", default=None, help="Target partition date (YYYY-MM-DD).")
-    parser.add_argument("--fail-on-issues", action="store_true", help="Legacy: use --enforce-quality instead.")
-    parser.add_argument("--enforce-quality", action="store_true", help="Exit with non-zero code on any failures (standard gate).")
-    parser.add_argument("--output-report", default="docs/validation_reports/ENRICHED_QUALITY.md", help="Path to write Markdown report.")
+    parser.add_argument(
+        "--config", default="config/config.yml", help="Path to pipeline config YAML."
+    )
+    parser.add_argument(
+        "--enriched-path",
+        default=None,
+        help="Path to Enriched Silver data (overrides env/config).",
+    )
+    parser.add_argument(
+        "--run-id", help="Run ID for this validation (auto-generated if not provided)."
+    )
+    parser.add_argument(
+        "--ingest-dt", default=None, help="Target partition date (YYYY-MM-DD)."
+    )
+    parser.add_argument(
+        "--fail-on-issues",
+        action="store_true",
+        help="Legacy: use --enforce-quality instead.",
+    )
+    parser.add_argument(
+        "--enforce-quality",
+        action="store_true",
+        help="Exit with non-zero code on any failures (standard gate).",
+    )
+    parser.add_argument(
+        "--output-report",
+        default="docs/validation_reports/ENRICHED_QUALITY.md",
+        help="Path to write Markdown report.",
+    )
     return parser.parse_args()
+
 
 def main() -> int:
     args = parse_args()
@@ -119,6 +143,7 @@ def main() -> int:
         enforce=args.enforce_quality or args.fail_on_issues,
         env=pipeline_env,
     )
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

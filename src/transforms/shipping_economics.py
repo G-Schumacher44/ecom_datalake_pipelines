@@ -19,7 +19,10 @@ def compute_shipping_economics(
         order_dt=pl.col(date_col).cast(pl.Date),
         shipping_margin=pl.col("shipping_cost") - pl.col("actual_shipping_cost"),
         shipping_margin_pct=pl.when(pl.col("shipping_cost") > 0)
-        .then((pl.col("shipping_cost") - pl.col("actual_shipping_cost")) / pl.col("shipping_cost"))
+        .then(
+            (pl.col("shipping_cost") - pl.col("actual_shipping_cost"))
+            / pl.col("shipping_cost")
+        )
         .otherwise(None),
         is_expedited=pl.when(pl.col("shipping_speed").is_in(["two-day", "overnight"]))
         .then(pl.lit(True))

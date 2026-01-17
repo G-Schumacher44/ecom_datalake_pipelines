@@ -28,6 +28,7 @@ def compute_null_rates(df: pl.DataFrame, columns: list[str]) -> dict[str, float]
         null_rates[column] = round(nulls / total, 6)
     return null_rates
 
+
 def evaluate_sanity_checks(df: pl.DataFrame, config: ValidationConfig) -> list[str]:
     issues: list[str] = []
     sanity = config.sanity_checks
@@ -48,6 +49,7 @@ def evaluate_sanity_checks(df: pl.DataFrame, config: ValidationConfig) -> list[s
             issues.append(f"{column}: {out_of_range} outside_0_1")
     return issues
 
+
 def evaluate_semantic_checks(
     df: pl.DataFrame,
     table: str,
@@ -67,6 +69,7 @@ def evaluate_semantic_checks(
         if failures:
             issues.append(f"{name}: {failures} rows")
     return issues
+
 
 def validate_table(
     table: str,

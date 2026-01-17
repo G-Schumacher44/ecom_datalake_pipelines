@@ -39,7 +39,7 @@ jobs:
         run: |
           # Test Bronze Validation
           python -m src.validation.bronze_quality --bronze-path samples/bronze --output-report bronze_ci.md
-          
+
           # Test Silver Validation (using new refactored package)
           # Note: dbt build in previous step populated data/silver/base
           mkdir -p data/silver/base/quarantine
@@ -56,4 +56,3 @@ jobs:
             --enriched-path data/silver/enriched \
             --ingest-dt 2020-01-01 \
             --output-report enriched_ci.md
-

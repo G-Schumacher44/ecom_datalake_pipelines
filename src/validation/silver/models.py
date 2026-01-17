@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 @dataclass
 class TableQualityMetrics:
     """Quality metrics for a single table."""
+
     table: str
     bronze_rows: int
     silver_rows: int
@@ -20,6 +21,7 @@ class TableQualityMetrics:
 @dataclass
 class SilverQualityReport:
     """Overall Silver layer quality report."""
+
     run_id: str
     timestamp: str
     table_metrics: List[TableQualityMetrics]

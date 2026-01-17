@@ -13,8 +13,12 @@ def compute_inventory_risk(
     """Score products based on stock-out risk and return rates."""
     # Ensure inputs are lazy
     products = products.lazy() if isinstance(products, pl.DataFrame) else products
-    order_items = order_items.lazy() if isinstance(order_items, pl.DataFrame) else order_items
-    return_items = return_items.lazy() if isinstance(return_items, pl.DataFrame) else return_items
+    order_items = (
+        order_items.lazy() if isinstance(order_items, pl.DataFrame) else order_items
+    )
+    return_items = (
+        return_items.lazy() if isinstance(return_items, pl.DataFrame) else return_items
+    )
 
     sales = order_items.group_by("product_id").agg(
         pl.col("quantity").sum().alias("sales_volume")

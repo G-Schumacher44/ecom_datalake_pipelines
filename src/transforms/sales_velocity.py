@@ -13,7 +13,9 @@ def compute_sales_velocity(
     """Compute rolling sales velocity and inventory depletion rates."""
     # Ensure inputs are lazy
     orders = orders.lazy() if isinstance(orders, pl.DataFrame) else orders
-    order_items = order_items.lazy() if isinstance(order_items, pl.DataFrame) else order_items
+    order_items = (
+        order_items.lazy() if isinstance(order_items, pl.DataFrame) else order_items
+    )
 
     sales = order_items.join(
         orders.select(["order_id", "order_date"]),

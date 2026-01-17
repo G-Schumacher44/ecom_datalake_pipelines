@@ -15,14 +15,14 @@ def compute_cart_attribution(
     carts_lazy = carts.lazy() if isinstance(carts, pl.DataFrame) else carts
     orders_lazy = orders.lazy() if isinstance(orders, pl.DataFrame) else orders
 
-    carts_ts = carts_lazy.with_columns(event_ts=pl.col("created_at").cast(pl.Datetime)).sort(
-        ["customer_id", "event_ts"]
-    )
+    carts_ts = carts_lazy.with_columns(
+        event_ts=pl.col("created_at").cast(pl.Datetime)
+    ).sort(["customer_id", "event_ts"])
     orders_ts = orders_lazy.with_columns(
         event_ts=pl.col("order_date").cast(pl.Datetime)
     ).sort(["customer_id", "event_ts"])
 
-    # join_asof currently requires eager DataFrames in older Polars, 
+    # join_asof currently requires eager DataFrames in older Polars,
     # but modern Polars supports it on LazyFrames if sorted.
     # We will return a LazyFrame.
     return orders_ts.join_asof(
@@ -42,16 +42,15 @@ def compute_cart_attribution_summary(
 ) -> pl.LazyFrame:
     """Summarize cart conversion and abandonment at cart grain."""
     carts_lazy = carts.lazy() if isinstance(carts, pl.DataFrame) else carts
-    items_lazy = cart_items.lazy() if isinstance(cart_items, pl.DataFrame) else cart_items
+    items_lazy = (
+        cart_items.lazy() if isinstance(cart_items, pl.DataFrame) else cart_items
+    )
     orders_lazy = orders.lazy() if isinstance(orders, pl.DataFrame) else orders
 
-    cart_items_agg = (
-        items_lazy.group_by("cart_id")
-        .agg(
-            item_count=pl.len(),
-            category_count=pl.col("category").n_unique(),
-            cart_value_items=(pl.col("quantity") * pl.col("unit_price")).sum(),
-        )
+    cart_items_agg = items_lazy.group_by("cart_id").agg(
+        item_count=pl.len(),
+        category_count=pl.col("category").n_unique(),
+        cart_value_items=(pl.col("quantity") * pl.col("unit_price")).sum(),
     )
 
     carts_ts = carts_lazy.with_columns(

@@ -10,13 +10,17 @@ import polars as pl
 def compute_customer_retention_signals(
     customers: pl.LazyFrame,
     orders: pl.LazyFrame,
-    lookback_days: list[int] = [30, 90],
+    lookback_days: list[int] | None = None,
     reference_date: date | None = None,
     bronze_nudge_days: int = 14,
 ) -> pl.LazyFrame:
-    """Identify signals of customer churn danger."""
-    # Ensure inputs are lazy
-    customers = customers.lazy() if isinstance(customers, pl.DataFrame) else customers
+    """Identify churn candidates based on order history."""
+    if lookback_days is None:
+        lookback_days = [30, 90]
+
+    customers_lazy = (
+        customers.lazy() if isinstance(customers, pl.DataFrame) else customers
+    )
     orders = orders.lazy() if isinstance(orders, pl.DataFrame) else orders
 
     if not lookback_days:
@@ -36,9 +40,9 @@ def compute_customer_retention_signals(
         )
     )
 
-    enriched = customers.join(order_rollup, on="customer_id", how="left").with_columns(
-        pl.col("total_orders").fill_null(0)
-    )
+    enriched = customers_lazy.join(
+        order_rollup, on="customer_id", how="left"
+    ).with_columns(pl.col("total_orders").fill_null(0))
 
     return enriched.with_columns(
         days_since_first_buy=(

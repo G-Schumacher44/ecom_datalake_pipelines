@@ -10,6 +10,7 @@ from src.validation.silver.models import SilverQualityReport
 
 logger = logging.getLogger(__name__)
 
+
 def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> None:
     """Generate self-documenting Markdown report."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -30,8 +31,12 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
         "",
         "## Summary",
         "",
-        "| Table | Bronze Rows | Silver Rows | Quarantine | Pass Rate | SLA | Status |".replace(' ', ' '),
-        "|-------|-------------|-------------|------------|-----------|-----|--------|".replace(' ', ' '),
+        (
+            "| Table | Bronze | Silver | Quarantine | Pass Rate | SLA | Status |"
+        ).replace(" ", " "),
+        (
+            "|-------|-------------|-------------|------------|-----------|-----|--------|"
+        ).replace(" ", " "),
     ]
 
     for metrics in report.table_metrics:
@@ -54,10 +59,15 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
     total_tables = len(report.table_metrics)
     pass_pct = (report.tables_passing / total_tables * 100) if total_tables > 0 else 0
 
-    lines.extend([
-        "",
-        f"**Tables Passing SLA:** {report.tables_passing}/{total_tables} ({pass_pct:.1f}%)",
-    ])
+    lines.extend(
+        [
+            "",
+            (
+                f"**Tables Passing SLA:** {report.tables_passing}/{total_tables} "
+                f"({pass_pct:.1f}%)"
+            ),
+        ]
+    )
 
     if report.tables_warning > 0:
         lines.append(f"**Tables with Warnings:** {report.tables_warning}")
@@ -71,24 +81,37 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
         lines.extend(["", "---", "", "## Issues Detected", ""])
         for metrics in failing_tables + warning_tables:
             emoji = "❌" if metrics.status == "FAIL" else "⚠️"
-            lines.extend([
-                f"### {emoji} {metrics.table}: Pass Rate {'Below' if metrics.status == 'FAIL' else 'Near'} SLA",
-                "",
-                f"- **Pass Rate:** {metrics.pass_rate:.2%} (SLA: {metrics.sla_threshold:.0%})",
-                f"- **Quarantine Count:** {metrics.quarantine_rows:,} rows",
-                "- **Recommended Action:** Investigate top quarantine reasons",
-                "",
-            ])
-            if metrics.quarantine_breakdown:
-                lines.extend([
-                    "**Top Quarantine Reasons:**",
+            lines.extend(
+                [
+                    (
+                        f"### {emoji} {metrics.table}: Pass Rate "
+                        f"{'Below' if metrics.status == 'FAIL' else 'Near'} SLA"
+                    ),
                     "",
-                    "| Reason | Count | Percentage |",
-                    "|--------|-------|------------|",
-                ])
+                    (
+                        f"- **Pass Rate:** {metrics.pass_rate:.2%} "
+                        f"(SLA: {metrics.sla_threshold:.0%})"
+                    ),
+                    f"- **Quarantine Count:** {metrics.quarantine_rows:,} rows",
+                    "- **Recommended Action:** Investigate top quarantine reasons",
+                    "",
+                ]
+            )
+            if metrics.quarantine_breakdown:
+                lines.extend(
+                    [
+                        "**Top Quarantine Reasons:**",
+                        "",
+                        "| Reason | Count | Percentage |",
+                        "|--------|-------|------------|",
+                    ]
+                )
                 for reason in metrics.quarantine_breakdown:
                     lines.append(
-                        f"| {reason['reason']} | {reason['count']:,} | {reason['percentage']}% |"
+                        (
+                            f"| {reason['reason']} | {reason['count']:,} | "
+                            f"{reason['percentage']}% |"
+                        )
                     )
                 lines.append("")
 
@@ -96,45 +119,74 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
     total_quarantined = sum(m.quarantine_rows for m in report.table_metrics)
     total_quarantine_pct = (
         (total_quarantined / report.total_processed * 100)
-        if report.total_processed > 0 else 0
+        if report.total_processed > 0
+        else 0
     )
-    lines.extend([
-        "### Overall Quarantine Statistics",
-        "",
-        f"**Total Quarantined:** {total_quarantined:,} rows across {len(report.table_metrics)} tables ({total_quarantine_pct:.1f}% of total)",
-        "",
-        "### Quarantine Breakdown by Table",
-        "",
-    ])
+    lines.extend(
+        [
+            "### Overall Quarantine Statistics",
+            "",
+            (
+                f"**Total Quarantined:** {total_quarantined:,} rows across "
+                f"{len(report.table_metrics)} tables "
+                f"({total_quarantine_pct:.1f}% of total)"
+            ),
+            "",
+            "### Quarantine Breakdown by Table",
+            "",
+        ]
+    )
 
-    for metrics in sorted(report.table_metrics, key=lambda m: m.quarantine_rows, reverse=True):
+    for metrics in sorted(
+        report.table_metrics, key=lambda m: m.quarantine_rows, reverse=True
+    ):
         if metrics.quarantine_rows == 0:
             continue
         quar_rate = (
-            (metrics.quarantine_rows / (metrics.silver_rows + metrics.quarantine_rows) * 100)
-            if (metrics.silver_rows + metrics.quarantine_rows) > 0 else 0
+            (
+                metrics.quarantine_rows
+                / (metrics.silver_rows + metrics.quarantine_rows)
+                * 100
+            )
+            if (metrics.silver_rows + metrics.quarantine_rows) > 0
+            else 0
         )
         emoji = "⚠️" if quar_rate > 5.0 else ""
-        lines.extend([
-            f"#### {metrics.table}",
-            f"- **Quarantine Rate:** {quar_rate:.2f}% {emoji}",
-        ])
+        lines.extend(
+            [
+                f"#### {metrics.table}",
+                f"- **Quarantine Rate:** {quar_rate:.2f}% {emoji}",
+            ]
+        )
         if metrics.quarantine_breakdown:
             top_reason = metrics.quarantine_breakdown[0]
-            lines.append(f"- **Top Reason:** {top_reason['reason']} ({top_reason['percentage']}%) ")
+            lines.append(
+                f"- **Top Reason:** {top_reason['reason']} "
+                f"({top_reason['percentage']}%) "
+            )
         else:
-            lines.append("- **Top Reason:** empty partition placeholder (no real failures)")
+            lines.append(
+                "- **Top Reason:** empty partition placeholder (no real failures)"
+            )
         lines.append("")
 
     if report.fk_mismatch_summary:
         lines.extend(["---", "", "## FK Mismatch Summary", ""])
-        lines.extend([
-            "| Child Table | Child Key | Parent Table | Parent Key | Missing Rows |".replace(' ', ' '),
-            "| --- | --- | --- | --- | --- |".replace(' ', ' '),
-        ])
+        lines.extend(
+            [
+                (
+                    "| Child Table | Child Key | Parent Table | Parent Key | Missing |"
+                ).replace(" ", " "),
+                "| --- | --- | --- | --- | --- |".replace(" ", " "),
+            ]
+        )
         for row in report.fk_mismatch_summary:
             lines.append(
-                f"| {row['child_table']} | {row['child_key']} | {row['parent_table']} | {row['parent_key']} | {row['missing_rows']:,} |"
+                (
+                    f"| {row['child_table']} | {row['child_key']} | "
+                    f"{row['parent_table']} | {row['parent_key']} | "
+                    f"{row['missing_rows']:,} |"
+                )
             )
         lines.append("")
 
@@ -144,28 +196,34 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
             lines.append(f"- **{issue['check']}**: {issue['message']}")
         lines.append("")
 
-    lines.extend([
-        "---",
-        "",
-        "## Metadata",
-        "",
-        "- **Generated by:** `src/validation/silver/report.py`",
-        "- **Validation Framework:** 1.1.0",
-        "- **Report Format Version:** 1.0",
-        "",
-        "<!-- AUTO-GENERATED - DO NOT EDIT MANUALLY -->",
-    ])
+    lines.extend(
+        [
+            "---",
+            "",
+            "## Metadata",
+            "",
+            "- **Generated by:** `src/validation/silver/report.py`",
+            "- **Validation Framework:** 1.1.0",
+            "- **Report Format Version:** 1.0",
+            "",
+            "<!-- AUTO-GENERATED - DO NOT EDIT MANUALLY -->",
+        ]
+    )
 
     output_path.write_text("\n".join(lines))
     logger.info(f"Wrote Markdown report to: {output_path}")
 
-def build_profile_report(tables: list[str], silver_path: Path, output_path: Path) -> None:
+
+def build_profile_report(
+    tables: list[str], silver_path: Path, output_path: Path
+) -> None:
     """Generate a lightweight Silver profile report."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         "# Silver Data Profile",
         "",
-        f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        f"**Generated:** "
+        f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
         "",
         "## Table Profiles",
         "",
@@ -178,7 +236,9 @@ def build_profile_report(tables: list[str], silver_path: Path, output_path: Path
 
         parquet_files = list(table_path.glob("**/*.parquet"))
         if not parquet_files:
-            lines.extend([f"### {table}", "", "- **Status:** No Parquet files found", ""])
+            lines.extend(
+                [f"### {table}", "", "- **Status:** No Parquet files found", ""]
+            )
             continue
 
         try:
@@ -199,20 +259,24 @@ def build_profile_report(tables: list[str], silver_path: Path, output_path: Path
                 error_type=type(exc).__name__,
                 error=str(exc),
             )
-            lines.extend([f"### {table}", "", "- **Status:** Failed to profile table", ""])
+            lines.extend(
+                [f"### {table}", "", "- **Status:** Failed to profile table", ""]
+            )
             continue
 
-        lines.extend([
-            f"### {table}",
-            "",
-            f"- **Row Count:** {row_count:,}",
-            f"- **Column Count:** {len(col_names)}",
-            "",
-            "**Schema (column → dtype):**",
-            "",
-            "| Column | Dtype | Nulls |".replace(' ', ' '),
-            "|--------|-------|-------|".replace(' ', ' '),
-        ])
+        lines.extend(
+            [
+                f"### {table}",
+                "",
+                f"- **Row Count:** {row_count:,}",
+                f"- **Column Count:** {len(col_names)}",
+                "",
+                "**Schema (column → dtype):**",
+                "",
+                "| Column | Dtype | Nulls |".replace(" ", " "),
+                "|--------|-------|-------|".replace(" ", " "),
+            ]
+        )
         for col in col_names:
             dtype = str(schema[col])
             nulls = null_counts.get(col, 0)

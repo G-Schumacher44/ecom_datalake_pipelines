@@ -14,6 +14,7 @@ from src.validation.common import (
 
 logger = get_logger(__name__)
 
+
 def resolve_partition(
     table_path: Path, partition_key: str, ingest_dt: str | None
 ) -> tuple[str | None, Path | None]:
@@ -27,6 +28,7 @@ def resolve_partition(
         return None, None
     latest = partitions[-1]
     return latest, table_path / f"{partition_key}={latest}"
+
 
 def get_schema_snapshot(path: Path) -> dict[str, str]:
     parquet_files = collect_parquet_files(path)
@@ -44,6 +46,7 @@ def get_schema_snapshot(path: Path) -> dict[str, str]:
         return {}
     schema = parquet_file.schema_arrow
     return {field.name: str(field.type) for field in schema}
+
 
 def compute_row_delta(
     table_path: Path,
