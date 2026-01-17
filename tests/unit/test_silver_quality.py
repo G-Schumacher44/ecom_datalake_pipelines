@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polars as pl
 
-from src.validation.silver_quality import get_quarantine_breakdown
+from src.validation.silver.data import get_quarantine_breakdown
 
 
 def test_get_quarantine_breakdown_counts_reasons(tmp_path: Path) -> None:
