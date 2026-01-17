@@ -2,7 +2,7 @@
 # Makefile - Common commands for local development and deployment
 # =============================================================================
 
-.PHONY: help build up down restart logs shell test lint format type-check clean
+.PHONY: help build up down restart logs shell test lint format type-check clean clean-data
 .PHONY: dbt-deps dbt-build dbt-test local-silver push-image
 .PHONY: strict-mode easy-mode run-sample run-sample-strict run-sample-bq backfill-easy backfill-strict run-dims backfill-dims
 
@@ -19,7 +19,8 @@ help:
 	@echo "  make restart     - Restart Airflow services"
 	@echo "  make logs        - Tail Airflow scheduler logs"
 	@echo "  make shell       - Open bash shell in scheduler container"
-	@echo "  make clean       - Stop services and remove volumes/images"
+	@echo "  make clean       - Stop services and remove volumes/images/data"
+	@echo "  make clean-data  - Remove contents of data/silver and data/enriched"
 	@echo ""
 	@echo "Testing & Quality:"
 	@echo "  make test        - Run pytest unit tests"
@@ -75,13 +76,21 @@ logs:
 shell:
 	docker-compose exec airflow-scheduler bash
 
+clean-data:
+	@echo "Cleaning local data directories..."
+	rm -rf data/silver/base/*
+	rm -rf data/silver/enriched/*
+	rm -rf data/metrics/*
+	@echo "Local data cleared!"
+
 clean:
-	@echo "WARNING: This will remove all containers, volumes, and the custom image!"
+	@echo "WARNING: This will remove all containers, volumes, custom image, AND local data!"
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
 		docker-compose down -v; \
 		docker rmi ecom-datalake-pipeline:latest 2>/dev/null || true; \
+		$(MAKE) clean-data; \
 		echo "Cleanup complete!"; \
 	fi
 
