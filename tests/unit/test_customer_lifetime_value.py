@@ -36,7 +36,7 @@ def test_compute_customer_lifetime_value_segments() -> None:
         whale_clv=10000.0,
         whale_orders=20,
         medium_clv=2000.0,
-    )
+    ).collect()
 
     cust1 = result.filter(pl.col("customer_id") == "CUST-1").row(0, named=True)
     cust2 = result.filter(pl.col("customer_id") == "CUST-2").row(0, named=True)

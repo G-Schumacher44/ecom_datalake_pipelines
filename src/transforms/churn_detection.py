@@ -12,6 +12,7 @@ def compute_customer_retention_signals(
     orders: pl.LazyFrame,
     lookback_days: list[int] = [30, 90],
     reference_date: date | None = None,
+    bronze_nudge_days: int = 14,
 ) -> pl.LazyFrame:
     """Identify signals of customer churn danger."""
     # Ensure inputs are lazy
@@ -52,5 +53,5 @@ def compute_customer_retention_signals(
         )
         & (pl.col("total_orders") == 1),
         needs_bronze_nudge=(pl.col("loyalty_tier") == "Bronze")
-        & (pl.col("days_since_last_buy") > 14),
+        & (pl.col("days_since_last_buy") > bronze_nudge_days),
     )

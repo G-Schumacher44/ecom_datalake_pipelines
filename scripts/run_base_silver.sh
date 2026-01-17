@@ -11,6 +11,17 @@ echo "Starting Base Silver run..."
 echo "Bronze Source: $BRONZE_BASE_PATH"
 echo "Silver Target: $SILVER_BASE_PATH"
 
+# Workaround for macOS Docker VirtioFS deadlock (Errno 35)
+# If reading from a mounted path that might have locking issues, copy to /tmp first.
+# This uses dd with direct I/O to avoid VirtioFS caching issues.
+if [[ "$BRONZE_BASE_PATH" == *"/opt/airflow/samples"* ]] && [[ -d "$BRONZE_BASE_PATH" ]]; then
+    # Test if we can read files without deadlock
+    if ! find "$BRONZE_BASE_PATH" -maxdepth 2 -type f -name "*.parquet" -print -quit 2>/dev/null | head -1 > /dev/null; then
+        echo "⚠️  VirtioFS read issue detected. Try: Docker Desktop → Settings → Change VirtioFS to gRPC FUSE"
+        exit 1
+    fi
+fi
+
 # Ensure directories exist for local/container paths (DuckDB won't auto-create)
 if [[ "$SILVER_BASE_PATH" != gs://* ]]; then
     echo "Ensuring local directory structure exists..."

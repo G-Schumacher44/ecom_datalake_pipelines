@@ -4,10 +4,10 @@ from datetime import date, timedelta
 
 import polars as pl
 
-from src.transforms.churn_detection import compute_churn_signals
+from src.transforms.churn_detection import compute_customer_retention_signals
 
 
-def test_compute_churn_signals_flags_danger_and_bronze() -> None:
+def test_compute_customer_retention_signals_flags_danger_and_bronze() -> None:
     today = date(2020, 3, 10)
     customers = pl.DataFrame(
         {
@@ -26,12 +26,12 @@ def test_compute_churn_signals_flags_danger_and_bronze() -> None:
         }
     )
 
-    result = compute_churn_signals(
+    result = compute_customer_retention_signals(
         customers,
         orders,
-        churn_windows_days=[30, 90],
+        lookback_days=[30, 90],
         reference_date=today,
-    )
+    ).collect()
 
     row_c1 = result.filter(pl.col("customer_id") == "c-1").row(0, named=True)
     row_c2 = result.filter(pl.col("customer_id") == "c-2").row(0, named=True)

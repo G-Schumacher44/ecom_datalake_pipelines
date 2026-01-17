@@ -4,12 +4,7 @@ from __future__ import annotations
 
 import polars as pl
 
-
-def _resolve_date_column(frame: pl.DataFrame, candidates: list[str]) -> str:
-    for candidate in candidates:
-        if candidate in frame.columns:
-            return candidate
-    raise ValueError(f"Missing date column, tried: {candidates}")
+from src.transforms.common import _resolve_date_column
 
 
 def compute_daily_business_metrics(

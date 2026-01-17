@@ -47,7 +47,7 @@ def test_compute_product_performance_basic_metrics() -> None:
         order_items=order_items,
         return_items=return_items,
         cart_items=cart_items,
-    )
+    ).collect()
 
     assert result.shape[0] == 1
     row = result.row(0, named=True)
