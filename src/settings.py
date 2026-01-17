@@ -49,6 +49,31 @@ class SemanticCheck(BaseModel):
         return v
 
 
+class RetryConfig(BaseModel):
+    """Schema for environment-specific retry configuration."""
+
+    retries: int = Field(ge=0, le=10, description="Number of retry attempts")
+    retry_delay_minutes: int = Field(
+        ge=1, le=60, description="Initial delay between retries in minutes"
+    )
+    retry_exponential_backoff: bool = Field(
+        default=False, description="Enable exponential backoff for retries"
+    )
+    max_retry_delay_minutes: int = Field(
+        ge=1, le=120, description="Maximum retry delay in minutes"
+    )
+
+    @model_validator(mode="after")
+    def max_delay_gte_initial_delay(self) -> "RetryConfig":
+        """Ensure max_retry_delay_minutes >= retry_delay_minutes."""
+        if self.max_retry_delay_minutes < self.retry_delay_minutes:
+            raise ValueError(
+                f"max_retry_delay_minutes ({self.max_retry_delay_minutes}) must be >= "
+                f"retry_delay_minutes ({self.retry_delay_minutes})"
+            )
+        return self
+
+
 class ValidationConfig(BaseModel):
     """Schema for validation configuration section."""
 
@@ -114,6 +139,10 @@ class PipelineConfig(BaseModel):
     logs_bucket: str = Field(
         default="ecom-datalake-logs",
         description="GCS bucket for logs",
+    )
+    retry_config: dict[str, RetryConfig] = Field(
+        default_factory=dict,
+        description="Environment-specific retry configuration for Airflow tasks",
     )
 
     # Business Logic Configuration
@@ -220,6 +249,21 @@ class PipelineConfig(BaseModel):
     def percentage_in_range(cls, v: float) -> float:
         if not 0.0 <= v <= 100.0:
             raise ValueError(f"Percentage must be between 0 and 100, got {v}")
+        return v
+
+    @field_validator("retry_config")
+    @classmethod
+    def retry_config_has_required_envs(
+        cls, v: dict[str, RetryConfig]
+    ) -> dict[str, RetryConfig]:
+        """Validate that retry_config contains entries for all expected environments."""
+        required_envs = {"local", "dev", "prod"}
+        missing = required_envs - set(v.keys())
+        if missing:
+            raise ValueError(
+                f"retry_config missing required environments: {missing}. "
+                f"Expected: {required_envs}"
+            )
         return v
 
     @model_validator(mode="after")
