@@ -15,6 +15,15 @@ __pycache__/
 .vscode/
 samples/
 
+# Test coverage artifacts
+coverage_html/
+.coverage
+htmlcov/
+
+# Package manager lock files (using conda)
+uv.lock
+constraints.txt
+
 docs/local_only/*
 
 logs/
