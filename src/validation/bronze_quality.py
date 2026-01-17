@@ -29,6 +29,7 @@ from src.validation.common import (
     resolve_layer_paths,
     get_overall_status,
     handle_exit,
+    is_gcs_path,
 )
 
 logger = get_logger(__name__)
@@ -87,10 +88,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to write Markdown report.",
     )
     return parser.parse_args()
-
-
-def is_gcs_path(path: str) -> bool:
-    return path.startswith("gs://")
 
 
 def bronze_qa_required() -> bool:

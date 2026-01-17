@@ -239,17 +239,17 @@ def main() -> int:
         profile_path = Path(os.getenv("SILVER_PROFILE_REPORT", "docs/validation_reports/SILVER_PROFILE.md"))
         build_profile_report(tables, silver_path, profile_path)
 
-    print("\n" + "=" * 70)
-    print(f"Silver Quality Validation Summary (run_id={run_id})")
-    print("=" * 70)
-    print(f"Overall Status: {overall_status}")
-    print(f"Tables Passing: {tables_passing}/{len(tables)}")
+    logger.info("=" * 70)
+    logger.info(f"Silver Quality Validation Summary (run_id={run_id})")
+    logger.info("=" * 70)
+    logger.info(f"Overall Status: {overall_status}")
+    logger.info(f"Tables Passing: {tables_passing}/{len(tables)}")
     if tables_warning > 0:
-        print(f"Tables Warning: {tables_warning}")
+        logger.warning(f"Tables Warning: {tables_warning}")
     if tables_failing > 0:
-        print(f"Tables Failing: {tables_failing}")
-    print(f"\nDetailed report: {args.output_report}")
-    print("=" * 70 + "\n")
+        logger.error(f"Tables Failing: {tables_failing}")
+    logger.info(f"Detailed report: {args.output_report}")
+    logger.info("=" * 70)
 
     return handle_exit(
         overall_status=overall_status,
