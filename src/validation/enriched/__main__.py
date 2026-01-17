@@ -23,13 +23,13 @@ logger = get_logger(__name__)
 DEFAULT_ENRICHED_TABLES = [
     "int_attributed_purchases",
     "int_cart_attribution",
-    "int_churn_detection",
+    "int_inventory_risk",
+    "int_customer_retention_signals",
     "int_customer_lifetime_value",
     "int_daily_business_metrics",
-    "int_inventory_risk",
     "int_product_performance",
-    "int_regional_financials",
     "int_sales_velocity",
+    "int_regional_financials",
     "int_shipping_economics",
 ]
 
