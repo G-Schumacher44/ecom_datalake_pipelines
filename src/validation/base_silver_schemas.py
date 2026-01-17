@@ -28,6 +28,7 @@ ORDERS_SCHEMA = {
     "is_reactivated": pl.Boolean,
     "batch_id": pl.Utf8,
     "ingestion_ts": pl.Datetime,
+    "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
 }
@@ -43,6 +44,7 @@ ORDER_ITEMS_SCHEMA = {
     "cost_price": pl.Decimal(18, 2),
     "batch_id": pl.Utf8,
     "ingestion_ts": pl.Datetime,
+    "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
 }
@@ -58,6 +60,7 @@ CART_ITEMS_SCHEMA = {
     "unit_price": pl.Decimal(18, 2),
     "batch_id": pl.Utf8,
     "ingestion_ts": pl.Datetime,
+    "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
 }
@@ -84,6 +87,7 @@ CUSTOMERS_SCHEMA = {
     "clv_bucket": pl.Utf8,
     "batch_id": pl.Utf8,
     "ingestion_ts": pl.Datetime,
+    "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
 }
@@ -96,6 +100,7 @@ PRODUCT_CATALOG_SCHEMA = {
     "inventory_quantity": pl.Int64,
     "batch_id": pl.Utf8,
     "ingestion_ts": pl.Datetime,
+    "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
 }
@@ -109,6 +114,7 @@ SHOPPING_CARTS_SCHEMA = {
     "status": pl.Utf8,
     "batch_id": pl.Utf8,
     "ingestion_ts": pl.Datetime,
+    "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
 }
@@ -127,6 +133,7 @@ RETURNS_SCHEMA = {
     "refund_method": pl.Utf8,
     "batch_id": pl.Utf8,
     "ingestion_ts": pl.Datetime,
+    "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
 }
@@ -144,6 +151,7 @@ RETURN_ITEMS_SCHEMA = {
     "refunded_amount": pl.Decimal(18, 2),
     "batch_id": pl.Utf8,
     "ingestion_ts": pl.Datetime,
+    "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
 }
