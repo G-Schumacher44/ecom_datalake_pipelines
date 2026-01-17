@@ -152,6 +152,7 @@ SILVER_ENRICHED_GCS_TARGET=gs://bucket/silver/enriched
 **GCP / BigQuery**
 ```bash
 GOOGLE_CLOUD_PROJECT=your-project
+GCS_BUCKET=your-bronze-bucket
 BQ_LOCATION=US
 DBT_BIGQUERY_KEYFILE=/path/to/sa.json
 BQ_LOAD_ENABLED=true|false
@@ -166,6 +167,8 @@ ECOM_SILVER_BUCKET=your-silver-bucket
 OBSERVABILITY_ENV=local|dev|prod
 METRICS_BUCKET=ecom-datalake-metrics
 LOGS_BUCKET=ecom-datalake-logs
+METRICS_BASE_PATH=/tmp/metrics
+LOGS_BASE_PATH=/tmp/logs
 ```
 
 **Quality gates**
@@ -177,9 +180,21 @@ SILVER_PROFILE_ENABLED=true|false
 SILVER_PROFILE_REPORT=docs/validation_reports/SILVER_PROFILE.md
 ```
 
-**dbt / DuckDB**
+**dbt / DuckDB (Docker paths)**
 ```bash
-DBT_DUCKDB_PATH=/opt/airflow/dbt_duckdb/target/ecom.duckdb
+DBT_TARGET_PATH=/tmp/dbt_target
+DBT_LOG_PATH=/tmp/dbt_logs
+DBT_DUCKDB_PATH=/tmp/dbt_duckdb/ecom.duckdb
+DBT_PARTIAL_PARSE=false
+```
+
+**Airflow user configuration**
+```bash
+AIRFLOW_USERNAME=airflow
+AIRFLOW_PASSWORD=airflow
+AIRFLOW_EMAIL=airflow@example.com
+AIRFLOW_FIRSTNAME=Airflow
+AIRFLOW_LASTNAME=Admin
 ```
 
 **Airflow / runtime (set by environment)**
@@ -195,6 +210,23 @@ AIRFLOW_CTX_TASK_ID=...
 AIRFLOW_CTX_EXECUTION_DATE=...
 ECOM_RUN_ID=...
 ```
+
+---
+
+### Docker/macOS VirtioFS Workaround
+
+On macOS with Docker Desktop using VirtioFS, mounted volumes can experience `Errno 35` (Resource temporarily unavailable) file locking issues. To avoid this, the following paths are redirected to `/tmp` inside the container:
+
+| Variable             | Default Value                   | Purpose                                          |
+| -------------------- | ------------------------------- | ------------------------------------------------ |
+| `DBT_TARGET_PATH`    | `/tmp/dbt_target`               | dbt compiled artifacts                           |
+| `DBT_LOG_PATH`       | `/tmp/dbt_logs`                 | dbt log files                                    |
+| `DBT_DUCKDB_PATH`    | `/tmp/dbt_duckdb/ecom.duckdb`   | DuckDB database file                             |
+| `METRICS_BASE_PATH`  | `/tmp/metrics`                  | Pipeline metrics output                          |
+| `LOGS_BASE_PATH`     | `/tmp/logs`                     | Structured log output                            |
+| `DBT_PARTIAL_PARSE`  | `false`                         | Disable partial parsing to avoid cache conflicts |
+
+These are configured in `docker-compose.yml` and should not be modified unless necessary.
 
 ### Infrastructure (Config + Env)
 ```yaml

@@ -13,14 +13,14 @@ from src.observability import get_logger
 from src.observability.metrics import write_silver_quality_metric
 from src.settings import load_settings
 from src.validation.common import (
-    resolve_layer_paths,
     get_overall_status,
     handle_exit,
+    resolve_layer_paths,
 )
-from src.validation.silver.models import SilverQualityReport
-from src.validation.silver.metrics import validate_table, compute_fk_mismatch_summary
-from src.validation.silver.report import generate_markdown_report, build_profile_report
 from src.validation.silver.data import list_ingest_partitions
+from src.validation.silver.metrics import compute_fk_mismatch_summary, validate_table
+from src.validation.silver.models import SilverQualityReport
+from src.validation.silver.report import build_profile_report, generate_markdown_report
 
 logger = get_logger(__name__)
 

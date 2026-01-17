@@ -1,5 +1,6 @@
 import polars as pl
 
+
 def _resolve_date_column(frame: pl.DataFrame | pl.LazyFrame, candidates: list[str]) -> str:
     """Resolve a date column from a list of candidates based on the frame schema."""
     columns = frame.columns if isinstance(frame, pl.DataFrame) else frame.collect_schema().names()

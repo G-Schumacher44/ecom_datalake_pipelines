@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-from functools import wraps
 import logging
 import os
+from datetime import date, datetime, timedelta
+from functools import wraps
 from typing import Any, Callable, Dict, Sequence
 
 import polars as pl
 
+from src.settings import PipelineConfig, load_settings
 from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
-from src.settings import load_settings, PipelineConfig
 
 logger = logging.getLogger(__name__)
 

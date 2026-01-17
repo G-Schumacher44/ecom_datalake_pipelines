@@ -1,13 +1,19 @@
 # Bronze Quality Report
 
-**Last Updated:** 2026-01-16 16:23:04 UTC
-**Run ID:** `manual__2025-10-11T00:00:00+00:00`
+**Last Updated:** 2026-01-17 05:26:17 UTC
+**Run ID:** `manual__2025-10-04T00:00:00+00:00`
 
 ## Summary
 
 | Table | Partitions | Manifests | Rows | Missing Manifests | Empty Partitions |
 | --- | --- | --- | --- | --- | --- |
+| orders | 0 | 0 | 0 | 0 | 0 |
+| order_items | 0 | 0 | 0 | 0 | 0 |
+| cart_items | 0 | 0 | 0 | 0 | 0 |
+| shopping_carts | 0 | 0 | 0 | 0 | 0 |
 | customers | 0 | 0 | 0 | 0 | 0 |
+| returns | 0 | 0 | 0 | 0 | 0 |
+| return_items | 0 | 0 | 0 | 0 | 0 |
 | product_catalog | 0 | 0 | 0 | 0 | 0 |
 
 ## Checks

@@ -329,26 +329,56 @@ gcloud compute instances describe airflow-vm \
 
 ### Required for Production
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `PIPELINE_ENV` | Environment: local, dev, prod | `prod` |
-| `GOOGLE_CLOUD_PROJECT` | GCP project ID | `my-project-123` |
-| `GCS_BUCKET` | Bronze data bucket | `ecom-datalake-bronze` |
-| `BRONZE_BASE_PATH` | Path to Bronze data | `gs://ecom-datalake-bronze/bronze` |
-| `SILVER_BASE_PATH` | Path to Base Silver output | `gs://ecom-datalake-silver/base` |
-| `SILVER_ENRICHED_PATH` | Path to Enriched Silver output | `gs://ecom-datalake-silver/enriched` |
+| Variable               | Description                      | Example                              |
+| ---------------------- | -------------------------------- | ------------------------------------ |
+| `PIPELINE_ENV`         | Environment: local, dev, prod    | `prod`                               |
+| `GOOGLE_CLOUD_PROJECT` | GCP project ID                   | `my-project-123`                     |
+| `GCS_BUCKET`           | Bronze data bucket               | `ecom-datalake-bronze`               |
+| `BRONZE_BASE_PATH`     | Path to Bronze data              | `gs://ecom-datalake-bronze/bronze`   |
+| `SILVER_BASE_PATH`     | Path to Base Silver output       | `gs://ecom-datalake-silver/base`     |
+| `SILVER_ENRICHED_PATH` | Path to Enriched Silver output   | `gs://ecom-datalake-silver/enriched` |
 
-### Optional
+### Optional Feature Flags
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GOLD_PIPELINE_ENABLED` | `false` (local), `true` (prod) | Enable BigQuery Gold layer |
-| `BQ_LOAD_ENABLED` | `false` (local), `true` (prod) | Enable Enriched Silver BigQuery loads |
-| `BRONZE_QA_REQUIRED` | `true` | Require Bronze QA phase |
-| `BRONZE_QA_FAIL` | `false` (local), `true` (prod) | Fail pipeline on Bronze issues |
-| `STRICT_FK` | `false` (local), `true` (prod) | Enforce FK validation in Silver |
-| `SILVER_PROFILE_ENABLED` | `false` | Generate Silver profiling reports |
-| `BQ_LOCATION` | `US` | BigQuery dataset location |
+| Variable                 | Default                         | Description                              |
+| ------------------------ | ------------------------------- | ---------------------------------------- |
+| `GOLD_PIPELINE_ENABLED`  | `false` (local), `true` (prod)  | Enable BigQuery Gold layer               |
+| `BQ_LOAD_ENABLED`        | `false` (local), `true` (prod)  | Enable Enriched Silver BigQuery loads    |
+| `BRONZE_QA_REQUIRED`     | `true`                          | Require Bronze QA phase                  |
+| `BRONZE_QA_FAIL`         | `false` (local), `true` (prod)  | Fail pipeline on Bronze issues           |
+| `STRICT_FK`              | `false` (local), `true` (prod)  | Enforce FK validation in Silver          |
+| `SILVER_PROFILE_ENABLED` | `false`                         | Generate Silver profiling reports        |
+| `BQ_LOCATION`            | `US`                            | BigQuery dataset location                |
+
+### Docker/macOS VirtioFS Issues
+
+If you encounter `Resource deadlock avoided` (Errno 35) errors on macOS with Docker Desktop:
+
+1. **Switch file sharing backend**: Docker Desktop → Settings → General → Change **VirtioFS** to **gRPC FUSE**
+2. **Avoid cloud-synced folders**: Ensure your project is NOT in iCloud, OneDrive, Dropbox, or Google Drive synced directories
+3. **Restart Docker Desktop** after making changes
+
+These variables redirect writable paths to `/tmp` inside the container to avoid write-related file locking issues:
+
+| Variable             | Default Value                   | Description                              |
+| -------------------- | ------------------------------- | ---------------------------------------- |
+| `DBT_TARGET_PATH`    | `/tmp/dbt_target`               | dbt compiled artifacts                   |
+| `DBT_LOG_PATH`       | `/tmp/dbt_logs`                 | dbt log files                            |
+| `DBT_DUCKDB_PATH`    | `/tmp/dbt_duckdb/ecom.duckdb`   | DuckDB database file                     |
+| `METRICS_BASE_PATH`  | `/tmp/metrics`                  | Pipeline metrics output                  |
+| `LOGS_BASE_PATH`     | `/tmp/logs`                     | Structured log output                    |
+| `DBT_PARTIAL_PARSE`  | `false`                         | Disable dbt partial parsing              |
+
+### Airflow User Configuration
+
+| Variable             | Default                    | Description                |
+| -------------------- | -------------------------- | -------------------------- |
+| `AIRFLOW_USERNAME`   | `airflow`                  | Airflow admin username     |
+| `AIRFLOW_PASSWORD`   | `airflow`                  | Airflow admin password     |
+| `AIRFLOW_EMAIL`      | `airflow@example.com`      | Airflow admin email        |
+| `AIRFLOW_FIRSTNAME`  | `Airflow`                  | Airflow admin first name   |
+| `AIRFLOW_LASTNAME`   | `Admin`                    | Airflow admin last name    |
+| `AIRFLOW_UID`        | `50000`                    | Airflow user ID in Docker  |
 
 ### Authentication
 

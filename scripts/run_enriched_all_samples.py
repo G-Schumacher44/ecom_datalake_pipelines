@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -13,7 +13,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.runners import enriched  # noqa: E402
 from src.validation import enriched_quality  # noqa: E402
-
 
 PARTITION_MAP = {
     "orders": "order_dt",
