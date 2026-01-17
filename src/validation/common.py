@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
-from src.settings import load_settings
-from src.observability import get_logger
+import polars as pl
 import pyarrow.parquet as pq
 from pyarrow.lib import ArrowInvalid, ArrowTypeError
+
+from src.observability import get_logger
+from src.settings import load_settings
 
 logger = get_logger(__name__)
 
@@ -89,6 +89,40 @@ def count_parquet_rows(path: Path) -> int:
             continue
 
     return total_rows
+
+def read_parquet_safe(
+    path: Path,
+    columns: list[str] | None = None,
+    n_rows: int | None = None,
+) -> pl.DataFrame | None:
+    """Read a parquet file or directory safely, returning None on failure."""
+    parquet_files = collect_parquet_files(path)
+    if not parquet_files:
+        return None
+    try:
+        return pl.read_parquet(
+            parquet_files,
+            columns=columns,
+            n_rows=n_rows,
+            memory_map=False,
+            low_memory=True,
+            use_pyarrow=True,
+        )
+    except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
+        logger.error(
+            f"Failed to read parquet at {path}",
+            error_type=type(exc).__name__,
+            error=str(exc),
+        )
+        return None
+
+def list_partitions(path: Path, partition_key: str) -> list[str]:
+    """List available partition values for a given key."""
+    partitions = []
+    for part_dir in path.glob(f"{partition_key}=*"):
+        if part_dir.is_dir():
+            partitions.append(part_dir.name.split("=", 1)[-1])
+    return sorted(partitions)
 
 def resolve_layer_paths(
     config_path: str = "config/config.yml",

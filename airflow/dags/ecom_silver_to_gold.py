@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import os
 
-from airflow import DAG
+import pendulum
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.utils.task_group import TaskGroup
-import pendulum
-
 from common import (
     AIRFLOW_HOME,
     COMMON_ENV,
@@ -18,6 +16,8 @@ from common import (
     make_runner_callable,
     resolve_bool,
 )
+
+from airflow import DAG
 
 # --- Task Callables ---
 
@@ -217,7 +217,7 @@ with DAG(
         task_id="validate_enriched_quality",
         env=COMMON_ENV,
         bash_command=(
-            f"cd {AIRFLOW_HOME} && python -m src.validation.enriched_quality "
+            f"cd {AIRFLOW_HOME} && python -m src.validation.enriched "
             f"--enriched-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched'] }}}} "
             f"--run-id {{{{ run_id }}}} "
             f"--ingest-dt {{{{ ds }}}} "

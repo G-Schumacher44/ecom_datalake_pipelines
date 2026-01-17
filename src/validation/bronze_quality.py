@@ -19,17 +19,16 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from src.observability import get_logger
 from src.observability.metrics import write_data_quality_metric
 from src.runners.enriched.shared import get_table_partitions
 from src.validation.common import (
     ValidationStatus,
-    resolve_layer_paths,
-    get_overall_status,
     handle_exit,
     is_gcs_path,
+    resolve_layer_paths,
 )
 
 logger = get_logger(__name__)
