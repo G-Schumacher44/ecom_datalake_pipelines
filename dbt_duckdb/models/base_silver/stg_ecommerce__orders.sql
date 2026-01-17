@@ -28,6 +28,7 @@ select
     is_reactivated,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     order_dt

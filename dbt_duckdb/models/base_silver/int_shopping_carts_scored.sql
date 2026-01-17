@@ -1,6 +1,6 @@
 {{ config(materialized='ephemeral') }}
 
-{% set enforce_customer_fk = strict_fk() %}
+{% set enforce_fk = strict_fk() %}
 
 {#
 STAGING CORE: shopping_carts (shared by base + quarantine)
@@ -12,7 +12,7 @@ with raw as (
     where {{ run_date_filter('ingest_dt') }}
 ),
 
-{% if enforce_customer_fk %}
+{% if enforce_fk %}
 dim_customers as (
     select distinct
         customer_id
@@ -32,6 +32,7 @@ cleaned as (
         {{ normalize_string('batch_id') }} as batch_id,
         {{ normalize_string('event_id') }} as event_id,
         {{ normalize_string('source_file') }} as source_file,
+        {{ get_ingestion_dt() }} as ingestion_dt,
         cast({{ safe_cast_timestamp('created_at') }} as date) as created_dt
     from raw
 ),
@@ -39,7 +40,7 @@ cleaned as (
 validated as (
     select
         cleaned.*,
-        {% if enforce_customer_fk %}
+        {% if enforce_fk %}
         dim_customers.customer_id is not null as customer_fk_valid,
         {% else %}
         true as customer_fk_valid,
@@ -49,7 +50,7 @@ validated as (
             order by cleaned.ingestion_ts desc nulls last, cleaned.event_id desc
         ) as row_num
     from cleaned
-    {% if enforce_customer_fk %}
+    {% if enforce_fk %}
     left join dim_customers
         on cleaned.customer_id = dim_customers.customer_id
     {% endif %}
@@ -64,7 +65,7 @@ scored as (
             and {{ is_valid_timestamp('created_at') }}
             and (cart_total is null or cart_total >= 0)
             and (updated_at is null or created_at is null or updated_at >= created_at)
-            {% if enforce_customer_fk %}
+            {% if enforce_fk %}
             and (
                 customer_id is null
                 or {{ is_guest_customer_id('customer_id') }}
@@ -80,7 +81,7 @@ scored as (
             case when cart_total < 0 then 'negative_cart_total' end,
             case when updated_at < created_at and updated_at is not null and created_at is not null
                  then 'updated_before_created' end,
-            {% if enforce_customer_fk %}
+            {% if enforce_fk %}
             case
                 when customer_id is not null
                 and not {{ is_guest_customer_id('customer_id') }}
@@ -102,6 +103,7 @@ select
     status,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     created_dt,

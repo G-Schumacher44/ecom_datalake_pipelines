@@ -40,6 +40,7 @@ cleaned as (
         {{ normalize_string('batch_id') }} as batch_id,
         {{ normalize_string('event_id') }} as event_id,
         {{ normalize_string('source_file') }} as source_file,
+        {{ get_ingestion_dt() }} as ingestion_dt,
         cast({{ safe_cast_timestamp('added_at') }} as date) as added_dt
     from raw
 ),
@@ -100,6 +101,7 @@ select
     unit_price,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     added_dt,

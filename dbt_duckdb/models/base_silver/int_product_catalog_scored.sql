@@ -21,7 +21,8 @@ cleaned as (
         {{ normalize_string('batch_id') }} as batch_id,
         {{ safe_cast_timestamp('ingestion_ts') }} as ingestion_ts,
         {{ normalize_string('event_id') }} as event_id,
-        {{ normalize_string('source_file') }} as source_file
+        {{ normalize_string('source_file') }} as source_file,
+        cast({{ safe_cast_timestamp('ingestion_ts') }} as date) as ingestion_dt
     from raw
 ),
 
@@ -72,6 +73,7 @@ select
     ingestion_ts,
     event_id,
     source_file,
+    ingestion_dt,
     is_valid,
     invalid_reason,
     row_num

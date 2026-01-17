@@ -95,6 +95,10 @@
     ({{ column_name }} is not null and {{ column_name }} >= 0)
 {%- endmacro %}
 
+{% macro get_ingestion_dt(ingestion_ts_col='ingestion_ts') %}
+    cast({{ safe_cast_timestamp(ingestion_ts_col) }} as date)
+{%- endmacro %}
+
 -- ============================================================================
 -- Partition Window Filter
 -- ============================================================================
@@ -108,31 +112,6 @@
     {%- else -%}
         true
     {%- endif -%}
-{%- endmacro %}
-
--- ============================================================================
--- FK Validation Macro (returns boolean + reason)
--- ============================================================================
-
-{% macro validate_fk(child_col, parent_table, parent_col) %}
-    case
-        when {{ child_col }} is null then false
-        when {{ parent_col }} is not null then true
-        else false
-    end
-{%- endmacro %}
-
--- ============================================================================
--- Invalid Reason Builder (concatenates validation failures)
--- ============================================================================
-
-{% macro build_invalid_reasons(checks) %}
-    trim(
-        {% for check in checks %}
-        case when not ({{ check.condition }}) then '{{ check.reason }}; ' else '' end ||
-        {% endfor %}
-        ''
-    )
 {%- endmacro %}
 
 -- ============================================================================
