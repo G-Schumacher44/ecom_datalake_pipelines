@@ -2,13 +2,72 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from functools import wraps
 import os
+from typing import Any, Callable, Dict, Sequence
 
 import polars as pl
 
 from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
-from src.settings import load_settings
+from src.settings import load_settings, PipelineConfig
+
+
+def enriched_runner(
+    output_table: str,
+    input_tables: Sequence[str],
+):
+    """Decorator to standardize Enriched Silver runner boilerplate."""
+
+    def decorator(
+        func: Callable[[Dict[str, pl.LazyFrame], PipelineConfig, str], pl.LazyFrame]
+    ):
+        @wraps(func)
+        def wrapper(
+            base_silver_path: str,
+            output_path: str,
+            ingest_dt: str = "2020-01-01",
+        ) -> Dict[str, Any]:
+            start_time = datetime.now()
+            settings = load_settings()
+            lookback_days = settings.pipeline.enriched_lookback_days
+
+            # 1. Read input tables
+            tables = {
+                table: read_partitioned(
+                    base_silver_path, table, ingest_dt, lookback_days
+                )
+                for table in input_tables
+            }
+
+            # 2. Execute transform
+            result_lazy = func(tables, settings.pipeline, ingest_dt)
+
+            # 3. Add lineage and materialize
+            result_lazy = result_lazy.with_columns(ingest_dt=pl.lit(ingest_dt))
+            result = result_lazy.collect()
+
+            # 4. Write output
+            partition_col = get_enriched_partitions()[output_table]
+            write_partitioned_shards(
+                result,
+                output_path,
+                output_table,
+                partition_col,
+                settings.pipeline.enriched_max_rows_per_file,
+            )
+
+            elapsed = (datetime.now() - start_time).total_seconds()
+            return {
+                "table": output_table,
+                "output_rows": len(result),
+                "processing_time_seconds": elapsed,
+                "output_path": f"{output_path}/{output_table}",
+            }
+
+        return wrapper
+
+    return decorator
 
 
 def get_table_partitions() -> dict[str, str | None]:
@@ -72,6 +131,7 @@ def read_partitioned(
             f"{base_path}/{table}/**/*.parquet",
             hive_partitioning=True,
             schema=BASE_SILVER_SCHEMAS.get(table),
+            extra_columns="ignore",
         )
 
     available = set(list_partitions(base_path, table, partition_key))
@@ -88,6 +148,7 @@ def read_partitioned(
         paths,
         hive_partitioning=True,
         schema=BASE_SILVER_SCHEMAS.get(table),
+        extra_columns="ignore",
     )
 
 
@@ -155,29 +216,13 @@ def write_partitioned_shards(
     partition_col: str,
     max_rows_per_file: int,
 ) -> None:
-    """Write partitioned parquet data supporting both LazyFrame and DataFrame inputs.
+    """Write partitioned parquet data with sharding support.
 
-    If a LazyFrame is provided, prefer fully streaming sink_parquet operations.
-    If a DataFrame is provided, fall back to the existing eager sharding logic.
+    Ensures consistent sharding behavior by collecting LazyFrames before writing.
     """
-
-    # Handle LazyFrame path – fully streaming
     if isinstance(df, pl.LazyFrame):
-        output_base = f"{output_path.rstrip('/')}/{table}"
-        ensure_output_dir(output_base)
+        df = df.collect()
 
-        # Normalize partition column values lazily
-        df = df.with_columns(pl.col(partition_col).cast(pl.Utf8).alias(partition_col))
-
-        # Use Polars native partitioned streaming write
-        df.sink_parquet(
-            f"{output_base}",
-            compression="snappy",
-            partition_by=[partition_col],
-        )
-        return
-
-    # ---- Existing eager fallback for DataFrame inputs ----
     df = normalize_partition_values(df, partition_col)
 
     if partition_col not in df.columns:
@@ -202,4 +247,5 @@ __all__ = [
     "get_enriched_partitions",
     "read_partitioned",
     "write_partitioned_shards",
+    "enriched_runner",
 ]
