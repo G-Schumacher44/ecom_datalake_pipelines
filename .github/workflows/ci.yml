@@ -35,3 +35,17 @@ jobs:
           cd ../dbt_bigquery
           dbt deps
           dbt parse
+      - name: Validation Integration Test
+        run: |
+          # Test Bronze Validation
+          python -m src.validation.bronze_quality --bronze-path samples/bronze --output-report bronze_ci.md
+          
+          # Test Silver Validation (using new refactored package)
+          # Note: dbt build in previous step populated data/silver/base
+          mkdir -p data/silver/base/quarantine
+          python -m src.validation.silver \
+            --bronze-path samples/bronze \
+            --silver-path data/silver/base \
+            --quarantine-path data/silver/base/quarantine \
+            --output-report silver_ci.md
+
