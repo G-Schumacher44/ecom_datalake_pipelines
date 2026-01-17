@@ -10,7 +10,7 @@
 <p align="center">
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="Status" src="https://img.shields.io/badge/status-development-orange">
-  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-blue">
+  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue">
   <img alt="dbt" src="https://img.shields.io/badge/dbt-1.8%2B-orange">
 </p>
 
@@ -165,16 +165,19 @@ This repository is part of a larger data engineering portfolio demonstrating end
 <details>
 <summary><strong>🫀 Version & Status</strong></summary>
 
-### Current Status: Development
+### Current Status: Feature Complete
 
 - ✅ Project scaffolding and config setup
 - ✅ Bronze profiling and schema validation
-- ✅ dbt-duckdb Base Silver models (in progress)
+- ✅ dbt-duckdb Base Silver models (8 tables + quarantine)
 - ✅ Data contract and quality gate definitions
-- 🚧 Polars Enriched Silver transforms (planned)
-- 🚧 dbt-bigquery Gold mart aggregations (planned)
-- 🚧 Airflow DAG orchestration (planned)
-- 🚧 Audit record loading and SLA dashboards (planned)
+- ✅ Polars Enriched Silver transforms (10 domain runners)
+- ✅ dbt-bigquery Gold mart aggregations (8 fact tables)
+- ✅ Airflow DAG orchestration (2 DAGs with full Bronze→Gold flow)
+- ✅ Structured observability (metrics, logging, audit trails)
+- ✅ Three-layer validation framework (Bronze, Silver, Enriched)
+- 🚧 SLA dashboards and alerting (future enhancement)
+
 </details>
 
 <details>
@@ -223,12 +226,11 @@ ecom-datalake-pipelines/
 │   ├── describe_parquet_samples.py  # Bronze profiling and quality checks
 │   └── bootstrap_airflow.sh         # Airflow setup helper
 ├── src/
-│   └── ecom_pipelines/
-│       ├── transforms/         # Pure Polars enrichment logic
-│       ├── runners/            # I/O wrappers (GCS read/write)
-│       ├── validation/         # Schema validation
-│       ├── observability/      # Audit record generation
-│       └── utils.py            # Shared utilities
+│   ├── transforms/             # Pure Polars enrichment logic
+│   ├── runners/                # I/O wrappers and domain runners
+│   ├── validation/             # Bronze, Silver, Enriched validation packages
+│   ├── observability/          # Structured logging, metrics, audit trails
+│   └── settings.py             # Pydantic config models
 ├── tests/                      # pytest suite for Python modules
 ├── environment.yml             # Conda environment
 ├── pyproject.toml              # Python package config
