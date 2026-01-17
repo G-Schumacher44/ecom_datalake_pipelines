@@ -4,19 +4,87 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
+from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
 
+class ConfigValidationError(Exception):
+    """Raised when config.yml fails schema validation."""
+
+    pass
+
+
+class SemanticCheck(BaseModel):
+    """Schema for a single semantic check expression."""
+
+    name: str = Field(..., min_length=1, description="Unique name for the check")
+    expr: str = Field(..., min_length=1, description="SQL expression to evaluate")
+
+    @field_validator("name")
+    @classmethod
+    def name_is_valid_identifier(cls, v: str) -> str:
+        if not re.match(r"^[a-z][a-z0-9_]*$", v):
+            raise ValueError(
+                f"Semantic check name '{v}' must be lowercase with underscores"
+            )
+        return v
+
+    @field_validator("expr")
+    @classmethod
+    def expr_has_no_dangerous_keywords(cls, v: str) -> str:
+        dangerous = ["drop", "delete", "truncate", "insert", "update", "alter"]
+        lower_expr = v.lower()
+        for keyword in dangerous:
+            if re.search(rf"\b{keyword}\b", lower_expr):
+                raise ValueError(
+                    f"Semantic check expression contains forbidden keyword: {keyword}"
+                )
+        return v
+
+
 class ValidationConfig(BaseModel):
+    """Schema for validation configuration section."""
+
     key_fields: dict[str, list[str]] = Field(default_factory=dict)
     sanity_checks: dict[str, list[str]] = Field(default_factory=dict)
     semantic_checks: dict[str, list[dict[str, str]]] = Field(default_factory=dict)
+
+    @field_validator("sanity_checks")
+    @classmethod
+    def sanity_check_types_valid(cls, v: dict[str, list[str]]) -> dict[str, list[str]]:
+        allowed_types = {"non_negative", "rate_0_1"}
+        for check_type in v.keys():
+            if check_type not in allowed_types:
+                raise ValueError(
+                    f"Invalid sanity check type '{check_type}'. "
+                    f"Allowed: {allowed_types}"
+                )
+        return v
+
+    @model_validator(mode="after")
+    def validate_semantic_checks_schema(self) -> "ValidationConfig":
+        """Validate each semantic check has required fields."""
+        for table, checks in self.semantic_checks.items():
+            for i, check in enumerate(checks):
+                if "name" not in check:
+                    raise ValueError(
+                        f"Semantic check {i} for '{table}' missing 'name' field"
+                    )
+                if "expr" not in check:
+                    raise ValueError(
+                        f"Semantic check '{check.get('name', i)}' for '{table}' "
+                        "missing 'expr' field"
+                    )
+                # Validate as SemanticCheck
+                SemanticCheck.model_validate(check)
+        return self
 
 
 class PipelineConfig(BaseModel):
@@ -120,22 +188,91 @@ class PipelineConfig(BaseModel):
     enriched_partitions: dict[str, str] = Field(default_factory=dict)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
 
+    @field_validator("environment")
+    @classmethod
+    def environment_is_valid(cls, v: str) -> str:
+        allowed = {"local", "dev", "prod"}
+        if v not in allowed:
+            raise ValueError(f"environment must be one of {allowed}, got '{v}'")
+        return v
+
+    @field_validator("default_ingest_dt")
+    @classmethod
+    def ingest_dt_is_valid_date(cls, v: str) -> str:
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", v):
+            raise ValueError(
+                f"default_ingest_dt must be YYYY-MM-DD format, got '{v}'"
+            )
+        return v
+
+    @field_validator("sla_thresholds")
+    @classmethod
+    def sla_thresholds_in_range(cls, v: dict[str, float]) -> dict[str, float]:
+        for table, threshold in v.items():
+            if not 0.0 <= threshold <= 1.0:
+                raise ValueError(
+                    f"SLA threshold for '{table}' must be between 0 and 1, got {threshold}"
+                )
+        return v
+
+    @field_validator("max_quarantine_pct", "max_row_loss_pct")
+    @classmethod
+    def percentage_in_range(cls, v: float) -> float:
+        if not 0.0 <= v <= 100.0:
+            raise ValueError(f"Percentage must be between 0 and 100, got {v}")
+        return v
+
+    @model_validator(mode="after")
+    def enriched_tables_have_partitions(self) -> "PipelineConfig":
+        """Warn if enriched tables are missing partition definitions."""
+        missing = []
+        for table in self.enriched_tables:
+            if table not in self.enriched_partitions:
+                missing.append(table)
+        if missing:
+            logger.warning(
+                f"Enriched tables missing partition definitions: {missing}"
+            )
+        return self
+
 
 class Settings(BaseSettings):
+    """Root settings container."""
+
     pipeline: PipelineConfig
 
     model_config = SettingsConfigDict(env_prefix="ECOM_", extra="ignore")
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "Settings":
+    def from_yaml(cls, path: str | Path, strict: bool = False) -> "Settings":
+        """Load settings from YAML file.
+
+        Args:
+            path: Path to config YAML file
+            strict: If True, raise ConfigValidationError on validation failure.
+                    If False (default), fall back to defaults with a warning.
+
+        Returns:
+            Validated Settings instance
+
+        Raises:
+            ConfigValidationError: If strict=True and validation fails
+        """
         try:
             payload = yaml.safe_load(Path(path).read_text()) or {}
         except OSError as exc:
+            if strict:
+                raise ConfigValidationError(f"Failed to read config {path}: {exc}")
             payload = {}
             logger.warning(f"Failed to read config {path}: {exc}")
+
         try:
             return cls.model_validate(payload)
         except ValidationError as exc:
+            if strict:
+                raise ConfigValidationError(
+                    f"Config validation failed for {path}:\n{exc}"
+                ) from exc
             logger.warning(f"Invalid config in {path}; falling back to defaults: {exc}")
             return cls(
                 pipeline=PipelineConfig(
@@ -170,7 +307,48 @@ class Settings(BaseSettings):
         return f"gs://{bucket}/{prefix}"
 
 
-def load_settings(config_path: str | Path | None = None) -> Settings:
+def load_settings(
+    config_path: str | Path | None = None, strict: bool = False
+) -> Settings:
+    """Load and validate settings from config file.
+
+    Args:
+        config_path: Path to config YAML file. Defaults to config/config.yml
+        strict: If True, raise ConfigValidationError on validation failure
+
+    Returns:
+        Validated Settings instance
+    """
     if config_path is None:
         config_path = "config/config.yml"
-    return Settings.from_yaml(config_path)
+    return Settings.from_yaml(config_path, strict=strict)
+
+
+def validate_config(config_path: str | Path | None = None) -> list[str]:
+    """Validate config file and return list of issues.
+
+    This function is useful for CI/CD pipelines to validate config before deploy.
+
+    Args:
+        config_path: Path to config YAML file. Defaults to config/config.yml
+
+    Returns:
+        List of validation error messages. Empty list if valid.
+
+    Example:
+        >>> issues = validate_config("config/config.yml")
+        >>> if issues:
+        ...     print("Config errors:", issues)
+        ...     sys.exit(1)
+    """
+    if config_path is None:
+        config_path = "config/config.yml"
+
+    issues: list[str] = []
+
+    try:
+        Settings.from_yaml(config_path, strict=True)
+    except ConfigValidationError as exc:
+        issues.append(str(exc))
+
+    return issues

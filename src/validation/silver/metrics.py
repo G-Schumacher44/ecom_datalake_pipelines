@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from polars.exceptions import ColumnNotFoundError, ComputeError, SchemaError
+from pyarrow.lib import ArrowInvalid, ArrowTypeError
 
 from src.validation.common import (
     collect_parquet_files,
@@ -130,9 +132,18 @@ def compute_fk_mismatch_summary(silver_path: Path) -> list[dict[str, Any]]:
                 .select(pl.len())
                 .item()
             )
-        except Exception as exc:
+        except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
             logger.warning(
-                "Failed FK mismatch summary",
+                "Failed FK mismatch summary: parquet read error",
+                child_table=child_table,
+                parent_table=parent_table,
+                error_type=type(exc).__name__,
+                error=str(exc),
+            )
+            continue
+        except (ColumnNotFoundError, SchemaError, ComputeError) as exc:
+            logger.warning(
+                "Failed FK mismatch summary: schema/column error",
                 child_table=child_table,
                 parent_table=parent_table,
                 error_type=type(exc).__name__,
