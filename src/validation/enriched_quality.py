@@ -33,6 +33,8 @@ from src.validation.common import (
     get_overall_status,
     handle_exit,
     resolve_layer_paths,
+    collect_parquet_files,
+    count_parquet_rows,
 )
 
 logger = get_logger(__name__)
@@ -105,51 +107,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to write Markdown report.",
     )
     return parser.parse_args()
-
-
-def collect_parquet_files(path: Path) -> list[Path]:
-    candidates = list(path.glob("**/*.parquet"))
-    if not candidates:
-        return []
-
-    valid_files = []
-    for file_path in candidates:
-        try:
-            with file_path.open("rb") as handle:
-                header = handle.read(4)
-                if header != b"PAR1":
-                    continue
-                handle.seek(-4, 2)
-                if handle.read(4) != b"PAR1":
-                    continue
-            valid_files.append(file_path)
-        except OSError:
-            continue
-
-    return valid_files
-
-
-def count_parquet_rows(path: Path) -> int:
-    if not path.exists():
-        return 0
-    parquet_files = collect_parquet_files(path)
-    if not parquet_files:
-        return 0
-
-    total_rows = 0
-    for file_path in parquet_files:
-        try:
-            parquet_file = pq.ParquetFile(file_path)
-            total_rows += parquet_file.metadata.num_rows
-        except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
-            logger.warning(
-                "Failed to read parquet",
-                path=str(file_path),
-                error_type=type(exc).__name__,
-                error=str(exc),
-            )
-            continue
-    return total_rows
 
 
 def list_partitions(path: Path, partition_key: str) -> list[str]:

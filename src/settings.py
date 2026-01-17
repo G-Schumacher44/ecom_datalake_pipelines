@@ -147,6 +147,25 @@ class Settings(BaseSettings):
                 )
             )
 
+    def resolve_path(self, bucket: str, prefix: str) -> str:
+        """Resolve a path to gs:// or local filesystem based on bucket config.
+        
+        Args:
+            bucket: Bucket name or 'local'
+            prefix: Path prefix within the bucket
+            
+        Returns:
+            Resolved path string (gs://... or /path/to/...)
+        """
+        env = (os.getenv("PIPELINE_ENV") or self.pipeline.environment or "local").lower()
+        
+        if bucket == "local" or env == "local":
+            # For local paths, we assume absolute paths or relative to execution context
+            # We don't verify existence here, just formatting
+            return str(Path(prefix))
+            
+        return f"gs://{bucket}/{prefix}"
+
 
 def load_settings(config_path: str | Path | None = None) -> Settings:
     if config_path is None:

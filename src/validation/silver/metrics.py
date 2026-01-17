@@ -7,8 +7,10 @@ import polars as pl
 
 from src.validation.silver.models import TableQualityMetrics
 from src.validation.silver.data import (
-    count_parquet_rows,
     get_quarantine_breakdown,
+)
+from src.validation.common import (
+    count_parquet_rows,
     collect_parquet_files,
 )
 
