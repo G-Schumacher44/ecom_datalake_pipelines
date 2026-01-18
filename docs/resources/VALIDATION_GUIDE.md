@@ -49,6 +49,10 @@ The pipeline has **3 validation gates**:
 └─────────────────────────────────────────┘
 ```
 
+**Dev/Prod report storage:**  
+When `PIPELINE_ENV=dev|prod`, reports are written to GCS at:
+`gs://$REPORTS_BUCKET/validation_reports/<run_id>/`
+
 ---
 
 ## Gate 2: Silver Quality Validation (✅ IMPLEMENTED)

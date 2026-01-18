@@ -11,12 +11,6 @@ graph TD
     E --> F[Gold Marts<br/>dbt + BigQuery]
 
     B -.->|Quarantine| G[Quarantine Tables]
-
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style B fill:#bbf,stroke:#333,stroke-width:2px
-    style C fill:#bfb,stroke:#333,stroke-width:2px
-    style F fill:#ffb,stroke:#333,stroke-width:2px
-    style G fill:#fbb,stroke:#333,stroke-width:2px
 ```
 
 ## Text Flow
