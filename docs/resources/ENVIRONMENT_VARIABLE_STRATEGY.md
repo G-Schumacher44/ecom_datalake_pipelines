@@ -43,7 +43,10 @@ export METRICS_BUCKET=ecom-prod-metrics
 **Example:**
 ```bash
 # .env (NEVER commit)
+# Optional service account credentials (prod-style)
+USE_SA_AUTH=true
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+GCP_SA_KEY_PATH=/path/to/service-account.json
 DBT_BIGQUERY_KEYFILE=/path/to/service-account.json
 OPENAI_API_KEY=sk-...
 DATABASE_PASSWORD=secret
@@ -56,13 +59,17 @@ import os
 # No default - will raise error if not set
 api_key = os.environ["OPENAI_API_KEY"]
 
-# Or with explicit check
-if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
-    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS must be set")
+# Or with explicit check (only when SA auth is enabled)
+if os.getenv("USE_SA_AUTH", "").lower() in {"1", "true", "yes", "on"}:
+    if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS must be set")
 ```
 
 **✅ Good for:** Credentials, keys, passwords  
 **❌ Not for:** Non-sensitive config, business logic
+
+**Note:** ADC (`gcloud auth application-default login`) is the default for local/dev
+and does not require `GOOGLE_APPLICATION_CREDENTIALS` unless `USE_SA_AUTH=true`.
 
 ---
 
@@ -154,7 +161,12 @@ SILVER_ENRICHED_GCS_TARGET=gs://bucket/silver/enriched
 GOOGLE_CLOUD_PROJECT=your-project
 GCS_BUCKET=your-bronze-bucket
 BQ_LOCATION=US
+USE_SA_AUTH=true|false
+CLOUDSDK_CONFIG=/home/airflow/.config/gcloud
+GCP_SA_KEY_PATH=/path/to/service-account.json
+GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/.gcp/sa.json
 DBT_BIGQUERY_KEYFILE=/path/to/sa.json
+DBT_BQ_METHOD=oauth|service-account
 BQ_LOAD_ENABLED=true|false
 GOLD_PIPELINE_ENABLED=true|false
 ECOM_PROJECT_ID=your-project
@@ -242,7 +254,9 @@ pipeline:
 ### Secrets (Env Only)
 ```bash
 # .env (not in config.yml)
+USE_SA_AUTH=true
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+GCP_SA_KEY_PATH=/path/to/service-account.json
 DBT_BIGQUERY_KEYFILE=/path/to/sa.json
 ```
 

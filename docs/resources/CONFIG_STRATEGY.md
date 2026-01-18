@@ -178,6 +178,13 @@ Key overrides:
 - `SILVER_GCS_TARGET` → Overrides silver base GCS sync target
 - `SILVER_ENRICHED_GCS_TARGET` → Overrides silver enriched GCS sync target
 
+#### GCP Auth (Secrets)
+
+- `USE_SA_AUTH` → Use service-account auth instead of ADC (default: false)
+- `CLOUDSDK_CONFIG` → ADC config path (default: `/home/airflow/.config/gcloud`)
+- `GCP_SA_KEY_PATH` → Host path for the service account key (docker-compose mount)
+- `GOOGLE_APPLICATION_CREDENTIALS` → In-container path to the mounted key
+
 #### dbt / DuckDB (Docker paths)
 
 - `DBT_TARGET_PATH` → dbt compiled artifacts (default: `/tmp/dbt_target`)
@@ -208,6 +215,10 @@ Key overrides:
 - ✅ Value contains secrets (API keys, credentials)
 - ✅ You need quick local overrides during debugging
 - ✅ Running in CI/CD or Airflow
+
+**Secret examples (env-only):**
+- `GOOGLE_APPLICATION_CREDENTIALS` (in-container path)
+- `GCP_SA_KEY_PATH` (host path for docker-compose mount)
 
 ---
 
