@@ -5,6 +5,7 @@ __pycache__/
 
 .env
 .env.*
+!.env.example
 .envrc
 .venv/
 .conda/
@@ -29,6 +30,7 @@ docs/local_only/*
 logs/
 
 # Local data and metrics (ephemeral - don't commit)
+data/bronze/
 data/metrics/
 data/logs/
 data/silver/
