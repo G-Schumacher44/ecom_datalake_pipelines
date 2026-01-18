@@ -1,11 +1,11 @@
 pipeline:
   # GCP Configuration
-  project_id: "your-gcp-project"
+  project_id: "acme-analytics"
 
   # Data Lake Buckets (use "local" for local filesystem)
-  bronze_bucket: "local"
-  bronze_prefix: "samples/bronze"
-  silver_bucket: "local"
+  bronze_bucket: "acme-analytics-raw"
+  bronze_prefix: "ecom/raw"
+  silver_bucket: "acme-analytics-silver"
   silver_base_prefix: "data/silver/base"
   silver_enriched_prefix: "data/silver/enriched"
 
@@ -15,11 +15,12 @@ pipeline:
 
   # Observability & Metrics
   # Environment: local (default), dev, or prod
-  # - local: Writes to ./data/metrics/ and ./data/logs/
+  # - local: Writes to ./data/metrics/, ./data/logs/, ./docs/validation_reports/
   # - dev/prod: Writes to GCS buckets below
   environment: "local"
-  metrics_bucket: "ecom-datalake-metrics"
+  metrics_bucket: "data-reporting"
   logs_bucket: "ecom-datalake-logs"
+  reports_bucket: "data-reporting"
 
   # Airflow Retry Configuration
   # Environment-appropriate task retry settings with exponential backoff
@@ -61,6 +62,9 @@ pipeline:
   min_return_id_distinct_ratio: 0.001
   # Expected ingest_dt partitions (YYYY-MM-DD or range: YYYY-MM-DD..YYYY-MM-DD)
   expected_bronze_partitions: []
+  # Validation partition window (days back from run date)
+  bronze_validation_lookback_days: 0
+  silver_validation_lookback_days: 0
   min_table_rows:
     orders: 1
     customers: 1
@@ -99,16 +103,18 @@ pipeline:
   # Tolerance for ratio checks (handles floating-point rounding).
   enriched_ratio_epsilon: 0.0001
 
-  # Partition Metadata
+  # Partition Metadata (Bronze Layer)
+  # NOTE: Bronze tables use ingest_dt for most tables, with exceptions for
+  # customers (signup_date) and product_catalog (category)
   table_partitions:
-    orders: "order_dt"
-    order_items: "order_dt"
-    cart_items: "added_dt"
-    shopping_carts: "created_dt"
-    customers: null
-    returns: "return_dt"
-    return_items: "return_dt"
-    product_catalog: null
+    orders: "ingest_dt"
+    order_items: "ingest_dt"
+    cart_items: "ingest_dt"
+    shopping_carts: "ingest_dt"
+    customers: "signup_date"
+    returns: "ingest_dt"
+    return_items: "ingest_dt"
+    product_catalog: "category"
   enriched_partitions:
     int_attributed_purchases: "order_dt"
     int_cart_attribution: "cart_dt"
@@ -154,11 +160,11 @@ pipeline:
     semantic_checks:
       int_cart_attribution:
         - name: "converted_requires_order_id"
-          expr: "cart_status == 'converted' and order_id is null"
+          expr: "cart_status = 'converted' and order_id is null"
         - name: "abandoned_requires_null_order_id"
-          expr: "cart_status == 'abandoned' and order_id is not null"
+          expr: "cart_status = 'abandoned' and order_id is not null"
         - name: "abandoned_value_positive_for_abandoned"
-          expr: "cart_status == 'abandoned' and order_id is null and time_to_purchase_hours is null and abandoned_value <= 0"
+          expr: "cart_status = 'abandoned' and order_id is null and time_to_purchase_hours is null and abandoned_value <= 0"
         - name: "time_to_purchase_hours_non_negative"
           expr: "time_to_purchase_hours is not null and time_to_purchase_hours < 0"
       int_product_performance:
@@ -183,4 +189,4 @@ pipeline:
           expr: >-
             abs((shipping_cost - actual_shipping_cost) - shipping_margin) > 0.01
         - name: "shipping_margin_pct_null_when_zero_cost"
-          expr: "shipping_cost == 0 and shipping_margin_pct is not null"
+          expr: "shipping_cost = 0 and shipping_margin_pct is not null"
