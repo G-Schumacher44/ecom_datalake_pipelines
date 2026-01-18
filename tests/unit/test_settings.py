@@ -41,10 +41,7 @@ class TestSemanticCheck:
             SemanticCheck(name="bad_check", expr="delete from users")
 
     def test_expr_allows_safe_sql(self) -> None:
-        check = SemanticCheck(
-            name="rate_check",
-            expr="rate > 0 and rate <= 1"
-        )
+        check = SemanticCheck(name="rate_check", expr="rate > 0 and rate <= 1")
         assert "rate" in check.expr
 
 
@@ -68,19 +65,11 @@ class TestValidationConfig:
 
     def test_semantic_check_missing_name(self) -> None:
         with pytest.raises(ValueError, match="missing 'name' field"):
-            ValidationConfig(
-                semantic_checks={
-                    "table1": [{"expr": "x > 0"}]
-                }
-            )
+            ValidationConfig(semantic_checks={"table1": [{"expr": "x > 0"}]})
 
     def test_semantic_check_missing_expr(self) -> None:
         with pytest.raises(ValueError, match="missing 'expr' field"):
-            ValidationConfig(
-                semantic_checks={
-                    "table1": [{"name": "check1"}]
-                }
-            )
+            ValidationConfig(semantic_checks={"table1": [{"name": "check1"}]})
 
 
 class TestPipelineConfig:
@@ -160,42 +149,54 @@ class TestPipelineConfig:
 class TestSettingsFromYaml:
     def test_loads_valid_yaml(self, tmp_path: Path) -> None:
         config_file = tmp_path / "config.yml"
-        config_file.write_text(yaml.dump({
-            "pipeline": {
-                "project_id": "test-project",
-                "bronze_bucket": "bronze-bucket",
-                "silver_bucket": "silver-bucket",
-                "environment": "local",
-            }
-        }))
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "pipeline": {
+                        "project_id": "test-project",
+                        "bronze_bucket": "bronze-bucket",
+                        "silver_bucket": "silver-bucket",
+                        "environment": "local",
+                    }
+                }
+            )
+        )
 
         settings = Settings.from_yaml(config_file)
         assert settings.pipeline.project_id == "test-project"
 
     def test_strict_mode_raises_on_invalid(self, tmp_path: Path) -> None:
         config_file = tmp_path / "config.yml"
-        config_file.write_text(yaml.dump({
-            "pipeline": {
-                "project_id": "test-project",
-                "bronze_bucket": "bronze",
-                "silver_bucket": "silver",
-                "environment": "invalid_env",
-            }
-        }))
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "pipeline": {
+                        "project_id": "test-project",
+                        "bronze_bucket": "bronze",
+                        "silver_bucket": "silver",
+                        "environment": "invalid_env",
+                    }
+                }
+            )
+        )
 
         with pytest.raises(ConfigValidationError):
             Settings.from_yaml(config_file, strict=True)
 
     def test_non_strict_mode_falls_back(self, tmp_path: Path) -> None:
         config_file = tmp_path / "config.yml"
-        config_file.write_text(yaml.dump({
-            "pipeline": {
-                "project_id": "test-project",
-                "bronze_bucket": "bronze",
-                "silver_bucket": "silver",
-                "environment": "invalid_env",
-            }
-        }))
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "pipeline": {
+                        "project_id": "test-project",
+                        "bronze_bucket": "bronze",
+                        "silver_bucket": "silver",
+                        "environment": "invalid_env",
+                    }
+                }
+            )
+        )
 
         # Should not raise, falls back to defaults
         settings = Settings.from_yaml(config_file, strict=False)
@@ -209,27 +210,35 @@ class TestSettingsFromYaml:
 class TestValidateConfig:
     def test_valid_config_returns_empty_list(self, tmp_path: Path) -> None:
         config_file = tmp_path / "config.yml"
-        config_file.write_text(yaml.dump({
-            "pipeline": {
-                "project_id": "test-project",
-                "bronze_bucket": "bronze",
-                "silver_bucket": "silver",
-            }
-        }))
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "pipeline": {
+                        "project_id": "test-project",
+                        "bronze_bucket": "bronze",
+                        "silver_bucket": "silver",
+                    }
+                }
+            )
+        )
 
         issues = validate_config(config_file)
         assert issues == []
 
     def test_invalid_config_returns_issues(self, tmp_path: Path) -> None:
         config_file = tmp_path / "config.yml"
-        config_file.write_text(yaml.dump({
-            "pipeline": {
-                "project_id": "test-project",
-                "bronze_bucket": "bronze",
-                "silver_bucket": "silver",
-                "environment": "bad_env",
-            }
-        }))
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "pipeline": {
+                        "project_id": "test-project",
+                        "bronze_bucket": "bronze",
+                        "silver_bucket": "silver",
+                        "environment": "bad_env",
+                    }
+                }
+            )
+        )
 
         issues = validate_config(config_file)
         assert len(issues) == 1
@@ -244,13 +253,17 @@ class TestLoadSettings:
 
     def test_loads_from_custom_path(self, tmp_path: Path) -> None:
         config_file = tmp_path / "custom.yml"
-        config_file.write_text(yaml.dump({
-            "pipeline": {
-                "project_id": "custom-project",
-                "bronze_bucket": "bronze",
-                "silver_bucket": "silver",
-            }
-        }))
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "pipeline": {
+                        "project_id": "custom-project",
+                        "bronze_bucket": "bronze",
+                        "silver_bucket": "silver",
+                    }
+                }
+            )
+        )
 
         settings = load_settings(config_file)
         assert settings.pipeline.project_id == "custom-project"
