@@ -26,13 +26,21 @@ def validate_table(
     silver_path: Path,
     quarantine_path: Path,
     sla_thresholds: dict[str, float],
+    partition_key: str | None = None,
+    partitions: list[str] | None = None,
 ) -> TableQualityMetrics:
     """Validate quality for a single table."""
     logger.info(f"Validating {table}...")
 
-    bronze_rows = count_parquet_rows(bronze_path / table)
-    silver_rows = count_parquet_rows(silver_path / table)
-    quarantine_rows = count_parquet_rows(quarantine_path / table)
+    bronze_rows = count_parquet_rows(
+        bronze_path / table, partition_key=partition_key, partitions=partitions
+    )
+    silver_rows = count_parquet_rows(
+        silver_path / table, partition_key=partition_key, partitions=partitions
+    )
+    quarantine_rows = count_parquet_rows(
+        quarantine_path / table, partition_key=partition_key, partitions=partitions
+    )
 
     total_processed = silver_rows + quarantine_rows
 
@@ -51,17 +59,23 @@ def validate_table(
     else:
         status = "FAIL"
 
-    quarantine_breakdown = get_quarantine_breakdown(quarantine_path / table)
+    quarantine_breakdown = get_quarantine_breakdown(
+        quarantine_path / table,
+        partition_key=partition_key,
+        partitions=partitions,
+    )
     row_loss = bronze_rows - total_processed
     row_loss_pct = (row_loss / bronze_rows * 100) if bronze_rows > 0 else 0.0
 
     logger.info(
         f"{table}: {status}",
-        bronze_rows=bronze_rows,
-        silver_rows=silver_rows,
-        quarantine_rows=quarantine_rows,
-        pass_rate=f"{pass_rate:.2%}",
-        sla=f"{sla_threshold:.2%}",
+        extra={
+            "bronze_rows": bronze_rows,
+            "silver_rows": silver_rows,
+            "quarantine_rows": quarantine_rows,
+            "pass_rate": f"{pass_rate:.2%}",
+            "sla": f"{sla_threshold:.2%}",
+        },
     )
 
     if status in ("WARN", "FAIL"):
@@ -135,19 +149,23 @@ def compute_fk_mismatch_summary(silver_path: Path) -> list[dict[str, Any]]:
         except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
             logger.warning(
                 "Failed FK mismatch summary: parquet read error",
-                child_table=child_table,
-                parent_table=parent_table,
-                error_type=type(exc).__name__,
-                error=str(exc),
+                extra={
+                    "child_table": child_table,
+                    "parent_table": parent_table,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
             )
             continue
         except (ColumnNotFoundError, SchemaError, ComputeError) as exc:
             logger.warning(
                 "Failed FK mismatch summary: schema/column error",
-                child_table=child_table,
-                parent_table=parent_table,
-                error_type=type(exc).__name__,
-                error=str(exc),
+                extra={
+                    "child_table": child_table,
+                    "parent_table": parent_table,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
             )
             continue
 

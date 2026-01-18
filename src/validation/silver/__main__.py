@@ -15,9 +15,11 @@ from src.settings import load_settings
 from src.validation.common import (
     get_overall_status,
     handle_exit,
+    is_gcs_path,
     resolve_layer_paths,
 )
 from src.validation.silver.data import compute_key_cardinality, list_ingest_partitions
+from src.runners.enriched.shared import get_table_partitions
 from src.validation.silver.metrics import compute_fk_mismatch_summary, validate_table
 from src.validation.silver.models import SilverQualityReport
 from src.validation.silver.report import build_profile_report, generate_markdown_report
@@ -55,6 +57,17 @@ def parse_args() -> argparse.Namespace:
         "--tables",
         default=None,
         help="Comma-separated list of tables to validate (default: all).",
+    )
+    parser.add_argument(
+        "--partition-date",
+        default=None,
+        help="Partition date (YYYY-MM-DD) to validate (optional).",
+    )
+    parser.add_argument(
+        "--lookback-days",
+        type=int,
+        default=0,
+        help="Number of days before partition-date to include (default: 0).",
     )
     parser.add_argument(
         "--fail-on-sla-breach",
@@ -103,6 +116,17 @@ def expand_partition_ranges(values: list[str]) -> list[str]:
     return expanded
 
 
+def build_partition_values(partition_date: str, lookback_days: int) -> list[str]:
+    from datetime import date, timedelta
+
+    base_date = date.fromisoformat(partition_date)
+    days = max(lookback_days, 0)
+    return [
+        (base_date - timedelta(days=offset)).isoformat()
+        for offset in range(days + 1)
+    ]
+
+
 def main() -> int:
     """Run Silver quality validation."""
     args = parse_args()
@@ -117,8 +141,27 @@ def main() -> int:
     silver_path = paths["silver"]
     quarantine_path = paths["quarantine"]
 
+    if any(
+        is_gcs_path(str(path)) for path in (bronze_path, silver_path, quarantine_path)
+    ):
+        logger.error("Silver validation does not support gs:// paths.")
+        return 1
+
+    bronze_path = Path(bronze_path)
+    silver_path = Path(silver_path)
+    quarantine_path = Path(quarantine_path)
+
     run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     logger.info(f"Starting Silver quality validation (run_id={run_id})")
+    partition_values: list[str] | None = None
+    if args.partition_date:
+        try:
+            partition_values = build_partition_values(
+                args.partition_date, args.lookback_days
+            )
+        except ValueError:
+            logger.error("Invalid partition-date; expected YYYY-MM-DD")
+            return 1
 
     if args.tables:
         requested_tables = [t.strip() for t in args.tables.split(",") if t.strip()]
@@ -128,12 +171,15 @@ def main() -> int:
 
     table_metrics = []
     for table in tables:
+        partition_key = get_table_partitions().get(table, "ingest_dt")
         metrics = validate_table(
             table,
             bronze_path,
             silver_path,
             quarantine_path,
             sla_thresholds,
+            partition_key=partition_key,
+            partitions=partition_values,
         )
         table_metrics.append(metrics)
 
@@ -172,10 +218,15 @@ def main() -> int:
             }
         )
 
-    if settings.pipeline.expected_bronze_partitions:
+    if partition_values:
+        expected_set = set(partition_values)
+    elif settings.pipeline.expected_bronze_partitions:
         expected_set = set(
             expand_partition_ranges(settings.pipeline.expected_bronze_partitions)
         )
+    else:
+        expected_set = set()
+    if expected_set:
         for table in tables:
             bronze_parts = list_ingest_partitions(bronze_path / table)
             missing = sorted(expected_set - bronze_parts)
@@ -214,10 +265,13 @@ def main() -> int:
         # but for brevity keeping it here or in metrics.
         # The original monolith had compute_key_cardinality inside itself.
         # I moved compute_key_cardinality to data.py, so we can use it here.
-    
+
     if "returns" in tables:
         returns_cardinality = compute_key_cardinality(
-            silver_path / "returns", "return_id"
+            silver_path / "returns",
+            "return_id",
+            partition_key=get_table_partitions().get("returns", "ingest_dt"),
+            partitions=partition_values,
         )
         if (
             returns_cardinality["non_null_rows"] > 0
@@ -236,7 +290,10 @@ def main() -> int:
 
     if "return_items" in tables:
         return_items_cardinality = compute_key_cardinality(
-            silver_path / "return_items", "return_id"
+            silver_path / "return_items",
+            "return_id",
+            partition_key=get_table_partitions().get("return_items", "ingest_dt"),
+            partitions=partition_values,
         )
         if (
             return_items_cardinality["non_null_rows"] > 0
@@ -266,7 +323,9 @@ def main() -> int:
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         table_metrics=table_metrics,
         fk_mismatch_summary=(
-            compute_fk_mismatch_summary(silver_path) if not args.tables else []
+            compute_fk_mismatch_summary(silver_path)
+            if not args.tables and not partition_values
+            else []
         ),
         contract_issues=contract_issues,
         overall_status=overall_status,
@@ -305,7 +364,18 @@ def main() -> int:
         contract_issues=contract_issues,
     )
 
-    generate_markdown_report(report, Path(args.output_report))
+    # Determine report path (use observability config for GCS in dev/prod)
+    from src.observability.config import get_config
+
+    obs_config = get_config()
+    if not obs_config.use_cloud_reports():
+        report_path = args.output_report
+    else:
+        # GCS: Use observability config path with run folder
+        report_filename = Path(args.output_report).name
+        report_path = obs_config.get_run_report_path(run_id, report_filename)
+
+    generate_markdown_report(report, report_path)
 
     profile_enabled = os.getenv("SILVER_PROFILE_ENABLED", "false").lower() in {
         "1",
@@ -330,7 +400,7 @@ def main() -> int:
         logger.warning(f"Tables Warning: {tables_warning}")
     if tables_failing > 0:
         logger.error(f"Tables Failing: {tables_failing}")
-    logger.info(f"Detailed report: {args.output_report}")
+    logger.info(f"Detailed report: {report_path}")
     logger.info("=" * 70)
 
     return handle_exit(

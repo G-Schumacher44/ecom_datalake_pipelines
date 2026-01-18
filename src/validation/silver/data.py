@@ -12,12 +12,19 @@ from src.validation.common import collect_parquet_files
 logger = logging.getLogger(__name__)
 
 
-def get_quarantine_breakdown(quarantine_path: Path, top_n: int = 5) -> list[dict]:
+def get_quarantine_breakdown(
+    quarantine_path: Path,
+    top_n: int = 5,
+    partition_key: str | None = None,
+    partitions: list[str] | None = None,
+) -> list[dict]:
     """Analyze quarantine reasons and return top failures."""
     if not quarantine_path.exists():
         return []
 
-    parquet_files = collect_parquet_files(quarantine_path)
+    parquet_files = collect_parquet_files(
+        quarantine_path, partition_key=partition_key, partitions=partitions
+    )
     if not parquet_files:
         return []
 
@@ -62,20 +69,29 @@ def get_quarantine_breakdown(quarantine_path: Path, top_n: int = 5) -> list[dict
     except (ArrowInvalid, ArrowTypeError, OSError) as e:
         logger.error(
             f"Failed to read quarantine parquet at {quarantine_path}",
-            error_type=type(e).__name__,
-            error=str(e),
+            extra={
+                "error_type": type(e).__name__,
+                "error": str(e),
+            },
         )
         return []
     except (ColumnNotFoundError, SchemaError, ComputeError) as e:
         logger.error(
             f"Failed to analyze quarantine schema for {quarantine_path}",
-            error_type=type(e).__name__,
-            error=str(e),
+            extra={
+                "error_type": type(e).__name__,
+                "error": str(e),
+            },
         )
         return []
 
 
-def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
+def compute_key_cardinality(
+    table_path: Path,
+    key: str,
+    partition_key: str | None = None,
+    partitions: list[str] | None = None,
+) -> dict[str, float]:
     if not table_path.exists():
         return {
             "total_rows": 0,
@@ -84,7 +100,9 @@ def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
             "distinct_ratio": 0.0,
         }
 
-    parquet_files = collect_parquet_files(table_path)
+    parquet_files = collect_parquet_files(
+        table_path, partition_key=partition_key, partitions=partitions
+    )
     if not parquet_files:
         return {
             "total_rows": 0,
@@ -104,10 +122,12 @@ def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
     except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
         logger.warning(
             "Failed key cardinality scan",
-            table=str(table_path),
-            key=key,
-            error_type=type(exc).__name__,
-            error=str(exc),
+            extra={
+                "table": str(table_path),
+                "key": key,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            },
         )
         return {
             "total_rows": 0,
@@ -118,7 +138,9 @@ def compute_key_cardinality(table_path: Path, key: str) -> dict[str, float]:
     except ColumnNotFoundError as exc:
         logger.warning(
             f"Key column '{key}' not found in {table_path}",
-            error_type=type(exc).__name__,
+            extra={
+                "error_type": type(exc).__name__,
+            },
         )
         return {
             "total_rows": 0,

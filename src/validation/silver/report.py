@@ -13,9 +13,16 @@ from src.validation.silver.models import SilverQualityReport
 logger = logging.getLogger(__name__)
 
 
-def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> None:
-    """Generate self-documenting Markdown report."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+def generate_markdown_report(
+    report: SilverQualityReport, output_path: str | Path
+) -> None:
+    """Generate self-documenting Markdown report and write to local or GCS.
+
+    Args:
+        report: Silver quality report data
+        output_path: Report path (local or gs://)
+    """
+    from src.observability.config import get_config
 
     if report.overall_status == "PASS":
         overall_emoji = "✅"
@@ -33,9 +40,9 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
         "",
         "## Summary",
         "",
-        (
-            "| Table | Bronze | Silver | Quarantine | Pass Rate | SLA | Status |"
-        ).replace(" ", " "),
+        ("| Table | Bronze | Silver | Quarantine | Pass Rate | SLA | Status |").replace(
+            " ", " "
+        ),
         (
             "|-------|-------------|-------------|------------|-----------|-----|--------|"
         ).replace(" ", " "),
@@ -212,8 +219,24 @@ def generate_markdown_report(report: SilverQualityReport, output_path: Path) -> 
         ]
     )
 
-    output_path.write_text("\n".join(lines))
-    logger.info(f"Wrote Markdown report to: {output_path}")
+    report_content = "\n".join(lines)
+
+    # Write to local or GCS based on environment
+    obs_config = get_config()
+    if not obs_config.use_cloud_reports():
+        # Local: write to filesystem
+        local_path = Path(output_path)
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_text(report_content)
+        logger.info(f"Wrote Markdown report to: {local_path}")
+    else:
+        # Dev/Prod: write to GCS
+        import fsspec
+
+        fs = fsspec.filesystem("gcs")
+        with fs.open(str(output_path), "w") as f:
+            f.write(report_content)
+        logger.info(f"Wrote Markdown report to GCS: {output_path}")
 
 
 def build_profile_report(
@@ -257,9 +280,11 @@ def build_profile_report(
         except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
             logger.warning(
                 "Failed to profile table: parquet read error",
-                table=table,
-                error_type=type(exc).__name__,
-                error=str(exc),
+                extra={
+                    "table": table,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
             )
             lines.extend(
                 [f"### {table}", "", "- **Status:** Failed to read parquet files", ""]
@@ -268,9 +293,11 @@ def build_profile_report(
         except (SchemaError, ComputeError) as exc:
             logger.warning(
                 "Failed to profile table: schema error",
-                table=table,
-                error_type=type(exc).__name__,
-                error=str(exc),
+                extra={
+                    "table": table,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
             )
             lines.extend(
                 [f"### {table}", "", "- **Status:** Failed to profile table schema", ""]

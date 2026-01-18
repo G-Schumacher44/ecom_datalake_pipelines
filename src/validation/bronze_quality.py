@@ -63,6 +63,17 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated list of tables to validate (default: all).",
     )
     parser.add_argument(
+        "--partition-date",
+        default=None,
+        help="Partition date (YYYY-MM-DD) to validate (optional).",
+    )
+    parser.add_argument(
+        "--lookback-days",
+        type=int,
+        default=0,
+        help="Number of days before partition-date to include (default: 0).",
+    )
+    parser.add_argument(
         "--fail-on-issues",
         action="store_true",
         help="Legacy: use --enforce-quality instead.",
@@ -128,13 +139,48 @@ def list_tables(root: str) -> list[str]:
     return sorted([p.name for p in Path(root).iterdir() if p.is_dir()])
 
 
-def list_partitions(root: str, table: str) -> list[str]:
+def list_partitions(
+    root: str, table: str, partition_values: list[str] | None
+) -> list[str]:
     partition_glob = get_partition_glob(table)
     if is_gcs_path(root):
         import fsspec
 
+        key = get_table_partitions().get(table, "ingest_dt")
         fs = fsspec.filesystem("gcs")
-        return sorted(fs.glob(f"{root}/{table}/{partition_glob}"))
+        if partition_values:
+            prefixes = []
+            for value in partition_values:
+                partition_path = f"{root}/{table}/{key}={value}"
+                if fs.exists(partition_path):
+                    prefixes.append(partition_path)
+            return sorted(prefixes)
+        matches = fs.glob(f"{root}/{table}/{key}=*/*")
+        if not matches:
+            matches = fs.glob(f"{root}/{table}/{partition_glob}")
+        prefixes: set[str] = set()
+        for match in matches:
+            path = match
+            if path.startswith("gs://"):
+                path = path[len("gs://") :]
+            parts = path.split("/")
+            for idx, part in enumerate(parts):
+                if part.startswith(f"{key}="):
+                    prefix = "/".join(parts[: idx + 1])
+                    if not prefix.startswith("gs://"):
+                        prefix = f"gs://{prefix}"
+                    prefixes.add(prefix)
+                    break
+        return sorted(prefixes)
+
+    if partition_values:
+        paths = []
+        key = get_table_partitions().get(table, "ingest_dt")
+        for value in partition_values:
+            partition_path = Path(root, table, f"{key}={value}")
+            if partition_path.is_dir():
+                paths.append(str(partition_path))
+        return sorted(paths)
 
     return sorted(str(p) for p in Path(root, table).glob(partition_glob) if p.is_dir())
 
@@ -161,8 +207,10 @@ def read_manifest(path: str) -> dict[str, Any] | None:
         return None
 
 
-def validate_table(root: str, table: str) -> TableMetrics:
-    partitions = list_partitions(root, table)
+def validate_table(
+    root: str, table: str, partition_values: list[str] | None
+) -> TableMetrics:
+    partitions = list_partitions(root, table, partition_values)
     manifests = 0
     rows = 0
     missing_manifests = 0
@@ -188,10 +236,16 @@ def validate_table(root: str, table: str) -> TableMetrics:
     )
 
 
-def generate_report(
-    metrics: list[TableMetrics], output_path: Path, run_id: str
-) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+def generate_report(metrics: list[TableMetrics], output_path: str, run_id: str) -> None:
+    """Generate validation report and write to local or GCS path.
+
+    Args:
+        metrics: List of table metrics to report
+        output_path: Report path (local or gs://)
+        run_id: Run identifier
+    """
+    from src.observability.config import get_config
+
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     lines = [
@@ -236,19 +290,50 @@ def generate_report(
         ]
     )
 
-    output_path.write_text("\n".join(lines))
-    logger.info(f"Wrote Markdown report to: {output_path}")
+    report_content = "\n".join(lines)
+
+    # Write to local or GCS based on environment
+    obs_config = get_config()
+    if not obs_config.use_cloud_reports():
+        # Local: write to filesystem
+        local_path = Path(output_path)
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_text(report_content)
+        logger.info(f"Wrote Markdown report to: {local_path}")
+    else:
+        # Dev/Prod: write to GCS
+        import fsspec
+
+        fs = fsspec.filesystem("gcs")
+        with fs.open(output_path, "w") as f:
+            f.write(report_content)
+        logger.info(f"Wrote Markdown report to GCS: {output_path}")
 
 
 def main() -> int:
     args = parse_args()
 
+    from src.observability.config import get_config
     from src.settings import load_settings
 
     settings = load_settings(args.config)
     pipeline_env = os.getenv("PIPELINE_ENV", settings.pipeline.environment).lower()
 
     run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    partition_values: list[str] | None = None
+    if args.partition_date:
+        try:
+            from datetime import date, timedelta
+
+            base_date = date.fromisoformat(args.partition_date)
+            lookback_days = max(args.lookback_days, 0)
+            partition_values = [
+                (base_date - timedelta(days=offset)).isoformat()
+                for offset in range(lookback_days + 1)
+            ]
+        except ValueError:
+            logger.error("Invalid partition-date; expected YYYY-MM-DD")
+            return 1
 
     # Resolve paths using shared library
     paths = resolve_layer_paths(args.config, bronze_over=args.bronze_path)
@@ -256,16 +341,27 @@ def main() -> int:
 
     logger.info(f"Starting Bronze quality validation (run_id={run_id})")
 
-    available_tables = list_tables(bronze_root)
     expected_tables = list(get_table_partitions().keys())
+    available_tables: list[str] | None = None
+
+    if not is_gcs_path(bronze_root):
+        available_tables = list_tables(bronze_root)
+    else:
+        logger.info("Skipping GCS table listing; using configured table list")
 
     if args.tables:
         requested = [t.strip() for t in args.tables.split(",") if t.strip()]
-        tables = [t for t in requested if t in available_tables]
+        if available_tables is None:
+            tables = requested
+        else:
+            tables = [t for t in requested if t in available_tables]
     else:
-        tables = [t for t in expected_tables if t in available_tables]
+        if available_tables is None:
+            tables = expected_tables
+        else:
+            tables = [t for t in expected_tables if t in available_tables]
 
-    metrics = [validate_table(bronze_root, table) for table in tables]
+    metrics = [validate_table(bronze_root, table, partition_values) for table in tables]
 
     # Overall status: FAIL if any critical issues found (missing manifests/empty)
     total_missing = sum(m.missing_manifests for m in metrics)
@@ -302,7 +398,16 @@ def main() -> int:
         overall_status=overall_status,
     )
 
-    generate_report(metrics, Path(args.output_report), run_id)
+    # Determine report path (use observability config for GCS in dev/prod)
+    obs_config = get_config()
+    if not obs_config.use_cloud_reports():
+        report_path = args.output_report
+    else:
+        # GCS: Use observability config path with run folder
+        report_filename = Path(args.output_report).name
+        report_path = obs_config.get_run_report_path(run_id, report_filename)
+
+    generate_report(metrics, report_path, run_id)
     logger.info(f"✅ Bronze quality validation completed: {overall_status}")
 
     return handle_exit(
