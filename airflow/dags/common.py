@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from datetime import timedelta
 
-from src.settings import load_settings, RetryConfig
+from src.settings import RetryConfig, load_settings
 
 # --- Configuration Helper (Lazy Loading) ---
+
 
 class SettingsConfig:
     """Lazy configuration loader for Airflow DAGs."""
@@ -66,9 +67,29 @@ COMMON_ENV = {
     "PYTHONPATH": os.getenv("PYTHONPATH", AIRFLOW_HOME),
     "PATH": f"{os.getenv('PATH', '')}:/home/airflow/.local/bin",
     "HOME": os.getenv("HOME", "/home/airflow"),
+    "CLOUDSDK_CONFIG": os.getenv("CLOUDSDK_CONFIG", ""),
+    "USE_SA_AUTH": os.getenv("USE_SA_AUTH", ""),
+    "GOOGLE_APPLICATION_CREDENTIALS": os.getenv("GOOGLE_APPLICATION_CREDENTIALS", ""),
+    "GOOGLE_CLOUD_PROJECT": os.getenv("GOOGLE_CLOUD_PROJECT", ""),
+    "BQ_LOCATION": os.getenv("BQ_LOCATION", ""),
+    "BQ_LOAD_ENABLED": os.getenv("BQ_LOAD_ENABLED", ""),
+    "GOLD_PIPELINE_ENABLED": os.getenv("GOLD_PIPELINE_ENABLED", ""),
+    "BRONZE_BASE_PATH": os.getenv("BRONZE_BASE_PATH", ""),
+    "SILVER_BASE_PATH": os.getenv("SILVER_BASE_PATH", ""),
+    "SILVER_ENRICHED_PATH": os.getenv("SILVER_ENRICHED_PATH", ""),
+    "SILVER_ENRICHED_LOCAL_PATH": os.getenv("SILVER_ENRICHED_LOCAL_PATH", ""),
+    "SILVER_QUARANTINE_PATH": os.getenv("SILVER_QUARANTINE_PATH", ""),
+    "METRICS_BUCKET": os.getenv("METRICS_BUCKET", ""),
+    "LOGS_BUCKET": os.getenv("LOGS_BUCKET", ""),
+    "REPORTS_BUCKET": os.getenv("REPORTS_BUCKET", ""),
+    "REPORTS_BASE_PATH": os.getenv("REPORTS_BASE_PATH", ""),
 }
 
+# Avoid passing empty env vars that can break ADC or cloud auth detection.
+COMMON_ENV = {key: value for key, value in COMMON_ENV.items() if value != ""}
+
 # --- Helpers ---
+
 
 def resolve_bool(env_key: str, default: bool = False) -> bool:
     """Resolve a boolean environment variable."""
@@ -77,34 +98,58 @@ def resolve_bool(env_key: str, default: bool = False) -> bool:
         return default
     return env_override.lower() in {"true", "1", "yes"}
 
+
 def run_enriched_runner(func, **kwargs):
     """Wrapper to run enriched runners with resolved paths."""
     config = SettingsConfig()
     pl = config.pipeline
 
-    kwargs["base_silver_path"] = config.resolve_path(
+    base_silver_path = config.resolve_path(
         pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
     )
-    kwargs["output_path"] = config.resolve_path(
+    output_path = config.resolve_path(
         pl.silver_bucket, pl.silver_enriched_prefix, "SILVER_ENRICHED_PATH"
     )
+    if base_silver_path.startswith("gs://"):
+        base_silver_path = os.getenv(
+            "SILVER_LOCAL_BASE_PATH", f"{config.airflow_home}/data/silver/base"
+        )
+    if output_path.startswith("gs://"):
+        output_path = os.getenv(
+            "SILVER_ENRICHED_LOCAL_PATH", f"{config.airflow_home}/data/silver/enriched"
+        )
+
+    if not os.path.isdir(base_silver_path):
+        raise FileNotFoundError(
+            "Enriched runner missing local silver base path. "
+            f"Expected directory: {base_silver_path}"
+        )
+    if not output_path.startswith("gs://"):
+        os.makedirs(output_path, exist_ok=True)
+
+    kwargs["base_silver_path"] = base_silver_path
+    kwargs["output_path"] = output_path
 
     allowed_keys = {"base_silver_path", "output_path", "ingest_dt"}
     filtered = {key: value for key, value in kwargs.items() if key in allowed_keys}
     return func(**filtered)
 
+
 def make_runner_callable(runner_func):
     """Factory to create Airflow-compatible callables for runners."""
+
     def wrapper(**kwargs):
         return run_enriched_runner(runner_func, **kwargs)
+
     return wrapper
+
 
 def get_retry_config(environment: str | None = None) -> dict:
     """Get Airflow retry configuration for the current environment.
 
     Args:
-        environment: Environment name (local/dev/prod). If None, resolves from PIPELINE_ENV
-                    or config.
+        environment: Environment name (local/dev/prod). If None, resolves
+                    from PIPELINE_ENV or config.
 
     Returns:
         Dictionary with Airflow default_args retry settings:

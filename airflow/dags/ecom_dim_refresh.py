@@ -46,8 +46,7 @@ with DAG(
 
     # 1. Setup Config
     setup_config = PythonOperator(
-        task_id="setup_pipeline_config",
-        python_callable=load_config_to_xcom
+        task_id="setup_pipeline_config", python_callable=load_config_to_xcom
     )
 
     # 2. Validate Bronze Dims
@@ -60,16 +59,11 @@ with DAG(
             f"--tables customers,product_catalog "
             f"--output-report docs/validation_reports/BRONZE_DIMS_{{{{ run_id | replace(':', '') }}}}.md "
             f"--run-id {{{{ run_id }}}} "
-            + (
-                " --enforce-quality"
-                if PIPELINE_ENV in {"dev", "prod"}
-                else ""
-            )
+            + (" --enforce-quality" if PIPELINE_ENV in {"dev", "prod"} else "")
         ),
     )
 
     # 3. Refresh Customers
-    # Samples baked into image; GCS uses httpfs (no locking issues)
     # DBT_DUCKDB_PATH unique per task to avoid lock contention
     refresh_customers = BashOperator(
         task_id="refresh_customers",
@@ -77,7 +71,9 @@ with DAG(
         bash_command=(
             f"cd {AIRFLOW_HOME} && "
             f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
+            f"&& export BRONZE_SYNC_TABLES=\"customers\" "
             f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
+            f"&& export DBT_DUCKDB_PATH=\"/tmp/dbt_duckdb/ecom_customers_{{{{ run_id | replace(':', '') }}}}.duckdb\" "
             f"&& python -m src.runners.base_silver "
             "--select stg_ecommerce__customers stg_ecommerce__customers_quarantine"
         ),
@@ -90,7 +86,9 @@ with DAG(
         bash_command=(
             f"cd {AIRFLOW_HOME} && "
             f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
+            f"&& export BRONZE_SYNC_TABLES=\"product_catalog\" "
             f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
+            f"&& export DBT_DUCKDB_PATH=\"/tmp/dbt_duckdb/ecom_product_catalog_{{{{ run_id | replace(':', '') }}}}.duckdb\" "
             f"&& python -m src.runners.base_silver "
             "--select stg_ecommerce__product_catalog stg_ecommerce__product_catalog_quarantine"
         ),
@@ -101,20 +99,29 @@ with DAG(
         task_id="validate_dim_quality",
         env=COMMON_ENV,
         bash_command=(
-            f"cd {AIRFLOW_HOME} && python -m src.validation.silver "
-            f"--bronze-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}} "
-            f"--silver-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}} "
-            f"--quarantine-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}/quarantine "
+            f"cd {AIRFLOW_HOME} && "
+            f"BRONZE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
+            f"SILVER_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
+            f'&& if [[ \"$BRONZE_PATH\" == gs://* ]]; then '
+            f'BRONZE_PATH=\"${{BRONZE_LOCAL_BASE_PATH:-{AIRFLOW_HOME}/data/bronze}}\"; fi '
+            f'&& if [[ \"$SILVER_PATH\" == gs://* ]]; then '
+            f'SILVER_PATH=\"${{SILVER_LOCAL_BASE_PATH:-{AIRFLOW_HOME}/data/silver/base}}\"; fi '
+            f"&& python -m src.validation.silver "
+            f"--bronze-path \"$BRONZE_PATH\" "
+            f"--silver-path \"$SILVER_PATH\" "
+            f"--quarantine-path \"$SILVER_PATH/quarantine\" "
             f"--tables customers,product_catalog "
             f"--run-id {{{{ run_id }}}} "
             f"--output-report docs/validation_reports/SILVER_DIMS_{{{{ run_id | replace(':', '') }}}}.md "
-            + (
-                " --enforce-quality"
-                if PIPELINE_ENV == "prod"
-                else ""
-            )
+            + (" --enforce-quality" if PIPELINE_ENV == "prod" else "")
         ),
     )
 
     # Flow
-    setup_config >> validate_bronze_dims >> refresh_customers >> refresh_product_catalog >> validate_dim_quality
+    (
+        setup_config
+        >> validate_bronze_dims
+        >> refresh_customers
+        >> refresh_product_catalog
+        >> validate_dim_quality
+    )
