@@ -41,9 +41,10 @@ class MetricsWriter:
         self.config = config
         self.metric_type = metric_type
         self.base_path = config.get_metrics_path(metric_type)
+        self.use_cloud = config.use_cloud_metrics()
 
         # Ensure local directories exist
-        if config.is_local:
+        if not self.use_cloud:
             Path(self.base_path).mkdir(parents=True, exist_ok=True)
 
     def write_metric(
@@ -80,10 +81,14 @@ class MetricsWriter:
             **data,
         }
 
-        # Write to storage
-        file_path = f"{self.base_path}/{filename}"
+        base_path = self.base_path
+        if run_id and self.use_cloud:
+            base_path = self.config.get_run_metrics_path(run_id, self.metric_type)
 
-        if self.config.is_local:
+        # Write to storage
+        file_path = f"{base_path}/{filename}"
+
+        if not self.use_cloud:
             # Local: Write to filesystem
             with open(file_path, "w") as f:
                 json.dump(enriched_data, f, indent=2, default=str)
@@ -110,7 +115,7 @@ class MetricsWriter:
         Returns:
             List of metric dictionaries
         """
-        if self.config.is_local:
+        if not self.use_cloud:
             # Local: Read from filesystem
             files = sorted(
                 Path(self.base_path).glob(pattern),
@@ -224,7 +229,7 @@ def write_data_quality_metric(
     }
 
     filename = f"{validation_type}_{run_id}.json"
-    return writer.write_metric(data, filename=filename)
+    return writer.write_metric(data, run_id=run_id, filename=filename)
 
 
 def write_silver_quality_metric(

@@ -51,7 +51,7 @@ class StructuredLogger:
         self.logger.setLevel(logging.INFO)
 
         # File handler for local development
-        if self.config.is_local:
+        if not self.config.use_cloud_logs():
             log_dir = Path(self.config.logs_base_path) / "debug"
             log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -92,21 +92,32 @@ class StructuredLogger:
         else:
             filename = f"{log_type}_{date_str}_{timestamp}_{token}.jsonl"
 
-        if self.config.is_local:
-            # Local: Append to file
-            log_path = Path(self.config.get_logs_path(log_type)) / filename
-            log_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if not self.config.use_cloud_logs():
+                # Local: Append to file
+                log_path = Path(self.config.get_logs_path(log_type)) / filename
+                log_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(log_path, "a") as f:
-                f.write(json.dumps(log_entry, default=str) + "\n")
-        else:
-            # Production: Write to GCS
-            import fsspec
+                with open(log_path, "a") as f:
+                    f.write(json.dumps(log_entry, default=str) + "\n")
+            else:
+                # Production: Write to GCS
+                import fsspec
 
-            log_uri = f"{self.config.get_logs_path(log_type)}/{filename}"
-            fs = fsspec.filesystem("gcs")
-            with fs.open(log_uri, "w") as f:
-                f.write(json.dumps(log_entry, default=str) + "\n")
+                log_uri = f"{self.config.get_logs_path(log_type)}/{filename}"
+                fs = fsspec.filesystem("gcs")
+                with fs.open(log_uri, "w") as f:
+                    f.write(json.dumps(log_entry, default=str) + "\n")
+        except OSError as exc:
+            self.logger.warning(
+                "Failed to write structured log",
+                exc_info=exc,
+                extra={
+                    **self.base_context,
+                    "log_type": log_type,
+                    "log_destination": self.config.get_logs_path(log_type),
+                },
+            )
 
     def info(self, message: str, **context) -> None:
         """Log info message."""
