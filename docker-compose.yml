@@ -10,11 +10,15 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    AIRFLOW__WEBSERVER__SECRET_KEY: "${AIRFLOW__WEBSERVER__SECRET_KEY:-}"
+    AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY:-}"
     PYTHONPATH: "/opt/airflow"
 
     # Pipeline Environment (local, dev, prod)
     PIPELINE_ENV: "${PIPELINE_ENV:-local}"
     OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-}"
+    CLOUDSDK_CONFIG: "/home/airflow/.config/gcloud"
+    USE_SA_AUTH: "${USE_SA_AUTH:-false}"
 
     # Redirect writable paths to /tmp inside container to avoid macOS Docker volume locking (Errno 35)
     DBT_TARGET_PATH: "/tmp/dbt_target"
@@ -23,12 +27,17 @@ x-airflow-common: &airflow-common
     METRICS_BASE_PATH: "/tmp/metrics"
     LOGS_BASE_PATH: "/tmp/logs"
     DBT_PARTIAL_PARSE: "false"
+    PYTHONWARNINGS: "ignore:invalid escape sequence:SyntaxWarning"
 
     # GCP Configuration (optional - only needed for prod/dev with GCS/BigQuery)
     GOOGLE_CLOUD_PROJECT: "${GOOGLE_CLOUD_PROJECT:-}"
     GCS_BUCKET: "${GCS_BUCKET:-}"
     BQ_LOCATION: "${BQ_LOCATION:-US}"
     BQ_LOAD_ENABLED: "${BQ_LOAD_ENABLED:-}"
+    METRICS_BUCKET: "${METRICS_BUCKET:-}"
+    LOGS_BUCKET: "${LOGS_BUCKET:-}"
+    REPORTS_BUCKET: "${REPORTS_BUCKET:-}"
+    GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
 
     # Path Overrides (optional - uses config.yml defaults if not set)
     BRONZE_BASE_PATH: "${BRONZE_BASE_PATH:-samples/bronze}"
@@ -52,13 +61,14 @@ x-airflow-common: &airflow-common
     # - ./airflow/dags:/opt/airflow/dags
 
     # Mount data directories for local runs
-    # NOTE: If you hit "Resource deadlock avoided" (Errno 35) on macOS:
-    #   1. Docker Desktop → Settings → General → Change VirtioFS to gRPC FUSE
-    #   2. Ensure project is NOT in a cloud-synced folder (iCloud, OneDrive, etc.)
-    #   3. Restart Docker Desktop
+    # NOTE: Use a named volume for /opt/airflow/data to avoid host FS deadlocks.
     - ./samples:/opt/airflow/samples
-    - ./data:/opt/airflow/data
+    - airflow-data:/opt/airflow/data
     - ./docs:/opt/airflow/docs
+    # ADC (default): mount gcloud application-default credentials
+    - ${CLOUDSDK_CONFIG_PATH:-~/.config/gcloud}:/home/airflow/.config/gcloud:rw
+    # Optional service account key (set USE_SA_AUTH=true + GOOGLE_APPLICATION_CREDENTIALS)
+    # - ${GCP_SA_KEY_PATH}:/opt/airflow/.gcp/sa.json:ro
 
     # Mount source code for development (optional - can remove in prod)
     # WARNING: Uncommenting dbt_duckdb causes Errno 35 on macOS Docker Desktop
@@ -106,3 +116,4 @@ services:
 volumes:
   postgres-db-volume:
   airflow-logs:
+  airflow-data:
