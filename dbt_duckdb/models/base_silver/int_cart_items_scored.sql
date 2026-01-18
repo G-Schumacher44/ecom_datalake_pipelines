@@ -22,7 +22,7 @@ dim_shopping_carts as (
 dim_products as (
     select distinct
         {{ safe_cast_integer('product_id') }} as product_id
-    from {{ source_parquet('bronze', 'product_catalog', partition_key='category') }}
+    from {{ silver_parquet('product_catalog') }}
     where {{ safe_cast_integer('product_id') }} is not null
 ),
 
