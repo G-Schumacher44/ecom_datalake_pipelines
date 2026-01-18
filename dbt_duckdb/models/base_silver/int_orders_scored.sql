@@ -18,7 +18,7 @@ with raw as (
 dim_customers as (
     select distinct
         customer_id
-    from {{ ref('stg_ecommerce__customers') }}
+    from {{ silver_parquet('customers') }}
 ),
 {% endif %}
 
