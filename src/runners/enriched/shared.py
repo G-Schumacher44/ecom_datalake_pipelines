@@ -130,10 +130,20 @@ def read_partitioned(
 ) -> pl.LazyFrame:
     partition_key = get_table_partitions().get(table)
     if partition_key is None:
+        schema = BASE_SILVER_SCHEMAS.get(table)
         return pl.scan_parquet(
             f"{base_path}/{table}/**/*.parquet",
             hive_partitioning=True,
-            schema=BASE_SILVER_SCHEMAS.get(table),
+            schema=schema,  # type: ignore[arg-type]
+        )
+
+    date_partitions = {"ingest_dt", "order_dt", "return_dt", "added_dt", "created_dt"}
+    if partition_key not in date_partitions:
+        schema = BASE_SILVER_SCHEMAS.get(table)
+        return pl.scan_parquet(
+            f"{base_path}/{table}/{partition_key}=*/**/*.parquet",
+            hive_partitioning=True,
+            schema=schema,  # type: ignore[arg-type]
         )
 
     available = set(list_partitions(base_path, table, partition_key))
@@ -150,7 +160,7 @@ def read_partitioned(
         )
         schema = BASE_SILVER_SCHEMAS.get(table)
         if schema:
-            return pl.DataFrame(schema=schema).lazy()
+            return pl.DataFrame(schema=schema).lazy()  # type: ignore[arg-type]
         # Fallback if schema is missing (should not happen given imports)
         raise FileNotFoundError(
             f"No {partition_key} partitions found for {table} at {base_path} "
@@ -158,10 +168,11 @@ def read_partitioned(
         )
 
     paths = [f"{base_path}/{table}/{partition_key}={dt}/**/*.parquet" for dt in desired]
+    schema = BASE_SILVER_SCHEMAS.get(table)
     return pl.scan_parquet(
         paths,
         hive_partitioning=True,
-        schema=BASE_SILVER_SCHEMAS.get(table),
+        schema=schema,  # type: ignore[arg-type]
     )
 
 
@@ -235,24 +246,24 @@ def write_partitioned_shards(
     If a DataFrame is provided, fall back to the existing eager sharding logic.
     """
 
-    # Handle LazyFrame path – fully streaming
+    # Handle LazyFrame path – collect then use eager partitioned write
     if isinstance(df, pl.LazyFrame):
-        output_base = f"{output_path.rstrip('/')}/{table}"
-        ensure_output_dir(output_base)
-
-        # Normalize partition column values lazily
-        df = df.with_columns(pl.col(partition_col).cast(pl.Utf8).alias(partition_col))
-
-        # Use Polars native partitioned streaming write
-        df.sink_parquet(
-            f"{output_base}",
-            compression="snappy",
-            partition_by=[partition_col],
-        )
-        return
+        # Collect LazyFrame to DataFrame for partitioned write
+        # Note: Polars sink_parquet doesn't support partition_by
+        # parameter in current version
+        df = df.collect()
+        # Fall through to eager DataFrame logic below
 
     # ---- Existing eager fallback for DataFrame inputs ----
     df = normalize_partition_values(df, partition_col)
+
+    if df.height == 0:
+        # No rows to write for this run; avoid failing on missing partition cols.
+        logger.warning(
+            "No rows produced for %s; skipping partitioned write.", table
+        )
+        ensure_output_dir(f"{output_path}/{table}")
+        return
 
     if partition_col not in df.columns:
         raise ValueError(f"Missing partition column: {partition_col}")

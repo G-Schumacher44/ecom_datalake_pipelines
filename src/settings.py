@@ -6,7 +6,6 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
@@ -140,6 +139,10 @@ class PipelineConfig(BaseModel):
         default="ecom-datalake-logs",
         description="GCS bucket for logs",
     )
+    reports_bucket: str = Field(
+        default="ecom-datalake-reports",
+        description="GCS bucket for validation reports",
+    )
     retry_config: dict[str, RetryConfig] = Field(
         default_factory=dict,
         description="Environment-specific retry configuration for Airflow tasks",
@@ -205,6 +208,14 @@ class PipelineConfig(BaseModel):
         default=0,
         description="Days of ingest_dt partitions to include in enriched reads.",
     )
+    bronze_validation_lookback_days: int = Field(
+        default=0,
+        description="Days of partitions to include in bronze validation.",
+    )
+    silver_validation_lookback_days: int = Field(
+        default=0,
+        description="Days of partitions to include in silver validation.",
+    )
     enriched_max_rows_per_file: int = Field(
         default=500_000,
         description="Max rows per Parquet file for enriched outputs.",
@@ -229,9 +240,7 @@ class PipelineConfig(BaseModel):
     @classmethod
     def ingest_dt_is_valid_date(cls, v: str) -> str:
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", v):
-            raise ValueError(
-                f"default_ingest_dt must be YYYY-MM-DD format, got '{v}'"
-            )
+            raise ValueError(f"default_ingest_dt must be YYYY-MM-DD format, got '{v}'")
         return v
 
     @field_validator("sla_thresholds")
@@ -240,7 +249,8 @@ class PipelineConfig(BaseModel):
         for table, threshold in v.items():
             if not 0.0 <= threshold <= 1.0:
                 raise ValueError(
-                    f"SLA threshold for '{table}' must be between 0 and 1, got {threshold}"
+                    f"SLA threshold for '{table}' must be between 0 and 1, "
+                    f"got {threshold}"
                 )
         return v
 
@@ -274,9 +284,7 @@ class PipelineConfig(BaseModel):
             if table not in self.enriched_partitions:
                 missing.append(table)
         if missing:
-            logger.warning(
-                f"Enriched tables missing partition definitions: {missing}"
-            )
+            logger.warning(f"Enriched tables missing partition definitions: {missing}")
         return self
 
 
@@ -306,7 +314,9 @@ class Settings(BaseSettings):
             payload = yaml.safe_load(Path(path).read_text()) or {}
         except OSError as exc:
             if strict:
-                raise ConfigValidationError(f"Failed to read config {path}: {exc}")
+                raise ConfigValidationError(
+                    f"Failed to read config {path}: {exc}"
+                ) from exc
             payload = {}
             logger.warning(f"Failed to read config {path}: {exc}")
 

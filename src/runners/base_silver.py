@@ -61,9 +61,49 @@ def ensure_local_directories(silver_path: Path, quarantine_path: Path) -> None:
         return
 
     logger.info("Ensuring local directory structure exists...")
+    silver_path.mkdir(parents=True, exist_ok=True)
+    quarantine_path.mkdir(parents=True, exist_ok=True)
     for table in STANDARD_TABLES:
         (silver_path / table).mkdir(parents=True, exist_ok=True)
         (quarantine_path / table).mkdir(parents=True, exist_ok=True)
+
+
+def is_gcs_path(path: str) -> bool:
+    """Check whether a path is a GCS URI."""
+    return path.startswith("gs://")
+
+
+def use_sa_auth() -> bool:
+    """Check whether service-account auth is enabled."""
+    return os.getenv("USE_SA_AUTH", "").lower() in {"1", "true", "yes", "on"}
+
+
+def adc_credentials_path() -> Path:
+    """Resolve the ADC credentials path for gcloud/gcsfs."""
+    config_dir = os.getenv("CLOUDSDK_CONFIG", "").strip()
+    if config_dir:
+        return Path(config_dir) / "application_default_credentials.json"
+    return Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
+
+
+def gcloud_rsync(source: str, destination: str, delete: bool) -> None:
+    """Sync paths using gcloud storage rsync."""
+    cmd = ["gcloud", "storage", "rsync", "-r"]
+    if delete:
+        cmd.append("--delete-unmatched-destination-objects")
+    cmd.extend([source, destination])
+    logger.info(f"Syncing {source} -> {destination}")
+    env = os.environ.copy()
+    creds = env.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    if use_sa_auth() and creds:
+        # Ensure gcloud uses the service account JSON without interactive login.
+        env["CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE"] = creds
+    elif not use_sa_auth():
+        adc_path = adc_credentials_path()
+        if adc_path.exists():
+            # Ensure gcloud uses ADC refresh token without interactive login.
+            env["CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE"] = str(adc_path)
+    subprocess.run(cmd, check=True, env=env)
 
 
 def run_dbt(
@@ -110,17 +150,65 @@ def run_dbt(
 def main() -> None:
     """Main entry point."""
     # Load settings to resolve defaults if env vars missing
-    load_settings()
+    settings = load_settings()
 
     # Resolve paths (Env vars take precedence over config)
-    bronze_path = Path(os.getenv("BRONZE_BASE_PATH", "samples/bronze"))
-    silver_path = Path(os.getenv("SILVER_BASE_PATH", "data/silver/base"))
-    quarantine_path = Path(
-        os.getenv("SILVER_QUARANTINE_PATH", str(silver_path / "quarantine"))
+    airflow_home = os.getenv("AIRFLOW_HOME", "/opt/airflow")
+    bronze_path_raw = os.getenv("BRONZE_BASE_PATH", "samples/bronze")
+    silver_path_raw = os.getenv("SILVER_BASE_PATH", "data/silver/base")
+    quarantine_path_raw = os.getenv(
+        "SILVER_QUARANTINE_PATH", f"{silver_path_raw}/quarantine"
     )
 
-    logger.info(f"Bronze Source: {bronze_path}")
-    logger.info(f"Silver Target: {silver_path}")
+    bronze_path_effective = bronze_path_raw
+    silver_path_effective = silver_path_raw
+    quarantine_path_effective = quarantine_path_raw
+
+    # Sync bronze from GCS to local
+    if is_gcs_path(bronze_path_raw):
+        local_bronze_root = os.getenv(
+            "BRONZE_LOCAL_BASE_PATH", f"{airflow_home}/data/bronze"
+        )
+        Path(local_bronze_root).mkdir(parents=True, exist_ok=True)
+        tables_env = os.getenv("BRONZE_SYNC_TABLES", "").strip()
+        if tables_env:
+            tables = [t.strip() for t in tables_env.split(",") if t.strip()]
+            logger.info(
+                "Syncing bronze tables from GCS to local",
+                extra={"tables": tables},
+            )
+            for table in tables:
+                gcloud_rsync(
+                    f"{bronze_path_raw.rstrip('/')}/{table}",
+                    str(Path(local_bronze_root) / table),
+                    delete=True,
+                )
+        else:
+            logger.info(
+                f"Syncing bronze from GCS to local: {bronze_path_raw} -> {local_bronze_root}"
+            )
+            gcloud_rsync(bronze_path_raw, local_bronze_root, delete=True)
+        bronze_path_effective = local_bronze_root
+
+    # Prepare local silver directory for GCS targets
+    if is_gcs_path(silver_path_raw):
+        local_silver_root = os.getenv(
+            "SILVER_LOCAL_BASE_PATH", f"{airflow_home}/data/silver/base"
+        )
+        Path(local_silver_root).mkdir(parents=True, exist_ok=True)
+        silver_path_effective = local_silver_root
+        quarantine_path_effective = os.path.join(local_silver_root, "quarantine")
+
+    os.environ["BRONZE_BASE_PATH"] = bronze_path_effective
+    os.environ["SILVER_BASE_PATH"] = silver_path_effective
+    os.environ["SILVER_QUARANTINE_PATH"] = quarantine_path_effective
+
+    bronze_path = Path(bronze_path_effective)
+    silver_path = Path(silver_path_effective)
+    quarantine_path = Path(quarantine_path_effective)
+
+    logger.info(f"Bronze Source: {bronze_path_effective}")
+    logger.info(f"Silver Target: {silver_path_effective}")
 
     check_virtiofs_deadlock(bronze_path)
     ensure_local_directories(silver_path, quarantine_path)
@@ -130,6 +218,19 @@ def main() -> None:
     dbt_extra_args = sys.argv[1:]
 
     run_dbt(dbt_args=dbt_extra_args)
+
+    # Export local silver to GCS
+    if is_gcs_path(silver_path_raw):
+        export_base = os.getenv("SILVER_EXPORT_BASE_PATH", "").strip()
+        pipeline_env = (
+            os.getenv("PIPELINE_ENV") or settings.pipeline.environment or "local"
+        ).lower()
+        if not export_base and pipeline_env in {"dev", "prod"}:
+            export_base = silver_path_raw
+
+        if export_base and is_gcs_path(export_base):
+            logger.info(f"Exporting local silver to GCS: {export_base}")
+            gcloud_rsync(str(silver_path), export_base, delete=True)
 
 
 if __name__ == "__main__":
