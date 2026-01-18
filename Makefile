@@ -2,9 +2,10 @@
 # Makefile - Common commands for local development and deployment
 # =============================================================================
 
-.PHONY: help build up down restart logs shell test lint format type-check clean clean-data
+.PHONY: help build up down restart logs shell log-task test lint format type-check clean clean-data
 .PHONY: dbt-deps dbt-build dbt-test local-silver push-image
 .PHONY: strict-mode easy-mode run-sample run-sample-strict run-sample-bq backfill-easy backfill-strict run-dims backfill-dims
+.PHONY: run-dev-gcs dev-mode run-dev-docker
 
 RUN_ID_OPT = $(if $(RUN_ID),--run-id $(RUN_ID),)
 
@@ -19,6 +20,9 @@ help:
 	@echo "  make down            Stop Airflow services"
 	@echo "  make restart         Restart Scheduler & Webserver"
 	@echo "  make logs            Tail Scheduler logs"
+	@echo "  make log-task        Tail a specific task log"
+	@echo "      Required: DAG=<dag_id> RUN_ID=<run_id> TASK=<task_id>"
+	@echo "      Optional: TRY=<n> (default: 1) LINES=<n> (default: 200)"
 	@echo "  make shell           Open Bash in Scheduler container"
 	@echo "  make clean           Destroy containers, images, volumes AND local data"
 	@echo "  make clean-data      Wipe local 'data/silver' and 'data/metrics' only"
@@ -46,6 +50,14 @@ help:
 	@echo "  make backfill-strict   Backfill Main Pipeline (Strict Mode)"
 	@echo "      Required: START=YYYY-MM-DD END=YYYY-MM-DD"
 	@echo ""
+	@echo "  make run-dev-gcs       Run Pipeline with GCS (Native, No Docker)"
+	@echo "      Required: DATE=YYYY-MM-DD"
+	@echo ""
+	@echo "  make run-dev-docker    Run Pipeline with GCS (Docker + Airflow)"
+	@echo "      Required: DATE=YYYY-MM-DD"
+	@echo "      Uses: gs://gcs-automation-project-raw (Bronze)"
+	@echo "            gs://gcs-automation-project-silver (Silver)"
+	@echo ""
 	@echo "Development & Testing:"
 	@echo "  make test            Run Unit Tests (pytest)"
 	@echo "  make lint            Run Linter (ruff)"
@@ -69,7 +81,8 @@ help:
 # ==============================================================================
 
 build:
-	docker-compose build
+	@echo "Building Docker image (building scheduler service only, others will reuse)..."
+	docker-compose build airflow-scheduler
 
 up:
 	@echo "Starting Airflow..."
@@ -86,6 +99,23 @@ restart:
 
 logs:
 	docker-compose logs -f airflow-scheduler
+
+log-task:
+ifndef DAG
+	@echo "ERROR: DAG not set. Usage: make log-task DAG=<dag_id> RUN_ID=<run_id> TASK=<task_id> [TRY=N] [LINES=N]"
+	@exit 1
+endif
+ifndef RUN_ID
+	@echo "ERROR: RUN_ID not set. Usage: make log-task DAG=<dag_id> RUN_ID=<run_id> TASK=<task_id> [TRY=N] [LINES=N]"
+	@exit 1
+endif
+ifndef TASK
+	@echo "ERROR: TASK not set. Usage: make log-task DAG=<dag_id> RUN_ID=<run_id> TASK=<task_id> [TRY=N] [LINES=N]"
+	@exit 1
+endif
+	@LINES=$${LINES:-200}; TRY=$${TRY:-1}; \
+	docker-compose exec airflow-scheduler tail -n $$LINES \
+	"/opt/airflow/logs/dag_id=$${DAG}/run_id=$${RUN_ID}/task_id=$${TASK}/attempt=$${TRY}.log"
 
 shell:
 	docker-compose exec airflow-scheduler bash
@@ -203,6 +233,52 @@ endif
 	docker-compose exec airflow-scheduler \
 		airflow dags backfill ecom_silver_to_gold_pipeline -s $(START) -e $(END)
 
+# Run pipeline in dev mode with GCS buckets (No Docker, No BQ)
+run-dev-gcs:
+ifndef DATE
+	@echo "ERROR: DATE not set. Usage: make run-dev-gcs DATE=2025-10-04"
+	@exit 1
+endif
+	@echo "=========================================="
+	@echo "Running Dev Pipeline with GCS (Native)"
+	@echo "Date: $(DATE)"
+	@echo "Bronze: gs://gcs-automation-project-raw/data/bronze"
+	@echo "Silver: gs://gcs-automation-project-silver/data/silver"
+	@echo "=========================================="
+	@./scripts/run_dev_pipeline.sh $(DATE)
+
+# Start Airflow in dev mode (GCS buckets, no BQ load)
+dev-mode:
+	@echo "Starting Airflow in DEV mode..."
+	@echo "  - Environment: dev"
+	@echo "  - Bronze: gs://gcs-automation-project-raw"
+	@echo "  - Silver: gs://gcs-automation-project-silver"
+	@echo "  - BigQuery: DISABLED"
+	@echo "  - Gold: DISABLED"
+	PIPELINE_ENV=dev \
+	BQ_LOAD_ENABLED=false \
+	GOLD_PIPELINE_ENABLED=false \
+	docker-compose up -d --force-recreate airflow-scheduler airflow-webserver
+	@echo ""
+	@echo "Airflow UI: http://localhost:8080"
+	@echo "Username: airflow | Password: airflow"
+
+# Run pipeline in Docker with GCS buckets
+run-dev-docker: dev-mode
+ifndef DATE
+	@echo "ERROR: DATE not set. Usage: make run-dev-docker DATE=2025-10-04"
+	@exit 1
+endif
+	@echo "=========================================="
+	@echo "Triggering DAG in Airflow (Docker)"
+	@echo "Date: $(DATE)"
+	@echo "=========================================="
+	@sleep 5  # Give Airflow time to start
+	docker-compose exec airflow-scheduler \
+		airflow dags trigger ecom_silver_to_gold_pipeline --exec-date $(DATE)
+	@echo ""
+	@echo "DAG triggered! Monitor at http://localhost:8080"
+
 # ==============================================================================
 # Testing & Code Quality
 # ==============================================================================
@@ -211,12 +287,12 @@ test:
 	pytest tests/unit/ -v
 
 lint:
-	ruff check src/ tests/
+	ruff check src/ tests/ airflow/
 	yamllint .
 
 format:
-	black src/ tests/
-	isort src/ tests/
+	black src/ tests/ airflow/
+	isort src/ tests/ airflow/
 
 type-check:
 	mypy src/

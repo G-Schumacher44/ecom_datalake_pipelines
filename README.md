@@ -126,7 +126,7 @@ Everything is designed for modularity and reusability: swap out buckets, adjust 
 <br>
 
 - **Project Vision**
-  - [Intent & Philosophy](docs/planning/intent.md) - Why "Rich Silver" matters and the learning journey
+  - [Intent & Philosophy](docs/planning/INTENT.md) - Why "Rich Silver" matters and the learning journey
 - **Planning & Architecture**
   - [Silver Transformation Plan](docs/planning/SILVER_PLAN.md)
   - [Silver Framework Overview](docs/planning/SILVER_FRAMEWORK.md)
@@ -264,9 +264,15 @@ BQ_PROJECT=your-gcp-project
 BQ_DATASET_SILVER=ecom_silver
 BQ_DATASET_GOLD=ecom_gold
 
-# Service account (optional if using ADC)
+# Auth (local/dev defaults to ADC)
+# gcloud auth application-default login
+# Optional service account (prod-style)
+USE_SA_AUTH=true
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ```
+
+For Docker-based local/dev runs, make sure your ADC file is mounted into the
+container (see `docker-compose.yml` for the default gcloud config mount).
 
 </details>
 
