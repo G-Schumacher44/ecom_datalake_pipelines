@@ -67,7 +67,10 @@ class ConfigValidationError(ConfigError):
         if environment not in ("local", "dev", "prod"):
             raise ConfigValidationError(
                 "Invalid environment",
-                details={"environment": environment, "allowed": ["local", "dev", "prod"]}
+                details={
+                    "environment": environment,
+                    "allowed": ["local", "dev", "prod"],
+                },
             )
     """
 
