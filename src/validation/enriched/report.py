@@ -15,9 +15,19 @@ def generate_markdown_report(
     timestamp: str,
     table_metrics: list[EnrichedTableMetrics],
     overall_status: str,
-    output_path: Path,
+    output_path: str | Path,
 ) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    """Generate validation report and write to local or GCS path.
+
+    Args:
+        run_id: Run identifier
+        timestamp: Report timestamp
+        table_metrics: List of table metrics
+        overall_status: Overall validation status
+        output_path: Report path (local or gs://)
+    """
+    from src.observability.config import get_config
+
     status_emoji = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌"}
 
     lines = [
@@ -114,16 +124,30 @@ def generate_markdown_report(
     )
 
     content = "\n".join(lines)
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        delete=False,
-        dir=output_path.parent,
-        prefix=f".{output_path.name}.",
-        suffix=".tmp",
-    ) as handle:
-        handle.write(content)
-        temp_name = handle.name
 
-    os.replace(temp_name, output_path)
-    logger.info(f"Wrote Markdown report to: {output_path}")
+    # Write to local or GCS based on environment
+    obs_config = get_config()
+    if not obs_config.use_cloud_reports():
+        # Local: write to filesystem with atomic replacement
+        local_path = Path(output_path)
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            delete=False,
+            dir=local_path.parent,
+            prefix=f".{local_path.name}.",
+            suffix=".tmp",
+        ) as handle:
+            handle.write(content)
+            temp_name = handle.name
+        os.replace(temp_name, local_path)
+        logger.info(f"Wrote Markdown report to: {local_path}")
+    else:
+        # Dev/Prod: write to GCS
+        import fsspec
+
+        fs = fsspec.filesystem("gcs")
+        with fs.open(str(output_path), "w") as f:
+            f.write(content)
+        logger.info(f"Wrote Markdown report to GCS: {output_path}")

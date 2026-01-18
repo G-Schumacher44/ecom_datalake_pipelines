@@ -44,15 +44,31 @@ def is_parquet_file(path: Path) -> bool:
         return False
 
 
-def collect_parquet_files(path: Path) -> list[Path]:
+def collect_parquet_files(
+    path: Path,
+    partition_key: str | None = None,
+    partitions: list[str] | None = None,
+) -> list[Path]:
     """Collect valid Parquet files under a path, skipping corrupt files."""
-    candidates = list(path.glob("**/*.parquet"))
+    candidates: list[Path] = []
+    if partition_key and partitions:
+        for value in partitions:
+            partition_path = path / f"{partition_key}={value}"
+            if not partition_path.exists():
+                continue
+            candidates.extend(partition_path.glob("**/*.parquet"))
+    else:
+        candidates = list(path.glob("**/*.parquet"))
     if not candidates:
         return []
 
     valid_files = []
     invalid_files = []
+    seen: set[Path] = set()
     for file_path in candidates:
+        if file_path in seen:
+            continue
+        seen.add(file_path)
         if is_parquet_file(file_path):
             valid_files.append(file_path)
         else:
@@ -70,13 +86,19 @@ def collect_parquet_files(path: Path) -> list[Path]:
     return valid_files
 
 
-def count_parquet_rows(path: Path) -> int:
+def count_parquet_rows(
+    path: Path,
+    partition_key: str | None = None,
+    partitions: list[str] | None = None,
+) -> int:
     """Count total rows in all Parquet files in a directory."""
     if not path.exists():
         logger.warning(f"Path does not exist: {path}")
         return 0
 
-    parquet_files = collect_parquet_files(path)
+    parquet_files = collect_parquet_files(
+        path, partition_key=partition_key, partitions=partitions
+    )
     if not parquet_files:
         logger.warning(f"No Parquet files found in: {path}")
         return 0
@@ -138,46 +160,47 @@ def resolve_layer_paths(
     bronze_over: str | None = None,
     silver_over: str | None = None,
     enriched_over: str | None = None,
-) -> dict[str, Path]:
+) -> dict[str, Path | str]:
     """Unified path resolution for validation scripts."""
     settings = load_settings(config_path)
     pl = settings.pipeline
 
-    def _res(over, env_var, bucket, prefix):
+    def _resolve_raw(over, env_var, bucket, prefix) -> str:
         if over:
-            return Path(over)
+            return over
         env_val = os.getenv(env_var)
         if env_val:
-            return Path(env_val)
-        return Path(settings.resolve_path(bucket, prefix))
+            return env_val
+        return settings.resolve_path(bucket, prefix)
+
+    def _maybe_path(value: str) -> Path | str:
+        return value if is_gcs_path(value) else Path(value)
+
+    bronze_raw = _resolve_raw(
+        bronze_over, "BRONZE_BASE_PATH", pl.bronze_bucket, pl.bronze_prefix
+    )
+    silver_raw = _resolve_raw(
+        silver_over, "SILVER_BASE_PATH", pl.silver_bucket, pl.silver_base_prefix
+    )
+    enriched_raw = _resolve_raw(
+        enriched_over,
+        "SILVER_ENRICHED_PATH",
+        pl.silver_bucket,
+        pl.silver_enriched_prefix,
+    )
+
+    quarantine_raw = os.getenv("SILVER_QUARANTINE_PATH")
+    if not quarantine_raw:
+        if is_gcs_path(silver_raw):
+            quarantine_raw = f"{silver_raw.rstrip('/')}/quarantine"
+        else:
+            quarantine_raw = str(Path(silver_raw) / "quarantine")
 
     return {
-        "bronze": _res(
-            bronze_over, "BRONZE_BASE_PATH", pl.bronze_bucket, pl.bronze_prefix
-        ),
-        "silver": _res(
-            silver_over, "SILVER_BASE_PATH", pl.silver_bucket, pl.silver_base_prefix
-        ),
-        "enriched": _res(
-            enriched_over,
-            "SILVER_ENRICHED_PATH",
-            pl.silver_bucket,
-            pl.silver_enriched_prefix,
-        ),
-        "quarantine": Path(
-            os.getenv(
-                "SILVER_QUARANTINE_PATH",
-                str(
-                    _res(
-                        silver_over,
-                        "SILVER_BASE_PATH",
-                        pl.silver_bucket,
-                        pl.silver_base_prefix,
-                    )
-                    / "quarantine"
-                ),
-            )
-        ),
+        "bronze": _maybe_path(bronze_raw),
+        "silver": _maybe_path(silver_raw),
+        "enriched": _maybe_path(enriched_raw),
+        "quarantine": _maybe_path(quarantine_raw),
     }
 
 

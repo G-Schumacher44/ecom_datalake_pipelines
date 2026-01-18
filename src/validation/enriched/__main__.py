@@ -13,6 +13,7 @@ from src.observability.metrics import write_enriched_quality_metric
 from src.settings import load_settings
 from src.validation.common import (
     handle_exit,
+    is_gcs_path,
     resolve_layer_paths,
 )
 from src.validation.enriched.metrics import validate_table
@@ -82,6 +83,12 @@ def main() -> int:
 
     enriched_path = paths["enriched"]
 
+    if is_gcs_path(str(enriched_path)):
+        logger.error("Enriched validation does not support gs:// paths.")
+        return 1
+
+    enriched_path = Path(enriched_path)
+
     tables = settings.pipeline.enriched_tables or DEFAULT_ENRICHED_TABLES
     min_rows_map = settings.pipeline.enriched_min_table_rows or {}
 
@@ -130,12 +137,23 @@ def main() -> int:
         overall_status=overall_status,
     )
 
+    # Determine report path (use observability config for GCS in dev/prod)
+    from src.observability.config import get_config
+
+    obs_config = get_config()
+    if not obs_config.use_cloud_reports():
+        report_path = args.output_report
+    else:
+        # GCS: Use observability config path with run folder
+        report_filename = Path(args.output_report).name
+        report_path = obs_config.get_run_report_path(run_id, report_filename)
+
     generate_markdown_report(
         run_id=run_id,
         timestamp=timestamp,
         table_metrics=table_metrics,
         overall_status=overall_status,
-        output_path=Path(args.output_report),
+        output_path=report_path,
     )
 
     return handle_exit(
