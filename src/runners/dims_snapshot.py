@@ -73,6 +73,7 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
 
     if silver_base_path is None:
         silver_base_path = os.getenv("SILVER_BASE_PATH", "data/silver/base")
+    silver_base_path_raw = silver_base_path
     silver_base_path = _resolve_local_base_path(
         silver_base_path,
         os.getenv("SILVER_LOCAL_BASE_PATH", str(Path(AIRFLOW_HOME) / "data/silver/base")),
@@ -80,6 +81,9 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
 
     logger.info("Building dims snapshot", run_date=run_date)
     pipeline_env = os.getenv("PIPELINE_ENV", "local").lower()
+    allow_fallback = pipeline_env in {"local", "dev"} or not str(
+        silver_base_path_raw
+    ).startswith("gs://")
 
     for table in dims_tables:
         df = _load_table(silver_base_path, table)
@@ -103,7 +107,7 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                 pl.col("ingestion_dt").is_not_null()
                 & (pl.col("ingestion_dt") <= run_dt)
             )
-            if df.is_empty() and pipeline_env in {"local", "dev"}:
+            if df.is_empty() and allow_fallback:
                 max_dt = (
                     base_df.select(pl.col("ingestion_dt").max()).item()
                     if "ingestion_dt" in base_df.columns
