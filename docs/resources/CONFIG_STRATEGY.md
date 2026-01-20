@@ -176,6 +176,8 @@ Key overrides:
 - `SILVER_BASE_PATH` → Overrides dbt var (for dbt models)
 - `SILVER_QUARANTINE_PATH` → Overrides silver quarantine output path
 - `SILVER_ENRICHED_PATH` → Overrides silver enriched output path
+- `SILVER_DIMS_PATH` → Overrides dims snapshot base path
+- `SILVER_DIMS_LOCAL_PATH` → Local dims snapshot path (used when `SILVER_DIMS_PATH` is gs://)
 - `SILVER_GCS_TARGET` → Overrides silver base GCS sync target
 - `SILVER_ENRICHED_GCS_TARGET` → Overrides silver enriched GCS sync target
 
