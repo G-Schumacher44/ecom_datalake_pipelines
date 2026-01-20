@@ -225,6 +225,7 @@ class PipelineConfig(BaseModel):
         description="Tolerance for enriched ratio checks (floating-point drift).",
     )
     table_partitions: dict[str, str | None] = Field(default_factory=dict)
+    silver_table_partitions: dict[str, str | None] = Field(default_factory=dict)
     enriched_partitions: dict[str, str] = Field(default_factory=dict)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
 

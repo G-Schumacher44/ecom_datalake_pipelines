@@ -52,6 +52,12 @@ def parse_args() -> argparse.Namespace:
         "--ingest-dt", default=None, help="Target partition date (YYYY-MM-DD)."
     )
     parser.add_argument(
+        "--lookback-days",
+        type=int,
+        default=None,
+        help="Days of partitions to include when validating business-date tables.",
+    )
+    parser.add_argument(
         "--fail-on-issues",
         action="store_true",
         help="Legacy: use --enforce-quality instead.",
@@ -94,6 +100,12 @@ def main() -> int:
 
     logger.info(f"Starting Enriched Silver validation (run_id={run_id})")
 
+    lookback_days = (
+        args.lookback_days
+        if args.lookback_days is not None
+        else settings.pipeline.enriched_lookback_days
+    )
+
     table_metrics = [
         validate_table(
             table=table,
@@ -102,6 +114,7 @@ def main() -> int:
             min_rows=min_rows_map.get(table),
             pipeline_env=pipeline_env,
             settings=settings.pipeline,
+            lookback_days=lookback_days,
         )
         for table in tables
     ]

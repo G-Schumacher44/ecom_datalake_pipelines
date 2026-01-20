@@ -162,10 +162,10 @@ def compute_key_cardinality(
     }
 
 
-def list_ingest_partitions(path: Path) -> set[str]:
-    """Return ingest_dt partition values (YYYY-MM-DD) for a table path."""
+def list_partitions_by_key(path: Path, partition_key: str) -> set[str]:
+    """Return partition values for a table path keyed by partition_key."""
     partitions = set()
-    for part_dir in path.glob("ingest_dt=*"):
+    for part_dir in path.glob(f"{partition_key}=*"):
         if not part_dir.is_dir():
             continue
         partitions.add(part_dir.name.split("=", 1)[-1])

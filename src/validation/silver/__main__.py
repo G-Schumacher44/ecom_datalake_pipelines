@@ -18,8 +18,8 @@ from src.validation.common import (
     is_gcs_path,
     resolve_layer_paths,
 )
-from src.validation.silver.data import compute_key_cardinality, list_ingest_partitions
-from src.runners.enriched.shared import get_table_partitions
+from src.validation.silver.data import compute_key_cardinality, list_partitions_by_key
+from src.runners.enriched.shared import get_silver_table_partitions, get_table_partitions
 from src.validation.silver.metrics import compute_fk_mismatch_summary, validate_table
 from src.validation.silver.models import SilverQualityReport
 from src.validation.silver.report import build_profile_report, generate_markdown_report
@@ -171,15 +171,17 @@ def main() -> int:
 
     table_metrics = []
     for table in tables:
-        partition_key = get_table_partitions().get(table, "ingest_dt")
+        silver_partition_key = get_silver_table_partitions().get(table, "ingest_dt")
+        bronze_partition_key = get_table_partitions().get(table, "ingest_dt")
         metrics = validate_table(
             table,
             bronze_path,
             silver_path,
             quarantine_path,
             sla_thresholds,
-            partition_key=partition_key,
+            partition_key=silver_partition_key,
             partitions=partition_values,
+            bronze_partition_key=bronze_partition_key,
         )
         table_metrics.append(metrics)
 
@@ -218,17 +220,28 @@ def main() -> int:
             }
         )
 
+    expected_source = "none"
     if partition_values:
         expected_set = set(partition_values)
+        expected_source = "partition_date"
     elif settings.pipeline.expected_bronze_partitions:
         expected_set = set(
             expand_partition_ranges(settings.pipeline.expected_bronze_partitions)
         )
+        expected_source = "config"
     else:
         expected_set = set()
     if expected_set:
+        date_partition_keys = {"ingest_dt", "signup_date"}
         for table in tables:
-            bronze_parts = list_ingest_partitions(bronze_path / table)
+            bronze_partition_key = get_table_partitions().get(table, "ingest_dt")
+            if bronze_partition_key not in date_partition_keys:
+                continue
+            if expected_source == "config" and bronze_partition_key != "ingest_dt":
+                continue
+            bronze_parts = list_partitions_by_key(
+                bronze_path / table, bronze_partition_key
+            )
             missing = sorted(expected_set - bronze_parts)
             if missing:
                 sample = ", ".join(missing[:5])
@@ -237,7 +250,7 @@ def main() -> int:
                         "check": "missing_bronze_partitions",
                         "table": table,
                         "message": (
-                            f"Missing {len(missing)} ingest_dt partitions "
+                            f"Missing {len(missing)} {bronze_partition_key} partitions "
                             f"for {table}: {sample}"
                         ),
                     }
@@ -270,7 +283,7 @@ def main() -> int:
         returns_cardinality = compute_key_cardinality(
             silver_path / "returns",
             "return_id",
-            partition_key=get_table_partitions().get("returns", "ingest_dt"),
+            partition_key=get_silver_table_partitions().get("returns", "ingest_dt"),
             partitions=partition_values,
         )
         if (
@@ -292,7 +305,7 @@ def main() -> int:
         return_items_cardinality = compute_key_cardinality(
             silver_path / "return_items",
             "return_id",
-            partition_key=get_table_partitions().get("return_items", "ingest_dt"),
+            partition_key=get_silver_table_partitions().get("return_items", "ingest_dt"),
             partitions=partition_values,
         )
         if (
