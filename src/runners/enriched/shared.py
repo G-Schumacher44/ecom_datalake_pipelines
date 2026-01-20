@@ -9,11 +9,22 @@ from functools import wraps
 from typing import Any, Callable, Dict, Sequence
 
 import polars as pl
+import pyarrow.parquet as pq
 
 from src.settings import PipelineConfig, load_settings
 from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_schema(
+    table: str, schema: dict[str, pl.DataType] | None
+) -> dict[str, pl.DataType] | None:
+    if schema is None:
+        return None
+    if table == "product_catalog" and "category" not in schema:
+        return {**schema, "category": pl.Utf8}
+    return schema
 
 
 def enriched_runner(
@@ -136,7 +147,7 @@ def read_partitioned(
 ) -> pl.LazyFrame:
     partition_key = get_silver_table_partitions().get(table)
     if partition_key is None:
-        schema = BASE_SILVER_SCHEMAS.get(table)
+        schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
         return pl.scan_parquet(
             f"{base_path}/{table}/**/*.parquet",
             hive_partitioning=True,
@@ -152,7 +163,7 @@ def read_partitioned(
         "created_dt",
     }
     if partition_key not in date_partitions:
-        schema = BASE_SILVER_SCHEMAS.get(table)
+        schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
         return pl.scan_parquet(
             f"{base_path}/{table}/{partition_key}=*/**/*.parquet",
             hive_partitioning=True,
@@ -164,6 +175,24 @@ def read_partitioned(
         dt for dt in partition_range(ingest_dt, lookback_days) if dt in available
     ]
     if not desired:
+        demo_mode = os.getenv("DEMO_MODE", "").lower() in {"1", "true", "yes", "on"}
+        if demo_mode and table == "product_catalog" and available:
+            latest = sorted(available)[-1]
+            paths = [
+                f"{base_path}/{table}/{partition_key}={latest}/**/*.parquet"
+            ]
+            schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
+            logger.warning(
+                "Demo mode: falling back to latest %s partition %s for %s.",
+                partition_key,
+                latest,
+                table,
+            )
+            return pl.scan_parquet(
+                paths,
+                hive_partitioning=True,
+                schema=schema,  # type: ignore[arg-type]
+            )
         # If no partitions match the requested date range, return an empty
         # DataFrame with the correct schema. This prevents pipeline failure
         # when data is legitimately missing (e.g. gaps in source data).
@@ -171,7 +200,7 @@ def read_partitioned(
             f"No {partition_key} partitions found for {table} at {base_path} "
             f"matching range for {ingest_dt}. Returning empty DataFrame."
         )
-        schema = BASE_SILVER_SCHEMAS.get(table)
+        schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
         if schema:
             return pl.DataFrame(schema=schema).lazy()  # type: ignore[arg-type]
         # Fallback if schema is missing (should not happen given imports)
@@ -181,7 +210,7 @@ def read_partitioned(
         )
 
     paths = [f"{base_path}/{table}/{partition_key}={dt}/**/*.parquet" for dt in desired]
-    schema = BASE_SILVER_SCHEMAS.get(table)
+    schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
     return pl.scan_parquet(
         paths,
         hive_partitioning=True,
@@ -205,26 +234,32 @@ def write_sharded_parquet(
     output_uri: str,
     max_rows_per_file: int,
 ) -> None:
+    def _write_parquet_compat(frame: pl.DataFrame, path: str) -> None:
+        try:
+            frame.write_parquet(path, use_dictionary=False)
+        except TypeError:
+            pq.write_table(frame.to_arrow(), path, use_dictionary=False)
+
     output_uri = output_uri.rstrip("/")
     ensure_output_dir(output_uri)
 
     if max_rows_per_file <= 0:
-        df.write_parquet(output_file(output_uri))
+        _write_parquet_compat(df, output_file(output_uri))
         return
 
     if df.height == 0:
-        df.head(0).write_parquet(output_file(output_uri))
+        _write_parquet_compat(df.head(0), output_file(output_uri))
         return
 
     if df.height <= max_rows_per_file:
-        df.write_parquet(output_file(output_uri))
+        _write_parquet_compat(df, output_file(output_uri))
         return
 
     shard_index = 0
     for offset in range(0, df.height, max_rows_per_file):
         chunk = df.slice(offset, max_rows_per_file)
         filename = f"{output_uri}/part-{shard_index:05d}.parquet"
-        chunk.write_parquet(filename)
+        _write_parquet_compat(chunk, filename)
         shard_index += 1
 
 

@@ -99,7 +99,7 @@ pipeline:
   enriched_lookback_days: 0
   # NOTE: Ensure enriched_lookback_days >= sales_velocity_window_days to avoid
   # rolling window leakage for int_sales_velocity.
-  enriched_max_rows_per_file: 1000
+  enriched_max_rows_per_file: 50000
   # Tolerance for ratio checks (handles floating-point rounding).
   enriched_ratio_epsilon: 0.0001
 
