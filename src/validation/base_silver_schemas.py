@@ -99,6 +99,7 @@ CUSTOMERS_SCHEMA = {
 PRODUCT_CATALOG_SCHEMA = {
     "product_id": pl.Int64,
     "product_name": pl.Utf8,
+    "category": pl.Utf8,
     "unit_price": pl.Decimal(18, 2),
     "cost_price": pl.Decimal(18, 2),
     "inventory_quantity": pl.Int64,

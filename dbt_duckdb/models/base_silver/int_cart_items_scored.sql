@@ -22,7 +22,7 @@ dim_shopping_carts as (
 dim_products as (
     select distinct
         {{ safe_cast_integer('product_id') }} as product_id
-    from {{ silver_parquet('product_catalog') }}
+    from {{ ref('stg_ecommerce__product_catalog') }}
     where {{ safe_cast_integer('product_id') }} is not null
 ),
 
