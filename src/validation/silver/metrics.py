@@ -28,12 +28,16 @@ def validate_table(
     sla_thresholds: dict[str, float],
     partition_key: str | None = None,
     partitions: list[str] | None = None,
+    bronze_partition_key: str | None = None,
 ) -> TableQualityMetrics:
     """Validate quality for a single table."""
     logger.info(f"Validating {table}...")
 
+    # Use bronze_partition_key if provided, otherwise fall back to partition_key
+    bronze_pk = bronze_partition_key if bronze_partition_key is not None else partition_key
+
     bronze_rows = count_parquet_rows(
-        bronze_path / table, partition_key=partition_key, partitions=partitions
+        bronze_path / table, partition_key=bronze_pk, partitions=partitions
     )
     silver_rows = count_parquet_rows(
         silver_path / table, partition_key=partition_key, partitions=partitions

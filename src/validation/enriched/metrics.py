@@ -82,6 +82,7 @@ def validate_table(
     min_rows: int | None,
     pipeline_env: str,
     settings: PipelineConfig,
+    lookback_days: int,
 ) -> EnrichedTableMetrics:
     table_path = enriched_path / table
     notes: list[str] = []
@@ -97,16 +98,16 @@ def validate_table(
     prior_rows: int | None = None
     row_delta_pct: float | None = None
 
-    resolved_ingest_dt, partition_path = resolve_partition(
-        table_path, partition_key, ingest_dt
+    resolved_partition, partition_path = resolve_partition(
+        table_path, partition_key, ingest_dt, lookback_days
     )
     if partition_path is None:
-        notes.append("missing_ingest_partition")
+        notes.append("missing_partition")
         status = "FAIL" if pipeline_env == "prod" else "WARN"
         return EnrichedTableMetrics(
             table=table,
             partition_key=partition_key,
-            ingest_dt=resolved_ingest_dt,
+            ingest_dt=resolved_partition,
             row_count=0,
             min_rows=min_rows,
             prior_row_count=prior_rows,
@@ -121,7 +122,7 @@ def validate_table(
 
     row_count = count_parquet_rows(partition_path)
     prior_rows, row_delta_pct = compute_row_delta(
-        table_path, partition_key, resolved_ingest_dt, row_count
+        table_path, partition_key, resolved_partition, row_count
     )
 
     schema_snapshot = get_schema_snapshot(partition_path)
@@ -181,7 +182,7 @@ def validate_table(
     return EnrichedTableMetrics(
         table=table,
         partition_key=partition_key,
-        ingest_dt=resolved_ingest_dt,
+        ingest_dt=resolved_partition,
         row_count=row_count,
         min_rows=min_rows,
         prior_row_count=prior_rows,

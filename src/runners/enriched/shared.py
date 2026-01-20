@@ -74,7 +74,13 @@ def enriched_runner(
 
 
 def get_table_partitions() -> dict[str, str | None]:
+    """Get bronze table partitions (deprecated - use get_silver_table_partitions for enriched runners)."""
     return load_settings().pipeline.table_partitions
+
+
+def get_silver_table_partitions() -> dict[str, str | None]:
+    """Get silver table partitions for enriched runners."""
+    return load_settings().pipeline.silver_table_partitions
 
 
 def get_enriched_partitions() -> dict[str, str]:
@@ -128,7 +134,7 @@ def read_partitioned(
     ingest_dt: str,
     lookback_days: int,
 ) -> pl.LazyFrame:
-    partition_key = get_table_partitions().get(table)
+    partition_key = get_silver_table_partitions().get(table)
     if partition_key is None:
         schema = BASE_SILVER_SCHEMAS.get(table)
         return pl.scan_parquet(
@@ -137,7 +143,14 @@ def read_partitioned(
             schema=schema,  # type: ignore[arg-type]
         )
 
-    date_partitions = {"ingest_dt", "order_dt", "return_dt", "added_dt", "created_dt"}
+    date_partitions = {
+        "ingest_dt",
+        "ingestion_dt",
+        "order_dt",
+        "return_dt",
+        "added_dt",
+        "created_dt",
+    }
     if partition_key not in date_partitions:
         schema = BASE_SILVER_SCHEMAS.get(table)
         return pl.scan_parquet(
