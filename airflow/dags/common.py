@@ -79,6 +79,7 @@ COMMON_ENV = {
     "SILVER_BASE_PATH": os.getenv("SILVER_BASE_PATH", ""),
     "SILVER_ENRICHED_PATH": os.getenv("SILVER_ENRICHED_PATH", ""),
     "SILVER_ENRICHED_LOCAL_PATH": os.getenv("SILVER_ENRICHED_LOCAL_PATH", ""),
+    "SILVER_DIMS_PATH": os.getenv("SILVER_DIMS_PATH", ""),
     "SILVER_QUARANTINE_PATH": os.getenv("SILVER_QUARANTINE_PATH", ""),
     "METRICS_BUCKET": os.getenv("METRICS_BUCKET", ""),
     "LOGS_BUCKET": os.getenv("LOGS_BUCKET", ""),
@@ -98,6 +99,25 @@ def resolve_bool(env_key: str, default: bool = False) -> bool:
     if env_override is None:
         return default
     return env_override.lower() in {"true", "1", "yes"}
+
+
+def resolve_dims_base_path() -> str | None:
+    """Resolve the dims snapshot base path, honoring env and spec defaults."""
+    env_override = os.getenv("SILVER_DIMS_PATH")
+    if env_override:
+        base_path = env_override
+    else:
+        spec = load_spec_safe()
+        if not spec or not spec.dims or not spec.dims.base_path:
+            return None
+        base_path = spec.dims.base_path
+
+    base_path = os.path.expandvars(base_path)
+    if base_path.startswith("gs://") or os.path.isabs(base_path):
+        return base_path
+
+    config = SettingsConfig()
+    return os.path.join(config.airflow_home, base_path)
 
 
 def run_enriched_runner(func, **kwargs):
