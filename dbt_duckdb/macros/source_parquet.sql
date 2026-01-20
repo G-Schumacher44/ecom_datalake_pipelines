@@ -10,3 +10,8 @@
   {%- set base = var('silver_base_path') -%}
   read_parquet('{{ base }}/{{ table_name }}/**/*.parquet', union_by_name=true, hive_partitioning=true)
 {%- endmacro %}
+
+{% macro dims_parquet(table_name) %}
+  {%- set base = var('dims_base_path') -%}
+  read_parquet('{{ base }}/{{ table_name }}/**/*.parquet', union_by_name=true, hive_partitioning=true)
+{%- endmacro %}

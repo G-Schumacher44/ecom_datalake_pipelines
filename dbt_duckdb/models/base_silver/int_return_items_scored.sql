@@ -30,8 +30,9 @@ dim_orders as (
 dim_products as (
     select distinct
         {{ safe_cast_integer('product_id') }} as product_id
-    from {{ ref('stg_ecommerce__product_catalog') }}
-    where {{ safe_cast_integer('product_id') }} is not null
+    from {{ dims_parquet('product_catalog') }}
+    where {{ run_date_filter('snapshot_dt') }}
+      and {{ safe_cast_integer('product_id') }} is not null
 ),
 
 cleaned as (
