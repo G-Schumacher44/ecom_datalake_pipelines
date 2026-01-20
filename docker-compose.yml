@@ -58,7 +58,7 @@ x-airflow-common: &airflow-common
     # Use a named volume for logs to avoid host FS deadlocks
     - airflow-logs:/opt/airflow/logs
     # - ./airflow/plugins:/opt/airflow/plugins
-    # - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/dags:/opt/airflow/dags
 
     # Mount data directories for local runs
     # NOTE: Use a named volume for /opt/airflow/data to avoid host FS deadlocks.

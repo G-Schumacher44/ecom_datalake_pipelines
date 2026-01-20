@@ -152,6 +152,7 @@ with DAG(
             f"--partition-date {{{{ ds }}}} "
             f"--lookback-days {os.getenv('SILVER_VALIDATION_LOOKBACK_DAYS', '0')} "
             f"--run-id {{{{ run_id }}}} "
+            f"--tables orders,order_items,shopping_carts,cart_items,returns,return_items "
             f"--output-report docs/validation_reports/SILVER_QUALITY_{{{{ run_id | replace(':', '') }}}}.md "
             + (" --enforce-quality" if PIPELINE_ENV == "prod" else "")
         ),
@@ -168,7 +169,7 @@ with DAG(
             f"ENV=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}}}\" "
             f'SILVER_GCS_TARGET="gs://$BUCKET/data/silver/base" '
             '&& if [[ "$ENV" =~ ^(dev|prod)$ ]] && [[ "$SILVER_BASE_PATH" != gs://* ]] && [[ "$BUCKET" != "local" ]]; then '
-            'gcloud storage rsync -r --delete-unmatched-destination-objects "$SILVER_BASE_PATH" "$SILVER_GCS_TARGET"; '
+            'gcloud storage rsync -r "$SILVER_BASE_PATH" "$SILVER_GCS_TARGET"; '
             "else echo 'sync skipped'; fi"
         ),
     )
@@ -254,10 +255,11 @@ with DAG(
             f"SILVER_ENRICHED_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched'] }}}}\" "
             f"BUCKET=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bucket'] }}}}\" "
             f"ENV=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}}}\" "
-            f'SILVER_ENRICHED_GCS_TARGET="gs://$BUCKET/data/silver/enriched" '
-            '&& if [[ "$ENV" =~ ^(dev|prod)$ ]] && [[ "$SILVER_ENRICHED_PATH" != gs://* ]] && [[ "$BUCKET" != "local" ]]; then '
-            'gcloud storage rsync -r --delete-unmatched-destination-objects "$SILVER_ENRICHED_PATH" "$SILVER_ENRICHED_GCS_TARGET"; '
-            "else echo 'sync skipped'; fi"
+            f'SILVER_ENRICHED_GCS_TARGET="$SILVER_ENRICHED_PATH" '
+            f'SILVER_ENRICHED_LOCAL_PATH="${{SILVER_ENRICHED_LOCAL_PATH:-/opt/airflow/data/silver/enriched}}" '
+            '&& if [[ "$ENV" =~ ^(dev|prod)$ ]] && [[ "$SILVER_ENRICHED_PATH" == gs://* ]] && [[ "$BUCKET" != "local" ]]; then '
+            'gcloud storage rsync -r "$SILVER_ENRICHED_LOCAL_PATH" "$SILVER_ENRICHED_GCS_TARGET"; '
+            "else echo 'sync skipped (ENV=$ENV, PATH=$SILVER_ENRICHED_PATH)'; fi"
         ),
     )
 
