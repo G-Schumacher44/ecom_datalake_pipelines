@@ -64,6 +64,8 @@ help:
 	@echo "  make format          Auto-format Code (black + isort)"
 	@echo "  make type-check      Run Type Checker (mypy)"
 	@echo "  make local-silver    Run dbt + Validation locally (No Docker)"
+	@echo "  make local-enriched  Run enriched transforms locally (optional: DATE=YYYY-MM-DD)"
+	@echo "  make local-dims      Run customer + product catalog dims locally"
 	@echo ""
 	@echo "dbt Utilities:"
 	@echo "  make dbt-deps        Install dbt packages"
@@ -313,14 +315,80 @@ dbt-test:
 # Build Silver locally (no Docker, for quick testing)
 local-silver:
 	PIPELINE_ENV=local \
-	BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
-	SILVER_BASE_PATH="$(PWD)/data/silver/base" \
-	python -m src.runners.base_silver --select "base_silver.*"
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		python -m src.runners.base_silver --select "base_silver.*"
+	python -m src.validation.silver \
+		--bronze-path samples/bronze \
+		--silver-path data/silver/base \
+		--quarantine-path data/silver/base/quarantine \
+		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md
+
+local-silver-strict:
+	PIPELINE_ENV=local \
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		python -m src.runners.base_silver --select "base_silver.*"
+	python -m src.validation.silver \
+		--bronze-path samples/bronze \
+		--silver-path data/silver/base \
+		--quarantine-path data/silver/base/quarantine \
+		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md \
+		--enforce-quality
+
+local-enriched:
+	PIPELINE_ENV=local \
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		SILVER_ENRICHED_PATH="$(PWD)/data/silver/enriched" \
+		python scripts/run_enriched_all_samples.py \
+		--base-path "$(PWD)/data/silver/base" \
+		--output-path "$(PWD)/data/silver/enriched" \
+		--per-date \
+		$(if $(DATE),--ingest-dt $(DATE),)
+
+local-enriched-strict:
+	PIPELINE_ENV=local \
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		SILVER_ENRICHED_PATH="$(PWD)/data/silver/enriched" \
+		python scripts/run_enriched_all_samples.py \
+		--base-path "$(PWD)/data/silver/base" \
+		--output-path "$(PWD)/data/silver/enriched" \
+		--per-date \
+		--enforce-quality \
+		$(if $(DATE),--ingest-dt $(DATE),)
+
+local-dims:
+	PIPELINE_ENV=local \
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		python -m src.runners.base_silver \
+		--select stg_ecommerce__customers \
+		stg_ecommerce__customers_quarantine \
+		stg_ecommerce__product_catalog \
+		stg_ecommerce__product_catalog_quarantine
 	python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
 		--quarantine-path data/silver/base/quarantine \
 		--output-report docs/validation_reports/SILVER_QUALITY.md
+
+local-dims-strict:
+	PIPELINE_ENV=local \
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		python -m src.runners.base_silver \
+		--select stg_ecommerce__customers \
+		stg_ecommerce__customers_quarantine \
+		stg_ecommerce__product_catalog \
+		stg_ecommerce__product_catalog_quarantine
+	python -m src.validation.silver \
+		--bronze-path samples/bronze \
+		--silver-path data/silver/base \
+		--quarantine-path data/silver/base/quarantine \
+		--output-report docs/validation_reports/SILVER_QUALITY.md \
+		--enforce-quality
 
 # ==============================================================================
 # Production Deployment (requires gcloud CLI + PROJECT_ID env var)

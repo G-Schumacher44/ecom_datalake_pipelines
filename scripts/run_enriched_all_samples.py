@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.runners import enriched  # noqa: E402
-from src.validation import enriched_quality  # noqa: E402
+from src.validation.enriched import __main__ as enriched_quality  # noqa: E402
 
 PARTITION_MAP = {
     "orders": "order_dt",
@@ -72,7 +72,7 @@ def run_enriched_for_date(
 
 
 def write_enriched_report(
-    output_path: str, ingest_dt: str, report_path: Path
+    output_path: str, ingest_dt: str, report_path: Path, enforce_quality: bool
 ) -> None:
     args = [
         "enriched_quality",
@@ -83,6 +83,8 @@ def write_enriched_report(
         "--output-report",
         str(report_path),
     ]
+    if enforce_quality:
+        args.append("--enforce-quality")
     # Reuse argparse via sys.argv for the module entrypoint.
     import sys
 
@@ -114,6 +116,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Write report per date (suffixes report filename).",
     )
+    parser.add_argument(
+        "--ingest-dt",
+        default=None,
+        help="Run enriched transforms for a single date (YYYY-MM-DD).",
+    )
+    parser.add_argument(
+        "--enforce-quality",
+        action="store_true",
+        help="Exit non-zero on any validation failures.",
+    )
     return parser.parse_args()
 
 
@@ -123,14 +135,16 @@ def main() -> None:
     output_path = args.output_path
     report_path = Path(args.report_path)
 
-    valid_dates = resolve_valid_dates(base_path)
-    if not valid_dates:
-        print("No shared partition dates found across base tables.")
-        return
+    if args.ingest_dt:
+        ingest_dates = [args.ingest_dt]
+    else:
+        ingest_dates = resolve_valid_dates(base_path)
+        if not ingest_dates:
+            print("No shared partition dates found across base tables.")
+            return
+        print(f"Found {len(ingest_dates)} valid dates: {', '.join(ingest_dates)}")
 
-    print(f"Found {len(valid_dates)} valid dates: {', '.join(valid_dates)}")
-
-    for ingest_dt in valid_dates:
+    for ingest_dt in ingest_dates:
         print(f"\n=== Enriched run for {ingest_dt} ===")
         run_enriched_for_date(base_path, output_path, ingest_dt)
 
@@ -141,7 +155,9 @@ def main() -> None:
         else:
             dated_report = report_path
 
-        write_enriched_report(output_path, ingest_dt, dated_report)
+        write_enriched_report(
+            output_path, ingest_dt, dated_report, args.enforce_quality
+        )
 
 
 if __name__ == "__main__":
