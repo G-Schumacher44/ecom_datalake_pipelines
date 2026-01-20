@@ -31,6 +31,7 @@ ORDERS_SCHEMA = {
     "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
+    "order_dt": pl.Date,
 }
 
 ORDER_ITEMS_SCHEMA = {
@@ -47,6 +48,7 @@ ORDER_ITEMS_SCHEMA = {
     "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
+    "order_dt": pl.Date,
 }
 
 CART_ITEMS_SCHEMA = {
@@ -63,6 +65,7 @@ CART_ITEMS_SCHEMA = {
     "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
+    "added_dt": pl.Date,
 }
 
 CUSTOMERS_SCHEMA = {
@@ -90,6 +93,7 @@ CUSTOMERS_SCHEMA = {
     "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
+    "signup_dt": pl.Date,
 }
 
 PRODUCT_CATALOG_SCHEMA = {
@@ -117,6 +121,7 @@ SHOPPING_CARTS_SCHEMA = {
     "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
+    "created_dt": pl.Date,
 }
 
 RETURNS_SCHEMA = {
@@ -136,6 +141,7 @@ RETURNS_SCHEMA = {
     "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
+    "return_dt": pl.Date,
 }
 
 RETURN_ITEMS_SCHEMA = {
@@ -154,6 +160,7 @@ RETURN_ITEMS_SCHEMA = {
     "ingestion_dt": pl.Date,
     "event_id": pl.Utf8,
     "source_file": pl.Utf8,
+    "return_dt": pl.Date,
 }
 
 BASE_SILVER_SCHEMAS = {

@@ -95,8 +95,8 @@
     ({{ column_name }} is not null and {{ column_name }} >= 0)
 {%- endmacro %}
 
-{% macro get_ingestion_dt(ingestion_ts_col='ingestion_ts') %}
-    cast({{ safe_cast_timestamp(ingestion_ts_col) }} as date)
+{% macro get_ingestion_dt(ingest_dt_col='ingest_dt') %}
+    cast({{ ingest_dt_col }} as date)
 {%- endmacro %}
 
 -- ============================================================================

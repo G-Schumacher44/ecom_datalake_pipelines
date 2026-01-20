@@ -22,7 +22,7 @@ cleaned as (
         {{ safe_cast_timestamp('ingestion_ts') }} as ingestion_ts,
         {{ normalize_string('event_id') }} as event_id,
         {{ normalize_string('source_file') }} as source_file,
-        {{ get_ingestion_dt() }} as ingestion_dt
+        {{ get_ingestion_dt('ingestion_ts') }} as ingestion_dt
     from raw
 ),
 

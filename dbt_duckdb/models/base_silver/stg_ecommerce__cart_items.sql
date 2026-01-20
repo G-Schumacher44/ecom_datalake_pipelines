@@ -1,7 +1,7 @@
 {{ config(
     materialized='external',
     location=var('silver_base_path') ~ '/cart_items',
-    options={'format': 'parquet', 'partition_by': 'added_dt', 'overwrite': true}
+    options={'format': 'parquet', 'partition_by': 'ingestion_dt', 'overwrite': true}
 ) }}
 
 select

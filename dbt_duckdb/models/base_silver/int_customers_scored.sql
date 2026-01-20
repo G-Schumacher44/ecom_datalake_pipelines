@@ -7,7 +7,7 @@ STAGING CORE: customers (shared by base + quarantine)
 with raw as (
     select *
     from {{ source_parquet('bronze', 'customers', partition_key='signup_date') }}
-    where {{ run_date_filter('ingestion_ts') }}
+    where {{ run_date_filter('signup_date') }}
 ),
 
 cleaned as (
@@ -35,7 +35,7 @@ cleaned as (
         {{ safe_cast_timestamp('ingestion_ts') }} as ingestion_ts,
         {{ normalize_string('event_id') }} as event_id,
         {{ normalize_string('source_file') }} as source_file,
-        {{ get_ingestion_dt() }} as ingestion_dt,
+        {{ get_ingestion_dt('ingestion_ts') }} as ingestion_dt,
         cast({{ safe_cast_date('signup_date') }} as date) as signup_dt
     from raw
 ),
