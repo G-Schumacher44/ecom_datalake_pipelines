@@ -52,9 +52,7 @@ def test_resolve_partition_business_date_latest_fallback(tmp_path: Path) -> None
     _make_partition(table_path, "order_dt", "2020-01-01")
     _make_partition(table_path, "order_dt", "2020-01-05")
 
-    resolved, path = resolve_partition(
-        table_path, "order_dt", None, lookback_days=0
-    )
+    resolved, path = resolve_partition(table_path, "order_dt", None, lookback_days=0)
 
     assert resolved == "2020-01-05"
     assert path == table_path / "order_dt=2020-01-05"

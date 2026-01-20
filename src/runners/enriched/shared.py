@@ -74,7 +74,7 @@ def enriched_runner(
 
 
 def get_table_partitions() -> dict[str, str | None]:
-    """Get bronze table partitions (deprecated - use get_silver_table_partitions for enriched runners)."""
+    """Get bronze table partitions (deprecated for enriched runners)."""
     return load_settings().pipeline.table_partitions
 
 
@@ -272,9 +272,7 @@ def write_partitioned_shards(
 
     if df.height == 0:
         # No rows to write for this run; avoid failing on missing partition cols.
-        logger.warning(
-            "No rows produced for %s; skipping partitioned write.", table
-        )
+        logger.warning("No rows produced for %s; skipping partitioned write.", table)
         ensure_output_dir(f"{output_path}/{table}")
         return
 
