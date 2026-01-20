@@ -70,10 +70,10 @@ x-airflow-common: &airflow-common
     # Optional service account key (set USE_SA_AUTH=true + GOOGLE_APPLICATION_CREDENTIALS)
     # - ${GCP_SA_KEY_PATH}:/opt/airflow/.gcp/sa.json:ro
 
-    # Mount source code for development (optional - can remove in prod)
-    # WARNING: Uncommenting dbt_duckdb causes Errno 35 on macOS Docker Desktop
-    # - ./src:/opt/airflow/src
-    # - ./config:/opt/airflow/config
+    # Mount source code for development (keep baked-in copies for prod)
+    # WARNING: Uncommenting dbt_duckdb can cause Errno 35 on macOS Docker Desktop
+    - ./src:/opt/airflow/src
+    - ./config:/opt/airflow/config
     # - ./dbt_duckdb:/opt/airflow/dbt_duckdb
     # - ./dbt_bigquery:/opt/airflow/dbt_bigquery
 
