@@ -169,6 +169,31 @@ def main() -> int:
         output_path=report_path,
     )
 
+    failing = [m for m in table_metrics if m.status == "FAIL"]
+    if failing:
+        details = []
+        for metric in failing:
+            issues = []
+            if metric.semantic_issues:
+                issues.append(
+                    f"semantic={'; '.join(metric.semantic_issues)}"
+                )
+            if metric.sanity_issues:
+                issues.append(
+                    f"sanity={'; '.join(metric.sanity_issues)}"
+                )
+            if metric.notes:
+                issues.append(
+                    f"notes={'; '.join(metric.notes)}"
+                )
+            if not issues:
+                issues.append("no_issue_details")
+            details.append(f"{metric.table} ({' | '.join(issues)})")
+        logger.error(
+            "Enriched validation failed: %s",
+            "; ".join(details),
+        )
+
     return handle_exit(
         overall_status=overall_status,
         enforce=args.enforce_quality or args.fail_on_issues,

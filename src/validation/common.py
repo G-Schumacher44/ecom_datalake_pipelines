@@ -128,6 +128,7 @@ def read_parquet_safe(
     parquet_files = collect_parquet_files(path)
     if not parquet_files:
         return None
+    demo_mode = os.getenv("DEMO_MODE", "").lower() in {"1", "true", "yes", "on"}
     try:
         return pl.read_parquet(
             parquet_files,
@@ -135,7 +136,7 @@ def read_parquet_safe(
             n_rows=n_rows,
             memory_map=False,
             low_memory=True,
-            use_pyarrow=True,
+            use_pyarrow=not demo_mode,
         )
     except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
         logger.error(
