@@ -6,13 +6,16 @@ for executing dbt models with proper environment setup and path handling.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.settings import load_settings
+from src.specs import load_spec_safe
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +66,9 @@ def ensure_local_directories(silver_path: Path, quarantine_path: Path) -> None:
     logger.info("Ensuring local directory structure exists...")
     silver_path.mkdir(parents=True, exist_ok=True)
     quarantine_path.mkdir(parents=True, exist_ok=True)
-    for table in STANDARD_TABLES:
+    spec = load_spec_safe()
+    table_names = [t.name for t in spec.silver_base.tables] if spec else STANDARD_TABLES
+    for table in table_names:
         (silver_path / table).mkdir(parents=True, exist_ok=True)
         (quarantine_path / table).mkdir(parents=True, exist_ok=True)
 
@@ -93,6 +98,11 @@ def gcloud_rsync(source: str, destination: str, delete: bool) -> None:
         cmd.append("--delete-unmatched-destination-objects")
     cmd.extend([source, destination])
     logger.info(f"Syncing {source} -> {destination}")
+    subprocess.run(cmd, check=True, env=gcloud_env())
+
+
+def gcloud_env() -> dict[str, str]:
+    """Build gcloud environment overrides for auth."""
     env = os.environ.copy()
     creds = env.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
     if use_sa_auth() and creds:
@@ -103,7 +113,23 @@ def gcloud_rsync(source: str, destination: str, delete: bool) -> None:
         if adc_path.exists():
             # Ensure gcloud uses ADC refresh token without interactive login.
             env["CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE"] = str(adc_path)
-    subprocess.run(cmd, check=True, env=env)
+    return env
+
+
+def gcloud_copy_file(source: Path, destination: str) -> None:
+    """Copy a local file to GCS using gcloud storage cp."""
+    cmd = ["gcloud", "storage", "cp", str(source), destination]
+    logger.info(f"Uploading {source} -> {destination}")
+    subprocess.run(cmd, check=True, env=gcloud_env())
+
+
+def resolve_run_id() -> str:
+    """Resolve a stable run_id for publish staging."""
+    for key in ("RUN_ID", "AIRFLOW_CTX_DAG_RUN_ID", "AIRFLOW_CTX_EXECUTION_DATE"):
+        value = os.getenv(key, "").strip()
+        if value:
+            return value.replace(":", "").replace("+", "").replace(" ", "_")
+    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
 
 def run_dbt(
@@ -154,10 +180,15 @@ def main() -> None:
 
     # Resolve paths (Env vars take precedence over config)
     airflow_home = os.getenv("AIRFLOW_HOME", "/opt/airflow")
-    bronze_path_raw = os.getenv("BRONZE_BASE_PATH", "samples/bronze")
-    silver_path_raw = os.getenv("SILVER_BASE_PATH", "data/silver/base")
-    quarantine_path_raw = os.getenv(
-        "SILVER_QUARANTINE_PATH", f"{silver_path_raw}/quarantine"
+    spec = load_spec_safe()
+    bronze_path_raw = os.getenv("BRONZE_BASE_PATH") or (
+        spec.bronze.base_path if spec else "samples/bronze"
+    )
+    silver_path_raw = os.getenv("SILVER_BASE_PATH") or (
+        spec.silver_base.base_path if spec else "data/silver/base"
+    )
+    quarantine_path_raw = os.getenv("SILVER_QUARANTINE_PATH") or (
+        spec.silver_base.quarantine_path if spec else f"{silver_path_raw}/quarantine"
     )
 
     bronze_path_effective = bronze_path_raw
@@ -231,8 +262,46 @@ def main() -> None:
             export_base = silver_path_raw
 
         if export_base and is_gcs_path(export_base):
-            logger.info(f"Exporting local silver to GCS: {export_base}")
-            gcloud_rsync(str(silver_path), export_base, delete=True)
+            publish_mode = os.getenv("SILVER_PUBLISH_MODE", "direct").lower()
+            if publish_mode == "staging":
+                run_id = resolve_run_id()
+                staging_base = f"{export_base.rstrip('/')}/_staging/{run_id}"
+                logger.info(
+                    "Exporting local silver to staging: %s",
+                    staging_base,
+                )
+                gcloud_rsync(str(silver_path), staging_base, delete=True)
+                table_names = (
+                    [table.name for table in spec.silver_base.tables]
+                    if spec
+                    else STANDARD_TABLES
+                )
+                manifest = {
+                    "run_id": run_id,
+                    "staging_path": staging_base,
+                    "tables": table_names,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                manifest_file = Path("/tmp") / "silver_manifest.json"
+                manifest_file.write_text(json.dumps(manifest, indent=2))
+                gcloud_copy_file(
+                    manifest_file,
+                    f"{staging_base}/_MANIFEST.json",
+                )
+                pointer = {
+                    "run_id": run_id,
+                    "staging_path": staging_base,
+                    "published_at": datetime.now(timezone.utc).isoformat(),
+                }
+                pointer_file = Path("/tmp") / "silver_latest.json"
+                pointer_file.write_text(json.dumps(pointer, indent=2))
+                gcloud_copy_file(
+                    pointer_file,
+                    f"{export_base.rstrip('/')}/_latest.json",
+                )
+            else:
+                logger.info("Exporting local silver to GCS: %s", export_base)
+                gcloud_rsync(str(silver_path), export_base, delete=True)
 
 
 if __name__ == "__main__":

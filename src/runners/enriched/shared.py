@@ -12,6 +12,7 @@ import polars as pl
 import pyarrow.parquet as pq
 
 from src.settings import PipelineConfig, load_settings
+from src.specs import load_spec_safe
 from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
 
 logger = logging.getLogger(__name__)
@@ -86,15 +87,26 @@ def enriched_runner(
 
 def get_table_partitions() -> dict[str, str | None]:
     """Get bronze table partitions (deprecated for enriched runners)."""
+    spec = load_spec_safe()
+    if spec:
+        return {table.name: table.partition_key for table in spec.bronze.tables}
     return load_settings().pipeline.table_partitions
 
 
 def get_silver_table_partitions() -> dict[str, str | None]:
     """Get silver table partitions for enriched runners."""
+    spec = load_spec_safe()
+    if spec:
+        return {table.name: table.partition_key for table in spec.silver_base.tables}
     return load_settings().pipeline.silver_table_partitions
 
 
 def get_enriched_partitions() -> dict[str, str]:
+    spec = load_spec_safe()
+    if spec:
+        return {
+            table.name: table.partition_key for table in spec.silver_enriched.tables
+        }
     return load_settings().pipeline.enriched_partitions
 
 
@@ -178,9 +190,7 @@ def read_partitioned(
         demo_mode = os.getenv("DEMO_MODE", "").lower() in {"1", "true", "yes", "on"}
         if demo_mode and table == "product_catalog" and available:
             latest = sorted(available)[-1]
-            paths = [
-                f"{base_path}/{table}/{partition_key}={latest}/**/*.parquet"
-            ]
+            paths = [f"{base_path}/{table}/{partition_key}={latest}/**/*.parquet"]
             schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
             logger.warning(
                 "Demo mode: falling back to latest %s partition %s for %s.",

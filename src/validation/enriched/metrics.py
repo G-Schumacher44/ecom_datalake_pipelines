@@ -80,6 +80,7 @@ def validate_table(
     enriched_path: Path,
     ingest_dt: str | None,
     min_rows: int | None,
+    partition_key: str,
     pipeline_env: str,
     settings: PipelineConfig,
     lookback_days: int,
@@ -88,7 +89,6 @@ def validate_table(
     notes: list[str] = []
     status = "PASS"
     config = settings.validation
-    partition_key = settings.enriched_partitions.get(table, "ingest_dt")
     ratio_epsilon = settings.enriched_ratio_epsilon
 
     schema_snapshot: dict[str, str] = {}

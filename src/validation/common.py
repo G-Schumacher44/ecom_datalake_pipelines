@@ -12,6 +12,7 @@ from pyarrow.lib import ArrowInvalid, ArrowTypeError
 
 from src.observability import get_logger
 from src.settings import load_settings
+from src.specs import load_spec_safe
 
 logger = get_logger(__name__)
 
@@ -165,29 +166,41 @@ def resolve_layer_paths(
     """Unified path resolution for validation scripts."""
     settings = load_settings(config_path)
     pl = settings.pipeline
+    spec = load_spec_safe()
 
-    def _resolve_raw(over, env_var, bucket, prefix) -> str:
+    def _resolve_raw(over, env_var, bucket, prefix, spec_default: str | None) -> str:
         if over:
             return over
         env_val = os.getenv(env_var)
         if env_val:
             return env_val
+        if spec_default:
+            return spec_default
         return settings.resolve_path(bucket, prefix)
 
     def _maybe_path(value: str) -> Path | str:
         return value if is_gcs_path(value) else Path(value)
 
     bronze_raw = _resolve_raw(
-        bronze_over, "BRONZE_BASE_PATH", pl.bronze_bucket, pl.bronze_prefix
+        bronze_over,
+        "BRONZE_BASE_PATH",
+        pl.bronze_bucket,
+        pl.bronze_prefix,
+        spec.bronze.base_path if spec else None,
     )
     silver_raw = _resolve_raw(
-        silver_over, "SILVER_BASE_PATH", pl.silver_bucket, pl.silver_base_prefix
+        silver_over,
+        "SILVER_BASE_PATH",
+        pl.silver_bucket,
+        pl.silver_base_prefix,
+        spec.silver_base.base_path if spec else None,
     )
     enriched_raw = _resolve_raw(
         enriched_over,
         "SILVER_ENRICHED_PATH",
         pl.silver_bucket,
         pl.silver_enriched_prefix,
+        spec.silver_enriched.base_path if spec else None,
     )
 
     quarantine_raw = os.getenv("SILVER_QUARANTINE_PATH")
