@@ -134,6 +134,8 @@ BRONZE_BASE_PATH=samples/bronze
 SILVER_BASE_PATH=data/silver/base
 SILVER_QUARANTINE_PATH=data/silver/base/quarantine
 SILVER_ENRICHED_PATH=data/silver/enriched
+SILVER_DIMS_PATH=data/silver/dims
+SILVER_DIMS_LOCAL_PATH=/opt/airflow/data/silver/dims
 SILVER_GCS_TARGET=gs://your-silver-bucket/silver/base
 SILVER_ENRICHED_GCS_TARGET=gs://your-silver-bucket/silver/enriched
 ```
@@ -154,6 +156,8 @@ BRONZE_BASE_PATH=samples/bronze
 SILVER_BASE_PATH=data/silver/base
 SILVER_QUARANTINE_PATH=data/silver/base/quarantine
 SILVER_ENRICHED_PATH=data/silver/enriched
+SILVER_DIMS_PATH=data/silver/dims
+SILVER_DIMS_LOCAL_PATH=/opt/airflow/data/silver/dims
 SILVER_GCS_TARGET=gs://bucket/silver/base
 SILVER_ENRICHED_GCS_TARGET=gs://bucket/silver/enriched
 ```
