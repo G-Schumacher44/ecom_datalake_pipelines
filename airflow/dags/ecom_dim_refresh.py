@@ -19,6 +19,7 @@ from common import (
     get_dim_table_names,
     resolve_dims_base_path,
 )
+from src.runners.dims_snapshot import snapshot_dims
 
 from airflow import DAG
 
@@ -146,6 +147,24 @@ with DAG(
             + (" --enforce-quality" if PIPELINE_ENV == "prod" else "")
         ),
     )
+    validate_dims_snapshot = BashOperator(
+        task_id="validate_dims_snapshot",
+        env=COMMON_ENV,
+        bash_command=(
+            f"cd {AIRFLOW_HOME} && python -m src.validation.dims_snapshot "
+            f"--run-date {{{{ ds }}}} "
+            f"--output-report docs/validation_reports/DIMS_SNAPSHOT_{{{{ run_id | replace(':', '') }}}}.md "
+            + (" --enforce-quality" if PIPELINE_ENV == "prod" else "")
+        ),
+    )
+    snapshot_dims_task = PythonOperator(
+        task_id="snapshot_dims",
+        python_callable=snapshot_dims,
+        op_kwargs={
+            "run_date": "{{ ds }}",
+            "silver_base_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}",
+        },
+    )
     publish_dims_latest_task = PythonOperator(
         task_id="publish_dims_latest",
         python_callable=publish_dims_latest,
@@ -157,5 +176,7 @@ with DAG(
         >> validate_bronze_dims
         >> refresh_dims_group
         >> validate_dim_quality
+        >> snapshot_dims_task
+        >> validate_dims_snapshot
         >> publish_dims_latest_task
     )
