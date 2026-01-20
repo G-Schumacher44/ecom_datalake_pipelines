@@ -1,7 +1,7 @@
 {{ config(
     materialized='external',
     location=var('silver_base_path') ~ '/quarantine/order_items',
-    options={'format': 'parquet', 'partition_by': 'order_dt', 'overwrite': true}
+    options={'format': 'parquet', 'partition_by': 'ingestion_dt', 'overwrite': true}
 ) }}
 
 select
@@ -15,6 +15,7 @@ select
     cost_price,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     order_dt,

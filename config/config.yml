@@ -115,6 +115,20 @@ pipeline:
     returns: "ingest_dt"
     return_items: "ingest_dt"
     product_catalog: "category"
+
+  # Partition Metadata (Silver Layer)
+  # NOTE: Silver tables use ingestion_dt for consistent arrival-time partitioning
+  # This matches Bronze partitioning strategy for easy backfills
+  silver_table_partitions:
+    orders: "ingestion_dt"
+    order_items: "ingestion_dt"
+    cart_items: "ingestion_dt"
+    shopping_carts: "ingestion_dt"
+    customers: "signup_dt"
+    returns: "ingestion_dt"
+    return_items: "ingestion_dt"
+    product_catalog: "ingestion_dt"
+
   enriched_partitions:
     int_attributed_purchases: "order_dt"
     int_cart_attribution: "cart_dt"

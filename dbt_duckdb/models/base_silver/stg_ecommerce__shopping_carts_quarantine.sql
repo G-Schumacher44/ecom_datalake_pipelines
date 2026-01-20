@@ -1,7 +1,7 @@
 {{ config(
     materialized='external',
     location=var('silver_base_path') ~ '/quarantine/shopping_carts',
-    options={'format': 'parquet', 'partition_by': 'created_dt', 'overwrite': true}
+    options={'format': 'parquet', 'partition_by': 'ingestion_dt', 'overwrite': true}
 ) }}
 
 select
@@ -13,6 +13,7 @@ select
     status,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     created_dt,

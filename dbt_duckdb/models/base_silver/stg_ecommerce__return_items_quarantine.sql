@@ -1,7 +1,7 @@
 {{ config(
     materialized='external',
     location=var('silver_base_path') ~ '/quarantine/return_items',
-    options={'format': 'parquet', 'partition_by': 'return_dt', 'overwrite': true}
+    options={'format': 'parquet', 'partition_by': 'ingestion_dt', 'overwrite': true}
 ) }}
 
 select
@@ -17,6 +17,7 @@ select
     refunded_amount,
     batch_id,
     ingestion_ts,
+    ingestion_dt,
     event_id,
     source_file,
     return_dt,
