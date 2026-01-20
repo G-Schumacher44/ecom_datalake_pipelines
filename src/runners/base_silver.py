@@ -185,7 +185,9 @@ def main() -> None:
                 )
         else:
             logger.info(
-                f"Syncing bronze from GCS to local: {bronze_path_raw} -> {local_bronze_root}"
+                "Syncing bronze from GCS to local: %s -> %s",
+                bronze_path_raw,
+                local_bronze_root,
             )
             gcloud_rsync(bronze_path_raw, local_bronze_root, delete=True)
         bronze_path_effective = local_bronze_root

@@ -11,6 +11,10 @@ from typing import Any
 
 from src.observability import get_logger
 from src.observability.metrics import write_silver_quality_metric
+from src.runners.enriched.shared import (
+    get_silver_table_partitions,
+    get_table_partitions,
+)
 from src.settings import load_settings
 from src.validation.common import (
     get_overall_status,
@@ -19,7 +23,6 @@ from src.validation.common import (
     resolve_layer_paths,
 )
 from src.validation.silver.data import compute_key_cardinality, list_partitions_by_key
-from src.runners.enriched.shared import get_silver_table_partitions, get_table_partitions
 from src.validation.silver.metrics import compute_fk_mismatch_summary, validate_table
 from src.validation.silver.models import SilverQualityReport
 from src.validation.silver.report import build_profile_report, generate_markdown_report
@@ -122,8 +125,7 @@ def build_partition_values(partition_date: str, lookback_days: int) -> list[str]
     base_date = date.fromisoformat(partition_date)
     days = max(lookback_days, 0)
     return [
-        (base_date - timedelta(days=offset)).isoformat()
-        for offset in range(days + 1)
+        (base_date - timedelta(days=offset)).isoformat() for offset in range(days + 1)
     ]
 
 
@@ -305,7 +307,9 @@ def main() -> int:
         return_items_cardinality = compute_key_cardinality(
             silver_path / "return_items",
             "return_id",
-            partition_key=get_silver_table_partitions().get("return_items", "ingest_dt"),
+            partition_key=get_silver_table_partitions().get(
+                "return_items", "ingest_dt"
+            ),
             partitions=partition_values,
         )
         if (

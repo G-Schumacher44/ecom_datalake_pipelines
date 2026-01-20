@@ -71,7 +71,7 @@ with DAG(
         bash_command=(
             f"cd {AIRFLOW_HOME} && "
             f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
-            f"&& export BRONZE_SYNC_TABLES=\"customers\" "
+            f'&& export BRONZE_SYNC_TABLES="customers" '
             f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
             f"&& export DBT_DUCKDB_PATH=\"/tmp/dbt_duckdb/ecom_customers_{{{{ run_id | replace(':', '') }}}}.duckdb\" "
             f"&& python -m src.runners.base_silver "
@@ -86,7 +86,7 @@ with DAG(
         bash_command=(
             f"cd {AIRFLOW_HOME} && "
             f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
-            f"&& export BRONZE_SYNC_TABLES=\"product_catalog\" "
+            f'&& export BRONZE_SYNC_TABLES="product_catalog" '
             f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
             f"&& export DBT_DUCKDB_PATH=\"/tmp/dbt_duckdb/ecom_product_catalog_{{{{ run_id | replace(':', '') }}}}.duckdb\" "
             f"&& python -m src.runners.base_silver "
@@ -102,14 +102,14 @@ with DAG(
             f"cd {AIRFLOW_HOME} && "
             f"BRONZE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
             f"SILVER_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
-            f'&& if [[ \"$BRONZE_PATH\" == gs://* ]]; then '
-            f'BRONZE_PATH=\"${{BRONZE_LOCAL_BASE_PATH:-{AIRFLOW_HOME}/data/bronze}}\"; fi '
-            f'&& if [[ \"$SILVER_PATH\" == gs://* ]]; then '
-            f'SILVER_PATH=\"${{SILVER_LOCAL_BASE_PATH:-{AIRFLOW_HOME}/data/silver/base}}\"; fi '
+            f'&& if [[ "$BRONZE_PATH" == gs://* ]]; then '
+            f'BRONZE_PATH="${{BRONZE_LOCAL_BASE_PATH:-{AIRFLOW_HOME}/data/bronze}}"; fi '
+            f'&& if [[ "$SILVER_PATH" == gs://* ]]; then '
+            f'SILVER_PATH="${{SILVER_LOCAL_BASE_PATH:-{AIRFLOW_HOME}/data/silver/base}}"; fi '
             f"&& python -m src.validation.silver "
-            f"--bronze-path \"$BRONZE_PATH\" "
-            f"--silver-path \"$SILVER_PATH\" "
-            f"--quarantine-path \"$SILVER_PATH/quarantine\" "
+            f'--bronze-path "$BRONZE_PATH" '
+            f'--silver-path "$SILVER_PATH" '
+            f'--quarantine-path "$SILVER_PATH/quarantine" '
             f"--tables customers,product_catalog "
             f"--run-id {{{{ run_id }}}} "
             f"--output-report docs/validation_reports/SILVER_DIMS_{{{{ run_id | replace(':', '') }}}}.md "
