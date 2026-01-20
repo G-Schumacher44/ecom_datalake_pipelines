@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
+import subprocess
 
 import pendulum
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator, ShortCircuitOperator
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import BranchPythonOperator, PythonOperator, ShortCircuitOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.utils.task_group import TaskGroup
@@ -19,6 +22,7 @@ from common import (
     get_enriched_table_names,
     get_silver_base_table_names,
     make_runner_callable,
+    resolve_dims_base_path,
     resolve_bool,
 )
 
@@ -61,6 +65,53 @@ def load_config_to_xcom(**kwargs):
         "env": p_env,
         "bucket": pl.silver_bucket,
     }
+
+
+def _read_dims_latest_payload(path: str) -> dict | None:
+    if path.startswith("gs://"):
+        result = subprocess.run(
+            ["gcloud", "storage", "cat", path],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return None
+        payload = result.stdout
+    else:
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                payload = handle.read()
+        except OSError:
+            return None
+
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+
+    return data if isinstance(data, dict) else None
+
+
+def _extract_dims_snapshot_date(payload: dict) -> str | None:
+    for key in ("run_date", "snapshot_dt", "as_of_dt", "ds"):
+        value = payload.get(key)
+        if value:
+            return str(value)
+    return None
+
+
+def choose_dim_refresh_task(**context) -> str:
+    latest_base = resolve_dims_base_path()
+    if not latest_base:
+        return "trigger_dim_refresh"
+
+    latest_path = f"{latest_base.rstrip('/')}/_latest.json"
+    payload = _read_dims_latest_payload(latest_path)
+    latest_date = _extract_dims_snapshot_date(payload or {})
+    if latest_date == context["ds"]:
+        return "skip_dim_refresh"
+    return "trigger_dim_refresh"
 
 
 _run_cart_attribution = make_runner_callable(run_cart_attribution)
@@ -129,6 +180,15 @@ with DAG(
         poke_interval=30,
         allowed_states=["success"],
         failed_states=["failed"],
+    )
+    skip_dim_refresh = EmptyOperator(task_id="skip_dim_refresh")
+    dims_refresh_done = EmptyOperator(
+        task_id="dims_refresh_done",
+        trigger_rule="none_failed_min_one_success",
+    )
+    dims_freshness_gate = BranchPythonOperator(
+        task_id="dims_freshness_gate",
+        python_callable=choose_dim_refresh_task,
     )
 
     # 2. Phase 0: Bronze Quality
@@ -335,7 +395,9 @@ with DAG(
     # Flow
     (
         setup_config
-        >> trigger_dim_refresh
+        >> dims_freshness_gate
+        >> [trigger_dim_refresh, skip_dim_refresh]
+        >> dims_refresh_done
         >> validate_bronze_quality
         >> base_silver_group
         >> validate_silver_quality
