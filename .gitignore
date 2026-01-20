@@ -35,8 +35,8 @@ data/metrics/
 data/logs/
 data/silver/
 
-# BUT DO commit validation reports (self-documenting)
-!docs/validation_reports/*.md
+# Validation reports (ephemeral during testing)
+docs/validation_reports/*.md
 
 # dbt
 dbt_packages/
@@ -52,3 +52,4 @@ airflow/plugins/__pycache__/
 # IDE
 .vscode/.ropeproject/
 .DS_Store
+.claude/*
