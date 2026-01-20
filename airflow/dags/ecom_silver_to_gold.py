@@ -14,6 +14,10 @@ from common import (
     PIPELINE_ENV,
     SettingsConfig,
     get_retry_config,
+    get_dim_specs,
+    get_dim_table_names,
+    get_enriched_table_names,
+    get_silver_base_table_names,
     make_runner_callable,
     resolve_bool,
 )
@@ -81,6 +85,35 @@ with DAG(
     default_args=get_retry_config(),
     tags=["ecom", "silver", "gold"],
 ) as dag:
+    dim_specs = get_dim_specs()
+    dim_table_names = set(get_dim_table_names())
+    silver_base_tables = get_silver_base_table_names()
+    silver_quality_tables = [
+        table for table in silver_base_tables if table not in dim_table_names
+    ]
+    if not silver_quality_tables:
+        silver_quality_tables = silver_base_tables
+    silver_quality_csv = ",".join(silver_quality_tables)
+    dim_excludes = []
+    for dim in dim_specs:
+        model = dim["dbt_model"]
+        dim_excludes.extend([model, f"{model}_quarantine"])
+    dim_exclude_args = " ".join(dim_excludes)
+    dim_exclude_clause = f"--exclude {dim_exclude_args}" if dim_exclude_args else ""
+
+    enriched_table_names = get_enriched_table_names()
+    enriched_callable_map = {
+        "int_attributed_purchases": _run_cart_attribution,
+        "int_cart_attribution": _run_cart_attribution_summary,
+        "int_inventory_risk": _run_inventory_risk,
+        "int_product_performance": _run_product_performance,
+        "int_customer_retention_signals": _run_customer_retention,
+        "int_sales_velocity": _run_sales_velocity,
+        "int_regional_financials": _run_regional_financials,
+        "int_customer_lifetime_value": _run_customer_lifetime_value,
+        "int_daily_business_metrics": _run_daily_business_metrics,
+        "int_shipping_economics": _run_shipping_economics,
+    }
 
     # 1. Setup Config Task (Push paths to XCom)
     setup_config = PythonOperator(
@@ -126,10 +159,7 @@ with DAG(
             f"&& python -m src.runners.base_silver "
             f"--vars '{{\"run_date\": \"{{{{ ds }}}}\", \"lookback_days\": {os.getenv('BASE_SILVER_LOOKBACK_DAYS', '0')}}}' "
             "--select path:models/base_silver "
-            "--exclude stg_ecommerce__customers "
-            "stg_ecommerce__customers_quarantine "
-            "stg_ecommerce__product_catalog "
-            "stg_ecommerce__product_catalog_quarantine"
+            f"{dim_exclude_clause}"
         ),
     )
 
@@ -152,7 +182,7 @@ with DAG(
             f"--partition-date {{{{ ds }}}} "
             f"--lookback-days {os.getenv('SILVER_VALIDATION_LOOKBACK_DAYS', '0')} "
             f"--run-id {{{{ run_id }}}} "
-            f"--tables orders,order_items,shopping_carts,cart_items,returns,return_items "
+            f"--tables {silver_quality_csv} "
             f"--output-report docs/validation_reports/SILVER_QUALITY_{{{{ run_id | replace(':', '') }}}}.md "
             + (" --enforce-quality" if PIPELINE_ENV == "prod" else "")
         ),
@@ -176,56 +206,15 @@ with DAG(
 
     # 6. Phase 2: Enriched Silver
     with TaskGroup("enriched_silver") as enriched_silver_group:
-        PythonOperator(
-            task_id="int_attributed_purchases",
-            python_callable=_run_cart_attribution,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_cart_attribution",
-            python_callable=_run_cart_attribution_summary,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_inventory_risk",
-            python_callable=_run_inventory_risk,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_product_performance",
-            python_callable=_run_product_performance,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_customer_retention_signals",
-            python_callable=_run_customer_retention,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_sales_velocity",
-            python_callable=_run_sales_velocity,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_regional_financials",
-            python_callable=_run_regional_financials,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_customer_lifetime_value",
-            python_callable=_run_customer_lifetime_value,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_daily_business_metrics",
-            python_callable=_run_daily_business_metrics,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
-        PythonOperator(
-            task_id="int_shipping_economics",
-            python_callable=_run_shipping_economics,
-            op_kwargs={"ingest_dt": "{{ ds }}"},
-        )
+        for table in enriched_table_names:
+            runner = enriched_callable_map.get(table)
+            if not runner:
+                continue
+            PythonOperator(
+                task_id=table,
+                python_callable=runner,
+                op_kwargs={"ingest_dt": "{{ ds }}"},
+            )
 
     # 7. Validate Enriched
     validate_enriched_quality = BashOperator(
