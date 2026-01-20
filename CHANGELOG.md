@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Align base silver partitions and ingestion fields; update product catalog snapshot partitioning.
+- Improve partition-aware validation for silver and enriched layers; add tests.
+- Adjust Airflow sync behavior and ignore local artifacts in version control.
 - Spot checks refreshed 2026-01-13T17:16:06Z scope=all spot_hash=e2546433be9a7524afdb3e9f0c748e3d3a7c67d54b134fbb16ddc13c72e600c8 profile_hash=7a45617d90ee8cdec879b2874db9896853bd5f3eaadf06fc0fb9490ffc019c56
 - Profile report refreshed 2026-01-12T19:47:22Z months=2020-03,2023-01,2025-10 hash=7a45617d90ee8cdec879b2874db9896853bd5f3eaadf06fc0fb9490ffc019c56
 - Profile report refreshed 2026-01-11T17:17:15Z scope=all hash=d3f5b16e97cb29af3d0bdb09396ae84be4bb0d494038d24425e90beec89d7b7c
