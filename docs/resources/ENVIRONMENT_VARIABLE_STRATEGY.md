@@ -125,6 +125,7 @@ tolerance = settings.pipeline.attribution_tolerance_hours
 # Gate optional stages without changing code
 GOLD_PIPELINE_ENABLED=true
 BQ_LOAD_ENABLED=true
+SILVER_PUBLISH_MODE=direct|staging
 ```
 
 ### Path Overrides (Per-Dev / Dev)
@@ -143,6 +144,7 @@ SILVER_ENRICHED_GCS_TARGET=gs://your-silver-bucket/silver/enriched
 ```bash
 PIPELINE_ENV=local|dev|prod
 ECOM_CONFIG_PATH=/opt/airflow/config/config.yml
+ECOM_SPEC_PATH=/opt/airflow/config/specs
 BASE_SILVER_LOOKBACK_DAYS=0
 ```
 

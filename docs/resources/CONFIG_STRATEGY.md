@@ -160,6 +160,7 @@ Key overrides:
 - `PIPELINE_ENV` → Overrides `pipeline.environment` (local, dev, prod)
 - `GOOGLE_CLOUD_PROJECT` → Overrides `pipeline.project_id`
 - `GCS_BUCKET` → Bronze data bucket for GCS operations
+- `ECOM_SPEC_PATH` → Overrides the spec directory or YAML file (default: `config/specs`)
 
 #### Observability
 
@@ -198,6 +199,12 @@ Key overrides:
 - `BQ_LOAD_ENABLED` → Enable Enriched Silver BigQuery loads (default: `false`)
 - `BRONZE_QA_REQUIRED` → Require Bronze QA phase (default: `true`)
 - `BRONZE_QA_FAIL` → Fail pipeline on Bronze issues (default: `false`)
+- `SILVER_PUBLISH_MODE` → Export mode for Silver (direct or staging) (default: `direct`)
+
+When `SILVER_PUBLISH_MODE=staging`, exports go to:
+- `gs://.../silver/base/_staging/<run_id>/...`
+- `_MANIFEST.json` written under the staging prefix
+- `_latest.json` written at the silver base root to point to the latest staging run
 - `STRICT_FK` → Enforce FK validation in Silver (default: `false`)
 
 ---
