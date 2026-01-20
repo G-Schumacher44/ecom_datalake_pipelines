@@ -4,6 +4,7 @@ import os
 from datetime import timedelta
 
 from src.settings import RetryConfig, load_settings
+from src.specs import load_spec_safe
 
 # --- Configuration Helper (Lazy Loading) ---
 
@@ -175,3 +176,34 @@ def get_retry_config(environment: str | None = None) -> dict:
         "retry_exponential_backoff": retry_cfg.retry_exponential_backoff,
         "max_retry_delay": timedelta(minutes=retry_cfg.max_retry_delay_minutes),
     }
+
+
+def get_dim_specs() -> list[dict[str, str]]:
+    """Return dim table specs (name + dbt_model) from spec or defaults."""
+    spec = load_spec_safe()
+    if spec:
+        return [{"name": t.name, "dbt_model": t.dbt_model} for t in spec.dims.tables]
+    return [
+        {"name": "customers", "dbt_model": "stg_ecommerce__customers"},
+        {"name": "product_catalog", "dbt_model": "stg_ecommerce__product_catalog"},
+    ]
+
+
+def get_dim_table_names() -> list[str]:
+    return [t["name"] for t in get_dim_specs()]
+
+
+def get_silver_base_table_names() -> list[str]:
+    spec = load_spec_safe()
+    if spec:
+        return [t.name for t in spec.silver_base.tables]
+    config = SettingsConfig()
+    return list(config.pipeline.sla_thresholds.keys())
+
+
+def get_enriched_table_names() -> list[str]:
+    spec = load_spec_safe()
+    if spec:
+        return [t.name for t in spec.silver_enriched.tables]
+    config = SettingsConfig()
+    return list(config.pipeline.enriched_tables)
