@@ -79,6 +79,8 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
     )
 
     logger.info("Building dims snapshot", run_date=run_date)
+    pipeline_env = os.getenv("PIPELINE_ENV", "local").lower()
+
     for table in dims_tables:
         df = _load_table(silver_base_path, table)
         if table == "customers":
@@ -91,14 +93,31 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                 & (pl.col("signup_date") <= run_dt)
             )
         elif table == "product_catalog":
-            df = df.with_columns(
+            base_df = df.with_columns(
                 pl.col("ingestion_dt").cast(pl.Date, strict=False).alias("ingestion_dt"),
+            )
+            df = base_df.with_columns(
                 pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"),
             )
             df = df.filter(
                 pl.col("ingestion_dt").is_not_null()
                 & (pl.col("ingestion_dt") <= run_dt)
             )
+            if df.is_empty() and pipeline_env in {"local", "dev"}:
+                max_dt = (
+                    base_df.select(pl.col("ingestion_dt").max()).item()
+                    if "ingestion_dt" in base_df.columns
+                    else None
+                )
+                if max_dt:
+                    logger.warning(
+                        "Product catalog empty for run_date; using latest available",
+                        run_date=run_date,
+                        fallback_date=str(max_dt),
+                    )
+                    df = base_df.filter(pl.col("ingestion_dt") == max_dt).with_columns(
+                        pl.lit(run_dt).cast(pl.Date).alias("as_of_dt")
+                    )
         else:
             df = df.with_columns(pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"))
         _write_snapshot(df, dims_local_path, table, run_date)
