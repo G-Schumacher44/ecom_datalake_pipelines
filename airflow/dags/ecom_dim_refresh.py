@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+from datetime import datetime, timezone
+
 import pendulum
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
@@ -12,6 +17,7 @@ from common import (
     get_retry_config,
     get_dim_specs,
     get_dim_table_names,
+    resolve_dims_base_path,
 )
 
 from airflow import DAG
@@ -34,6 +40,34 @@ def load_config_to_xcom(**kwargs):
         ),
         "env": p_env,
     }
+
+
+def publish_dims_latest(**context) -> None:
+    """Persist dims freshness pointer for the current run_date."""
+    latest_base = resolve_dims_base_path()
+    if not latest_base:
+        return
+
+    payload = {
+        "run_date": context["ds"],
+        "run_id": context["run_id"],
+        "published_at": datetime.now(timezone.utc).isoformat(),
+    }
+    latest_path = f"{latest_base.rstrip('/')}/_latest.json"
+
+    if latest_base.startswith("gs://"):
+        tmp_file = "/tmp/dims_latest.json"
+        with open(tmp_file, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+        subprocess.run(
+            ["gcloud", "storage", "cp", tmp_file, latest_path],
+            check=True,
+        )
+        return
+
+    os.makedirs(latest_base, exist_ok=True)
+    with open(latest_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
 
 
 # --- DAG Definition ---
@@ -112,6 +146,10 @@ with DAG(
             + (" --enforce-quality" if PIPELINE_ENV == "prod" else "")
         ),
     )
+    publish_dims_latest_task = PythonOperator(
+        task_id="publish_dims_latest",
+        python_callable=publish_dims_latest,
+    )
 
     # Flow
     (
@@ -119,4 +157,5 @@ with DAG(
         >> validate_bronze_dims
         >> refresh_dims_group
         >> validate_dim_quality
+        >> publish_dims_latest_task
     )
