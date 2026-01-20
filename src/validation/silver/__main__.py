@@ -16,6 +16,7 @@ from src.runners.enriched.shared import (
     get_table_partitions,
 )
 from src.settings import load_settings
+from src.specs import load_spec_safe
 from src.validation.common import (
     get_overall_status,
     handle_exit,
@@ -165,11 +166,20 @@ def main() -> int:
             logger.error("Invalid partition-date; expected YYYY-MM-DD")
             return 1
 
+    spec = load_spec_safe()
+    if spec:
+        for table in spec.silver_base.tables:
+            if table.quality and table.quality.sla is not None:
+                sla_thresholds[table.name] = table.quality.sla
+        available_tables = {table.name for table in spec.silver_base.tables}
+    else:
+        available_tables = set(sla_thresholds.keys())
+
     if args.tables:
         requested_tables = [t.strip() for t in args.tables.split(",") if t.strip()]
-        tables = [t for t in requested_tables if t in sla_thresholds]
+        tables = [t for t in requested_tables if t in available_tables]
     else:
-        tables = list(sla_thresholds.keys())
+        tables = sorted(available_tables)
 
     table_metrics = []
     for table in tables:

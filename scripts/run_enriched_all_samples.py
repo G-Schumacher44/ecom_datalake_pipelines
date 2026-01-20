@@ -12,9 +12,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.runners import enriched  # noqa: E402
+from src.specs import load_spec_safe  # noqa: E402
 from src.validation.enriched import __main__ as enriched_quality  # noqa: E402
 
-PARTITION_MAP = {
+DEFAULT_PARTITION_MAP = {
     "orders": "order_dt",
     "order_items": "order_dt",
     "cart_items": "added_dt",
@@ -37,9 +38,16 @@ def list_dates(base_path: Path, table: str, key: str) -> set[str]:
 
 
 def resolve_valid_dates(base_path: Path) -> list[str]:
+    spec = load_spec_safe()
+    if spec:
+        partition_map = {
+            table.name: table.partition_key for table in spec.silver_base.tables
+        }
+    else:
+        partition_map = DEFAULT_PARTITION_MAP
     date_sets = [
         list_dates(base_path, table, key)
-        for table, key in PARTITION_MAP.items()
+        for table, key in partition_map.items()
     ]
     if not date_sets:
         return []

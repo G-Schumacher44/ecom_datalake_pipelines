@@ -11,6 +11,7 @@ from pathlib import Path
 from src.observability import get_logger
 from src.observability.metrics import write_enriched_quality_metric
 from src.settings import load_settings
+from src.specs import load_spec_safe
 from src.validation.common import (
     handle_exit,
     is_gcs_path,
@@ -95,16 +96,30 @@ def main() -> int:
 
     enriched_path = Path(enriched_path)
 
-    tables = settings.pipeline.enriched_tables or DEFAULT_ENRICHED_TABLES
-    min_rows_map = settings.pipeline.enriched_min_table_rows or {}
+    spec = load_spec_safe()
+    if spec:
+        tables = [table.name for table in spec.silver_enriched.tables]
+        min_rows_map = {
+            table.name: table.min_rows
+            for table in spec.silver_enriched.tables
+            if table.min_rows is not None
+        }
+        partition_map = {
+            table.name: table.partition_key for table in spec.silver_enriched.tables
+        }
+    else:
+        tables = settings.pipeline.enriched_tables or DEFAULT_ENRICHED_TABLES
+        min_rows_map = settings.pipeline.enriched_min_table_rows or {}
+        partition_map = settings.pipeline.enriched_partitions
 
     logger.info(f"Starting Enriched Silver validation (run_id={run_id})")
 
-    lookback_days = (
-        args.lookback_days
-        if args.lookback_days is not None
-        else settings.pipeline.enriched_lookback_days
-    )
+    if args.lookback_days is not None:
+        lookback_days = args.lookback_days
+    elif spec:
+        lookback_days = spec.silver_enriched.lookback_days
+    else:
+        lookback_days = settings.pipeline.enriched_lookback_days
 
     table_metrics = [
         validate_table(
@@ -112,6 +127,9 @@ def main() -> int:
             enriched_path=enriched_path,
             ingest_dt=args.ingest_dt,
             min_rows=min_rows_map.get(table),
+            partition_key=partition_map.get(
+                table, settings.pipeline.enriched_partitions.get(table, "ingest_dt")
+            ),
             pipeline_env=pipeline_env,
             settings=settings.pipeline,
             lookback_days=lookback_days,
@@ -175,17 +193,11 @@ def main() -> int:
         for metric in failing:
             issues = []
             if metric.semantic_issues:
-                issues.append(
-                    f"semantic={'; '.join(metric.semantic_issues)}"
-                )
+                issues.append(f"semantic={'; '.join(metric.semantic_issues)}")
             if metric.sanity_issues:
-                issues.append(
-                    f"sanity={'; '.join(metric.sanity_issues)}"
-                )
+                issues.append(f"sanity={'; '.join(metric.sanity_issues)}")
             if metric.notes:
-                issues.append(
-                    f"notes={'; '.join(metric.notes)}"
-                )
+                issues.append(f"notes={'; '.join(metric.notes)}")
             if not issues:
                 issues.append("no_issue_details")
             details.append(f"{metric.table} ({' | '.join(issues)})")

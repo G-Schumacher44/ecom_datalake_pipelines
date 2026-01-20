@@ -23,7 +23,8 @@ from typing import Any
 
 from src.observability import get_logger
 from src.observability.metrics import write_data_quality_metric
-from src.runners.enriched.shared import get_table_partitions
+from src.settings import load_settings
+from src.specs import load_spec_safe
 from src.validation.common import (
     ValidationStatus,
     handle_exit,
@@ -34,9 +35,16 @@ from src.validation.common import (
 logger = get_logger(__name__)
 
 
+def get_bronze_partitions() -> dict[str, str | None]:
+    spec = load_spec_safe()
+    if spec:
+        return {table.name: table.partition_key for table in spec.bronze.tables}
+    return load_settings().pipeline.table_partitions
+
+
 def get_partition_glob(table: str) -> str:
     """Get the partition glob for a table from centralized config."""
-    key = get_table_partitions().get(table, "ingest_dt")
+    key = get_bronze_partitions().get(table, "ingest_dt")
     return f"{key}=*"
 
 
@@ -146,7 +154,7 @@ def list_partitions(
     if is_gcs_path(root):
         import fsspec
 
-        key = get_table_partitions().get(table, "ingest_dt")
+        key = get_bronze_partitions().get(table, "ingest_dt")
         fs = fsspec.filesystem("gcs")
         if partition_values:
             prefixes = []
@@ -175,7 +183,7 @@ def list_partitions(
 
     if partition_values:
         paths = []
-        key = get_table_partitions().get(table, "ingest_dt")
+        key = get_bronze_partitions().get(table, "ingest_dt")
         for value in partition_values:
             partition_path = Path(root, table, f"{key}={value}")
             if partition_path.is_dir():
@@ -341,7 +349,7 @@ def main() -> int:
 
     logger.info(f"Starting Bronze quality validation (run_id={run_id})")
 
-    expected_tables = list(get_table_partitions().keys())
+    expected_tables = list(get_bronze_partitions().keys())
     available_tables: list[str] | None = None
 
     if not is_gcs_path(bronze_root):
