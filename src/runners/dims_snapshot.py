@@ -78,7 +78,7 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
         os.getenv("SILVER_LOCAL_BASE_PATH", str(Path(AIRFLOW_HOME) / "data/silver/base")),
     )
 
-    logger.info("Building dims snapshot for %s", run_date)
+    logger.info("Building dims snapshot", run_date=run_date)
     for table in dims_tables:
         df = _load_table(silver_base_path, table)
         if table == "customers":
@@ -104,7 +104,7 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
         _write_snapshot(df, dims_local_path, table, run_date)
 
     if dims_gcs_path:
-        logger.info("Syncing dims snapshot to %s", dims_gcs_path)
+        logger.info("Syncing dims snapshot to GCS", dims_path=dims_gcs_path)
         subprocess.run(
             ["gcloud", "storage", "rsync", "-r", dims_local_path, dims_gcs_path],
             check=True,
