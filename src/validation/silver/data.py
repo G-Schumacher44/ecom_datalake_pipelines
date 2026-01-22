@@ -198,34 +198,21 @@ def check_required_columns(
     sample_rows: int | None = None,
 ) -> dict[str, list[str] | dict[str, int]]:
     """Check required columns exist and are non-null."""
-    parquet_files = collect_parquet_files(
-        table_path, partition_key=partition_key, partitions=partitions
-    )
-    if not parquet_files:
-        return {"missing": required_cols, "nulls": {}}
+    from src.validation.common import read_parquet_safe
 
-    try:
-        df = pl.read_parquet(
-            parquet_files,
-            columns=required_cols,
-            n_rows=sample_rows,
-            memory_map=False,
-            low_memory=True,
-            use_pyarrow=True,
-        )
-    except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
+    df = read_parquet_safe(
+        table_path,
+        columns=required_cols,
+        n_rows=sample_rows,
+    )
+    if df is None:
         logger.warning(
             "Failed required-column scan",
             extra={
                 "table": str(table_path),
-                "error_type": type(exc).__name__,
-                "error": str(exc),
             },
         )
         return {"missing": required_cols, "nulls": {}}
-    except ColumnNotFoundError as exc:
-        missing = [col for col in required_cols if col in str(exc)]
-        return {"missing": missing or required_cols, "nulls": {}}
 
     missing_cols = [col for col in required_cols if col not in df.columns]
     null_counts: dict[str, int] = {}
