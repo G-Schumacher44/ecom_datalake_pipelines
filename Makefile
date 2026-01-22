@@ -281,7 +281,7 @@ dev-mode:
 	OBSERVABILITY_ENV=dev \
 	BQ_LOAD_ENABLED=false \
 	GOLD_PIPELINE_ENABLED=false \
-	docker-compose up -d --force-recreate airflow-scheduler airflow-webserver
+	docker compose --env-file docker.env up -d --force-recreate airflow-scheduler airflow-webserver
 	@echo ""
 	@echo "Airflow UI: http://localhost:8080"
 	@echo "Username: airflow | Password: airflow"
@@ -314,7 +314,7 @@ prod-sim-mode:
 	OBSERVABILITY_ENV=prod \
 	BQ_LOAD_ENABLED=false \
 	GOLD_PIPELINE_ENABLED=false \
-	docker-compose up -d --force-recreate airflow-scheduler airflow-webserver
+	docker compose --env-file docker.env up -d --force-recreate airflow-scheduler airflow-webserver
 	@echo ""
 	@echo "Airflow UI: http://localhost:8080"
 	@echo "Username: airflow | Password: airflow"

@@ -4,6 +4,8 @@ x-airflow-common: &airflow-common
     context: .
     dockerfile: Dockerfile
   image: ecom-datalake-pipeline:latest
+  env_file:
+    - docker.env
   environment:
     # Airflow Core Config
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -34,15 +36,8 @@ x-airflow-common: &airflow-common
     GCS_BUCKET: "${GCS_BUCKET:-}"
     BQ_LOCATION: "${BQ_LOCATION:-US}"
     BQ_LOAD_ENABLED: "${BQ_LOAD_ENABLED:-}"
-    METRICS_BUCKET: "${METRICS_BUCKET:-data-reporting}"
-    LOGS_BUCKET: "${LOGS_BUCKET:-data-reporting}"
-    REPORTS_BUCKET: "${REPORTS_BUCKET:-data-reporting}"
     GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
-    BRONZE_BASE_PATH: "${BRONZE_BASE_PATH:-gs://acme-analytics-raw/ecom/raw}"
-    SILVER_BASE_PATH: "${SILVER_BASE_PATH:-gs://acme-analytics-silver/data/silver/base}"
-    SILVER_ENRICHED_PATH: "${SILVER_ENRICHED_PATH:-gs://acme-analytics-silver/data/silver/enriched}"
-    SILVER_DIMS_PATH: "${SILVER_DIMS_PATH:-gs://acme-analytics-silver/data/silver/dims}"
-    SILVER_PUBLISH_MODE: "${SILVER_PUBLISH_MODE:-staging}"
+    # Use docker.env for GCS buckets and paths to avoid host env overrides.
 
     # Feature Flags
     GOLD_PIPELINE_ENABLED: "${GOLD_PIPELINE_ENABLED:-false}"
