@@ -12,6 +12,10 @@ def compute_daily_business_metrics(
     returns: pl.LazyFrame,
     carts: pl.LazyFrame,
     ratio_epsilon: float = 0.0001,
+    rate_precision: int = 6,
+    rate_cap_min: float = 0.0,
+    rate_cap_max: float = 1.0,
+    rate_cap_enabled: bool = True,
 ) -> pl.LazyFrame:
     """Aggregate high-level business performance daily."""
     # Ensure inputs are lazy
@@ -63,15 +67,25 @@ def compute_daily_business_metrics(
         )
     )
 
+    orders_count_f = pl.col("orders_count").cast(pl.Float64)
+    carts_created_f = pl.col("carts_created").cast(pl.Float64)
+    returns_count_f = pl.col("returns_count").cast(pl.Float64)
+
+    cart_rate_expr = orders_count_f / carts_created_f
+    return_rate_expr = returns_count_f / orders_count_f
+    if rate_cap_enabled:
+        cart_rate_expr = cart_rate_expr.clip(rate_cap_min, rate_cap_max)
+        return_rate_expr = return_rate_expr.clip(rate_cap_min, rate_cap_max)
+
     combined = combined.with_columns(
         avg_order_value=pl.when(pl.col("orders_count") > 0)
-        .then(pl.col("net_revenue") / pl.col("orders_count"))
+        .then(pl.col("net_revenue") / orders_count_f)
         .otherwise(0.0),
         cart_conversion_rate=pl.when(pl.col("carts_created") > 0)
-        .then(pl.col("orders_count") / pl.col("carts_created"))
+        .then(cart_rate_expr.round(rate_precision))
         .otherwise(0.0),
         return_rate=pl.when(pl.col("orders_count") > 0)
-        .then(pl.col("returns_count") / pl.col("orders_count"))
+        .then(return_rate_expr.round(rate_precision))
         .otherwise(0.0),
     )
 
