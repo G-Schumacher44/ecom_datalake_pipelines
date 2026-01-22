@@ -32,6 +32,38 @@ STANDARD_TABLES = [
 ]
 
 
+def extract_spec_path(argv: list[str]) -> tuple[str | None, list[str]]:
+    """Extract --spec-path from argv and return cleaned args."""
+    spec_path: str | None = None
+    cleaned: list[str] = []
+    skip_next = False
+    for idx, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg.startswith("--spec-path"):
+            if arg == "--spec-path":
+                if idx + 1 < len(argv):
+                    spec_path = argv[idx + 1]
+                    skip_next = True
+            else:
+                _, value = arg.split("=", 1)
+                spec_path = value
+            continue
+        cleaned.append(arg)
+    return spec_path, cleaned
+
+
+def has_select_arg(argv: list[str]) -> bool:
+    """Return True if dbt selection is already present in argv."""
+    for arg in argv:
+        if arg in {"--select", "--models"}:
+            return True
+        if arg.startswith("--select=") or arg.startswith("--models="):
+            return True
+    return False
+
+
 def check_virtiofs_deadlock(bronze_path: Path) -> None:
     """Detect MacOS Docker VirtioFS deadlock (Errno 35)."""
     # Only relevant for specific local paths in Docker
@@ -175,12 +207,15 @@ def run_dbt(
 
 def main() -> None:
     """Main entry point."""
+    spec_path, dbt_extra_args = extract_spec_path(sys.argv[1:])
+    if spec_path:
+        os.environ["ECOM_SPEC_PATH"] = spec_path
     # Load settings to resolve defaults if env vars missing
     settings = load_settings()
 
     # Resolve paths (Env vars take precedence over config)
     airflow_home = os.getenv("AIRFLOW_HOME", "/opt/airflow")
-    spec = load_spec_safe()
+    spec = load_spec_safe(spec_path)
     bronze_path_raw = os.getenv("BRONZE_BASE_PATH") or (
         spec.bronze.base_path if spec else "samples/bronze"
     )
@@ -246,9 +281,14 @@ def main() -> None:
     check_virtiofs_deadlock(bronze_path)
     ensure_local_directories(silver_path, quarantine_path)
 
-    # Pass remaining CLI arguments to dbt
-    # sys.argv[0] is the script name, so we take everything after
-    dbt_extra_args = sys.argv[1:]
+    if not has_select_arg(dbt_extra_args) and spec:
+        model_list = [
+            table.dbt_model
+            for table in spec.silver_base.tables
+            if table.dbt_model
+        ]
+        if model_list:
+            dbt_extra_args = ["--select", *model_list, *dbt_extra_args]
 
     run_dbt(dbt_args=dbt_extra_args)
 
@@ -262,7 +302,11 @@ def main() -> None:
             export_base = silver_path_raw
 
         if export_base and is_gcs_path(export_base):
-            publish_mode = os.getenv("SILVER_PUBLISH_MODE", "direct").lower()
+            publish_mode = (
+                os.getenv("SILVER_PUBLISH_MODE")
+                or settings.pipeline.silver_publish_mode
+                or "direct"
+            ).lower()
             if publish_mode == "staging":
                 run_id = resolve_run_id()
                 staging_base = f"{export_base.rstrip('/')}/_staging/{run_id}"
