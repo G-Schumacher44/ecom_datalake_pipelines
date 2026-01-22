@@ -22,8 +22,15 @@ from src.validation.common import (
     handle_exit,
     is_gcs_path,
     resolve_layer_paths,
+    resolve_reports_enabled,
+    join_path,
 )
-from src.validation.silver.data import compute_key_cardinality, list_partitions_by_key
+from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
+from src.validation.silver.data import (
+    check_required_columns,
+    compute_key_cardinality,
+    list_partitions_by_key,
+)
 from src.validation.silver.metrics import compute_fk_mismatch_summary, validate_table
 from src.validation.silver.models import SilverQualityReport
 from src.validation.silver.report import build_profile_report, generate_markdown_report
@@ -88,6 +95,11 @@ def parse_args() -> argparse.Namespace:
         default="docs/validation_reports/SILVER_QUALITY.md",
         help="Path to write Markdown report.",
     )
+    parser.add_argument(
+        "--spec-path",
+        default=None,
+        help="Path to spec directory or file (overrides ECOM_SPEC_PATH).",
+    )
     return parser.parse_args()
 
 
@@ -133,26 +145,28 @@ def build_partition_values(partition_date: str, lookback_days: int) -> list[str]
 def main() -> int:
     """Run Silver quality validation."""
     args = parse_args()
+    if args.spec_path:
+        os.environ["ECOM_SPEC_PATH"] = args.spec_path
     settings = load_settings(args.config)
     sla_thresholds = settings.pipeline.sla_thresholds or {}
     pipeline_env = os.getenv("PIPELINE_ENV", settings.pipeline.environment).lower()
 
     paths = resolve_layer_paths(
-        args.config, bronze_over=args.bronze_path, silver_over=args.silver_path
+        args.config,
+        bronze_over=args.bronze_path,
+        silver_over=args.silver_path,
+        spec_path=args.spec_path,
     )
     bronze_path = paths["bronze"]
     silver_path = paths["silver"]
     quarantine_path = paths["quarantine"]
 
-    if any(
+    if not any(
         is_gcs_path(str(path)) for path in (bronze_path, silver_path, quarantine_path)
     ):
-        logger.error("Silver validation does not support gs:// paths.")
-        return 1
-
-    bronze_path = Path(bronze_path)
-    silver_path = Path(silver_path)
-    quarantine_path = Path(quarantine_path)
+        bronze_path = Path(bronze_path)
+        silver_path = Path(silver_path)
+        quarantine_path = Path(quarantine_path)
 
     run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     logger.info(f"Starting Silver quality validation (run_id={run_id})")
@@ -167,10 +181,13 @@ def main() -> int:
             return 1
 
     spec = load_spec_safe()
+    allow_empty_map: dict[str, bool] = {}
     if spec:
         for table in spec.silver_base.tables:
             if table.quality and table.quality.sla is not None:
                 sla_thresholds[table.name] = table.quality.sla
+            if table.quality and table.quality.allow_empty:
+                allow_empty_map[table.name] = True
         available_tables = {table.name for table in spec.silver_base.tables}
     else:
         available_tables = set(sla_thresholds.keys())
@@ -191,11 +208,13 @@ def main() -> int:
             silver_path,
             quarantine_path,
             sla_thresholds,
+            allow_empty=allow_empty_map.get(table, False),
             partition_key=silver_partition_key,
             partitions=partition_values,
             bronze_partition_key=bronze_partition_key,
         )
         table_metrics.append(metrics)
+    metrics_by_table = {m.table: m for m in table_metrics}
 
     overall_status = get_overall_status([m.status for m in table_metrics])
 
@@ -252,7 +271,7 @@ def main() -> int:
             if expected_source == "config" and bronze_partition_key != "ingest_dt":
                 continue
             bronze_parts = list_partitions_by_key(
-                bronze_path / table, bronze_partition_key
+                join_path(bronze_path, table), bronze_partition_key
             )
             missing = sorted(expected_set - bronze_parts)
             if missing:
@@ -291,9 +310,49 @@ def main() -> int:
         # The original monolith had compute_key_cardinality inside itself.
         # I moved compute_key_cardinality to data.py, so we can use it here.
 
+    sample_rows_env = os.getenv("SILVER_LINEAGE_SAMPLE_ROWS", "0").strip()
+    sample_rows = int(sample_rows_env) if sample_rows_env.isdigit() else 0
+    sample_rows = None if sample_rows <= 0 else sample_rows
+    for table in tables:
+        metrics = metrics_by_table.get(table)
+        if allow_empty_map.get(table) and metrics:
+            processed = metrics.silver_rows + metrics.quarantine_rows
+            if processed == 0:
+                continue
+        required_cols = list(BASE_SILVER_SCHEMAS.get(table, {}).keys())
+        if not required_cols:
+            continue
+        partition_key = get_silver_table_partitions().get(table, "ingest_dt")
+        checks = check_required_columns(
+            join_path(silver_path, table),
+            required_cols,
+            partition_key=partition_key,
+            partitions=partition_values,
+            sample_rows=sample_rows,
+        )
+        missing = checks.get("missing", [])
+        nulls = checks.get("nulls", {})
+        if missing:
+            contract_issues.append(
+                {
+                    "check": "missing_required_columns",
+                    "table": table,
+                    "message": f"Missing columns: {', '.join(missing)}",
+                }
+            )
+        if nulls:
+            detail = ", ".join(f"{col}={count}" for col, count in nulls.items())
+            contract_issues.append(
+                {
+                    "check": "null_required_columns",
+                    "table": table,
+                    "message": f"Null required values detected: {detail}",
+                }
+            )
+
     if "returns" in tables:
         returns_cardinality = compute_key_cardinality(
-            silver_path / "returns",
+            join_path(silver_path, "returns"),
             "return_id",
             partition_key=get_silver_table_partitions().get("returns", "ingest_dt"),
             partitions=partition_values,
@@ -315,7 +374,7 @@ def main() -> int:
 
     if "return_items" in tables:
         return_items_cardinality = compute_key_cardinality(
-            silver_path / "return_items",
+            join_path(silver_path, "return_items"),
             "return_id",
             partition_key=get_silver_table_partitions().get(
                 "return_items", "ingest_dt"
@@ -393,16 +452,18 @@ def main() -> int:
 
     # Determine report path (use observability config for GCS in dev/prod)
     from src.observability.config import get_config
+    if resolve_reports_enabled(args.spec_path):
+        obs_config = get_config()
+        if not obs_config.use_cloud_reports():
+            report_path = args.output_report
+        else:
+            # GCS: Use observability config path with run folder
+            report_filename = Path(args.output_report).name
+            report_path = obs_config.get_run_report_path(run_id, report_filename)
 
-    obs_config = get_config()
-    if not obs_config.use_cloud_reports():
-        report_path = args.output_report
+        generate_markdown_report(report, report_path)
     else:
-        # GCS: Use observability config path with run folder
-        report_filename = Path(args.output_report).name
-        report_path = obs_config.get_run_report_path(run_id, report_filename)
-
-    generate_markdown_report(report, report_path)
+        report_path = "(reports disabled)"
 
     profile_enabled = os.getenv("SILVER_PROFILE_ENABLED", "false").lower() in {
         "1",

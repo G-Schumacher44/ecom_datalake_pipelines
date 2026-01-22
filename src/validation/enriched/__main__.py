@@ -16,6 +16,7 @@ from src.validation.common import (
     handle_exit,
     is_gcs_path,
     resolve_layer_paths,
+    resolve_reports_enabled,
 )
 from src.validation.enriched.metrics import validate_table
 from src.validation.enriched.report import generate_markdown_report
@@ -73,11 +74,18 @@ def parse_args() -> argparse.Namespace:
         default="docs/validation_reports/ENRICHED_QUALITY.md",
         help="Path to write Markdown report.",
     )
+    parser.add_argument(
+        "--spec-path",
+        default=None,
+        help="Path to spec directory or file (overrides ECOM_SPEC_PATH).",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.spec_path:
+        os.environ["ECOM_SPEC_PATH"] = args.spec_path
     settings = load_settings(args.config)
     pipeline_env = os.getenv("PIPELINE_ENV", settings.pipeline.environment).lower()
 
@@ -85,16 +93,14 @@ def main() -> int:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     paths = resolve_layer_paths(
-        config_path=args.config, enriched_over=args.enriched_path
+        config_path=args.config,
+        enriched_over=args.enriched_path,
+        spec_path=args.spec_path,
     )
 
     enriched_path = paths["enriched"]
-
-    if is_gcs_path(str(enriched_path)):
-        logger.error("Enriched validation does not support gs:// paths.")
-        return 1
-
-    enriched_path = Path(enriched_path)
+    if not is_gcs_path(str(enriched_path)):
+        enriched_path = Path(enriched_path)
 
     spec = load_spec_safe()
     if spec:
@@ -171,21 +177,24 @@ def main() -> int:
     # Determine report path (use observability config for GCS in dev/prod)
     from src.observability.config import get_config
 
-    obs_config = get_config()
-    if not obs_config.use_cloud_reports():
-        report_path = args.output_report
-    else:
-        # GCS: Use observability config path with run folder
-        report_filename = Path(args.output_report).name
-        report_path = obs_config.get_run_report_path(run_id, report_filename)
+    if resolve_reports_enabled(args.spec_path):
+        obs_config = get_config()
+        if not obs_config.use_cloud_reports():
+            report_path = args.output_report
+        else:
+            # GCS: Use observability config path with run folder
+            report_filename = Path(args.output_report).name
+            report_path = obs_config.get_run_report_path(run_id, report_filename)
 
-    generate_markdown_report(
-        run_id=run_id,
-        timestamp=timestamp,
-        table_metrics=table_metrics,
-        overall_status=overall_status,
-        output_path=report_path,
-    )
+        generate_markdown_report(
+            run_id=run_id,
+            timestamp=timestamp,
+            table_metrics=table_metrics,
+            overall_status=overall_status,
+            output_path=report_path,
+        )
+    else:
+        report_path = "(reports disabled)"
 
     failing = [m for m in table_metrics if m.status == "FAIL"]
     if failing:
@@ -202,8 +211,8 @@ def main() -> int:
                 issues.append("no_issue_details")
             details.append(f"{metric.table} ({' | '.join(issues)})")
         logger.error(
-            "Enriched validation failed: %s",
-            "; ".join(details),
+            "Enriched validation failed",
+            details="; ".join(details),
         )
 
     return handle_exit(

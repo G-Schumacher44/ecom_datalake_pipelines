@@ -42,6 +42,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Exit non-zero when any table fails.",
     )
+    parser.add_argument(
+        "--spec-path",
+        default=None,
+        help="Path to spec directory or file (overrides ECOM_SPEC_PATH).",
+    )
     return parser.parse_args()
 
 
@@ -71,6 +76,8 @@ def count_rows(path: Path) -> int:
 
 def main() -> int:
     args = parse_args()
+    if args.spec_path:
+        os.environ["ECOM_SPEC_PATH"] = args.spec_path
     dims_path = resolve_dims_path(args)
     if dims_path.startswith("gs://"):
         dims_path = os.getenv(
@@ -100,7 +107,10 @@ def main() -> int:
     ]
     for table, status, row_count, path in rows:
         report_lines.append(f"| {table} | {status} | {row_count} | `{path}` |")
-    Path(args.output_report).write_text("\n".join(report_lines), encoding="utf-8")
+    from src.validation.common import resolve_reports_enabled
+
+    if resolve_reports_enabled(args.spec_path):
+        Path(args.output_report).write_text("\n".join(report_lines), encoding="utf-8")
 
     if failures:
         logger.error("Dims snapshot validation failed", tables=failures)
