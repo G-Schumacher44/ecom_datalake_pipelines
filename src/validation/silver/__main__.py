@@ -25,7 +25,10 @@ from src.validation.common import (
     resolve_reports_enabled,
     join_path,
 )
-from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
+from src.validation.base_silver_schemas import (
+    BASE_SILVER_SCHEMAS,
+    REQUIRED_BASE_SILVER_COLUMNS,
+)
 from src.validation.silver.data import (
     check_required_columns,
     compute_key_cardinality,
@@ -319,7 +322,7 @@ def main() -> int:
             processed = metrics.silver_rows + metrics.quarantine_rows
             if processed == 0:
                 continue
-        required_cols = list(BASE_SILVER_SCHEMAS.get(table, {}).keys())
+        required_cols = REQUIRED_BASE_SILVER_COLUMNS.get(table, [])
         if not required_cols:
             continue
         partition_key = get_silver_table_partitions().get(table, "ingest_dt")

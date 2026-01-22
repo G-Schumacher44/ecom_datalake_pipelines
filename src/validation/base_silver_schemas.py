@@ -174,3 +174,69 @@ BASE_SILVER_SCHEMAS = {
     "returns": RETURNS_SCHEMA,
     "return_items": RETURN_ITEMS_SCHEMA,
 }
+
+LINEAGE_REQUIRED_COLUMNS = [
+    "batch_id",
+    "ingestion_ts",
+    "event_id",
+    "source_file",
+]
+
+REQUIRED_BASE_SILVER_COLUMNS = {
+    "orders": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "net_total",
+        "gross_total",
+        *LINEAGE_REQUIRED_COLUMNS,
+    ],
+    "order_items": [
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price",
+        *LINEAGE_REQUIRED_COLUMNS,
+    ],
+    "customers": [
+        "customer_id",
+        "email",
+        "signup_date",
+        *LINEAGE_REQUIRED_COLUMNS,
+    ],
+    "product_catalog": [
+        "product_id",
+        "product_name",
+        "unit_price",
+        *LINEAGE_REQUIRED_COLUMNS,
+    ],
+    "shopping_carts": [
+        "cart_id",
+        "customer_id",
+        "created_at",
+        *LINEAGE_REQUIRED_COLUMNS,
+    ],
+    "cart_items": [
+        "cart_item_id",
+        "cart_id",
+        "product_id",
+        "quantity",
+        "unit_price",
+        *LINEAGE_REQUIRED_COLUMNS,
+    ],
+    "returns": [
+        "return_id",
+        "order_id",
+        "customer_id",
+        "return_date",
+        *LINEAGE_REQUIRED_COLUMNS,
+    ],
+    "return_items": [
+        "return_item_id",
+        "return_id",
+        "order_id",
+        "product_id",
+        "quantity_returned",
+        *LINEAGE_REQUIRED_COLUMNS,
+    ],
+}
