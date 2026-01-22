@@ -53,13 +53,20 @@ def evaluate_semantic_checks(
     df: pl.DataFrame,
     table: str,
     config: ValidationConfig,
+    settings: PipelineConfig,
     ratio_epsilon: float,
 ) -> list[str]:
     checks = config.semantic_checks.get(table, [])
     issues: list[str] = []
     for check in checks:
         name = check["name"]
-        expr = check["expr"].format(ratio_epsilon=ratio_epsilon)
+        expr = check["expr"].format(
+            ratio_epsilon=ratio_epsilon,
+            cart_abandoned_min_value=settings.cart_abandoned_min_value,
+            rate_cap_min=settings.rate_cap_min,
+            rate_cap_max=settings.rate_cap_max,
+            return_units_max_ratio=settings.return_units_max_ratio,
+        )
         try:
             failures = df.filter(pl.sql_expr(expr)).height
         except (SQLSyntaxError, SQLInterfaceError) as exc:
@@ -156,10 +163,35 @@ def validate_table(
         if selected:
             df = read_parquet_safe(partition_path, columns=selected)
             if df is not None:
+                if table == "int_daily_business_metrics":
+                    orders_count_f = pl.col("orders_count").cast(pl.Float64)
+                    carts_created_f = pl.col("carts_created").cast(pl.Float64)
+                    returns_count_f = pl.col("returns_count").cast(pl.Float64)
+
+                    cart_rate_expr = orders_count_f / carts_created_f
+                    return_rate_expr = returns_count_f / orders_count_f
+                    if settings.rate_cap_enabled:
+                        cart_rate_expr = cart_rate_expr.clip(
+                            settings.rate_cap_min, settings.rate_cap_max
+                        )
+                        return_rate_expr = return_rate_expr.clip(
+                            settings.rate_cap_min, settings.rate_cap_max
+                        )
+
+                    df = df.with_columns(
+                        expected_cart_conversion_rate=pl.when(
+                            pl.col("carts_created") > 0
+                        )
+                        .then(cart_rate_expr.round(settings.rate_precision))
+                        .otherwise(0.0),
+                        expected_return_rate=pl.when(pl.col("orders_count") > 0)
+                        .then(return_rate_expr.round(settings.rate_precision))
+                        .otherwise(0.0),
+                    )
                 null_rates = compute_null_rates(df, key_fields)
                 sanity_issues = evaluate_sanity_checks(df, config)
                 semantic_issues = evaluate_semantic_checks(
-                    df, table, config, ratio_epsilon
+                    df, table, config, settings, ratio_epsilon
                 )
 
     if row_count == 0:

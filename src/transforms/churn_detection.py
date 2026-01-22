@@ -21,6 +21,7 @@ def compute_customer_retention_signals(
     customers_lazy = (
         customers.lazy() if isinstance(customers, pl.DataFrame) else customers
     )
+    customers_lazy = customers_lazy.unique(subset=["customer_id"], keep="last")
     orders = orders.lazy() if isinstance(orders, pl.DataFrame) else orders
 
     if not lookback_days:

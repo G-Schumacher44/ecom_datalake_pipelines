@@ -46,6 +46,7 @@ def run_cart_attribution_summary(
         cart_items=tables["cart_items"],
         orders=tables["orders"],
         tolerance_hours=settings.attribution_tolerance_hours,
+        abandoned_min_value=settings.cart_abandoned_min_value,
     ).with_columns(
         cart_dt=pl.col("created_at").cast(pl.Date),
     )
@@ -79,6 +80,10 @@ def run_product_performance(
         order_items=tables["order_items"],
         return_items=tables["return_items"],
         cart_items=tables["cart_items"],
+        rate_precision=settings.rate_precision,
+        rate_cap_min=settings.rate_cap_min,
+        rate_cap_max=settings.rate_cap_max,
+        rate_cap_enabled=settings.rate_cap_enabled,
     )
 
 

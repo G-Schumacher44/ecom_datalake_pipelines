@@ -54,3 +54,4 @@ airflow/plugins/__pycache__/
 .DS_Store
 .claude/*
 src/*.egg-info/
+.gcloud/
