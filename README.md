@@ -30,6 +30,7 @@ ___
 - **Gold marts (dbt-bigquery)**: Aggregated analytics tables optimized for BI and reporting in BigQuery.
 - **Orchestration**: Airflow DAGs coordinate Bronze → Silver → Gold flows with partition-level backfill and incremental processing.
 - **Observability**: Audit trails, data quality metrics, and SLA monitoring baked into every transformation.
+- **Spec-driven orchestration**: Layered YAML specs drive table lists, partitions, and gates (see [Spec Overview](docs/resources/SPEC_OVERVIEW.md)).
 
 <details>
 <summary> ⏯️ Quick Start</summary>
@@ -90,6 +91,7 @@ ___
 ## 📐 What's Included
 
 - **Medallion architecture**: Bronze (raw) → Silver (clean, typed) → Gold (aggregated marts).
+- **Spec-driven pipeline control**: Table lists, partitions, and validation gates live in `config/specs/*.yml`.
 - **dbt-duckdb for Base Silver**: Leverage DuckDB's speed for local development and testing.
 - **Polars for Enriched Silver**: Pure Python transforms for business logic, cohort analysis, and feature engineering.
 - **dbt-bigquery for Gold marts**: SQL-based aggregations optimized for BI and reporting in BigQuery.
