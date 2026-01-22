@@ -17,6 +17,7 @@ class QualitySpec(BaseModel):
 
     sla: float | None = None
     min_rows: int | None = None
+    allow_empty: bool = False
 
 
 class BronzeTableSpec(BaseModel):

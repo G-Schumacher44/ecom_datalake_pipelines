@@ -30,6 +30,7 @@ from src.validation.common import (
     handle_exit,
     is_gcs_path,
     resolve_layer_paths,
+    resolve_reports_enabled,
 )
 
 logger = get_logger(__name__)
@@ -104,6 +105,11 @@ def parse_args() -> argparse.Namespace:
         "--output-report",
         default="docs/validation_reports/BRONZE_QUALITY.md",
         help="Path to write Markdown report.",
+    )
+    parser.add_argument(
+        "--spec-path",
+        default=None,
+        help="Path to spec directory or file (overrides ECOM_SPEC_PATH).",
     )
     return parser.parse_args()
 
@@ -320,6 +326,8 @@ def generate_report(metrics: list[TableMetrics], output_path: str, run_id: str) 
 
 def main() -> int:
     args = parse_args()
+    if args.spec_path:
+        os.environ["ECOM_SPEC_PATH"] = args.spec_path
 
     from src.observability.config import get_config
     from src.settings import load_settings
@@ -344,7 +352,11 @@ def main() -> int:
             return 1
 
     # Resolve paths using shared library
-    paths = resolve_layer_paths(args.config, bronze_over=args.bronze_path)
+    paths = resolve_layer_paths(
+        args.config,
+        bronze_over=args.bronze_path,
+        spec_path=args.spec_path,
+    )
     bronze_root = str(paths["bronze"])
 
     logger.info(f"Starting Bronze quality validation (run_id={run_id})")
@@ -415,7 +427,10 @@ def main() -> int:
         report_filename = Path(args.output_report).name
         report_path = obs_config.get_run_report_path(run_id, report_filename)
 
-    generate_report(metrics, report_path, run_id)
+    if resolve_reports_enabled(args.spec_path):
+        generate_report(metrics, report_path, run_id)
+    else:
+        report_path = "(reports disabled)"
     logger.info(f"✅ Bronze quality validation completed: {overall_status}")
 
     return handle_exit(

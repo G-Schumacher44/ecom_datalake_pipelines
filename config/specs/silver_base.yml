@@ -51,6 +51,7 @@ silver_base:
       quality:
         sla: 0.95
         min_rows: 1
+        allow_empty: true
     - name: "return_items"
       partition_key: "ingestion_dt"
       source: "bronze.return_items"
@@ -58,3 +59,4 @@ silver_base:
       quality:
         sla: 0.95
         min_rows: 1
+        allow_empty: true

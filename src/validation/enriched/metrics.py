@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import polars as pl
 from polars.exceptions import ComputeError, SQLInterfaceError, SQLSyntaxError
 
 from src.settings import PipelineConfig, ValidationConfig
-from src.validation.common import read_parquet_safe
+from src.validation.common import join_path, read_parquet_safe
 from src.validation.enriched.data import (
     compute_row_delta,
     count_parquet_rows,
@@ -77,7 +75,7 @@ def evaluate_semantic_checks(
 
 def validate_table(
     table: str,
-    enriched_path: Path,
+    enriched_path: Path | str,
     ingest_dt: str | None,
     min_rows: int | None,
     partition_key: str,
@@ -85,7 +83,7 @@ def validate_table(
     settings: PipelineConfig,
     lookback_days: int,
 ) -> EnrichedTableMetrics:
-    table_path = enriched_path / table
+    table_path = join_path(enriched_path, table)
     notes: list[str] = []
     status = "PASS"
     config = settings.validation

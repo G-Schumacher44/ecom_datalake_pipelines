@@ -235,10 +235,6 @@ with DAG(
             f"cd {AIRFLOW_HOME} && "
             f"BRONZE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
             f"SILVER_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
-            f'&& if [[ "$BRONZE_PATH" == gs://* ]]; then '
-            f'BRONZE_PATH="${{BRONZE_LOCAL_BASE_PATH:-{AIRFLOW_HOME}/data/bronze}}"; fi '
-            f'&& if [[ "$SILVER_PATH" == gs://* ]]; then '
-            f'SILVER_PATH="${{SILVER_LOCAL_BASE_PATH:-{AIRFLOW_HOME}/data/silver/base}}"; fi '
             f"&& python -m src.validation.silver "
             f'--bronze-path "$BRONZE_PATH" '
             f'--silver-path "$SILVER_PATH" '
@@ -287,9 +283,6 @@ with DAG(
         bash_command=(
             f"cd {AIRFLOW_HOME} && "
             f"ENRICHED_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched'] }}}}\" "
-            '&& if [[ "$ENRICHED_PATH" == gs://* ]]; then '
-            'ENRICHED_PATH="${SILVER_ENRICHED_LOCAL_PATH:-/opt/airflow/data/silver/enriched}"; '
-            "fi "
             "&& python -m src.validation.enriched "
             f'--enriched-path "$ENRICHED_PATH" '
             f"--run-id {{{{ run_id }}}} "

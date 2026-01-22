@@ -10,7 +10,10 @@ from src.observability import get_logger
 from src.validation.common import (
     collect_parquet_files,
     count_parquet_rows,
+    join_path,
     list_partitions,
+    path_exists,
+    get_gcs_filesystem,
 )
 
 logger = get_logger(__name__)
@@ -24,22 +27,22 @@ def _parse_iso_date(value: str) -> date | None:
 
 
 def resolve_partition(
-    table_path: Path,
+    table_path: Path | str,
     partition_key: str,
     ingest_dt: str | None,
     lookback_days: int,
-) -> tuple[str | None, Path | None]:
-    if not table_path.exists():
+) -> tuple[str | None, Path | str | None]:
+    if not path_exists(table_path):
         return ingest_dt, None
     partitions = list_partitions(table_path, partition_key)
     if not partitions:
         return ingest_dt, None
     if partition_key == "ingest_dt":
         if ingest_dt:
-            partition_path = table_path / f"{partition_key}={ingest_dt}"
-            return ingest_dt, partition_path if partition_path.exists() else None
+            partition_path = join_path(table_path, f"{partition_key}={ingest_dt}")
+            return ingest_dt, partition_path if path_exists(partition_path) else None
         latest = partitions[-1]
-        return latest, table_path / f"{partition_key}={latest}"
+        return latest, join_path(table_path, f"{partition_key}={latest}")
     if ingest_dt:
         run_date = _parse_iso_date(ingest_dt)
         if run_date is None:
@@ -53,17 +56,22 @@ def resolve_partition(
         if not desired:
             return ingest_dt, None
         latest = desired[-1]
-        return latest, table_path / f"{partition_key}={latest}"
+        return latest, join_path(table_path, f"{partition_key}={latest}")
     latest = partitions[-1]
-    return latest, table_path / f"{partition_key}={latest}"
+    return latest, join_path(table_path, f"{partition_key}={latest}")
 
 
-def get_schema_snapshot(path: Path) -> dict[str, str]:
+def get_schema_snapshot(path: Path | str) -> dict[str, str]:
     parquet_files = collect_parquet_files(path)
     if not parquet_files:
         return {}
     try:
-        parquet_file = pq.ParquetFile(parquet_files[0])
+        if isinstance(parquet_files[0], Path):
+            parquet_file = pq.ParquetFile(parquet_files[0])
+        else:
+            fs = get_gcs_filesystem()
+            with fs.open(parquet_files[0], "rb") as handle:
+                parquet_file = pq.ParquetFile(handle)
     except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
         logger.warning(
             "Failed to read parquet schema",
@@ -77,7 +85,7 @@ def get_schema_snapshot(path: Path) -> dict[str, str]:
 
 
 def compute_row_delta(
-    table_path: Path,
+    table_path: Path | str,
     partition_key: str,
     partition_value: str | None,
     current_rows: int,
@@ -88,7 +96,7 @@ def compute_row_delta(
     idx = partitions.index(partition_value)
     if idx == 0:
         return None, None
-    prior_partition = table_path / f"{partition_key}={partitions[idx - 1]}"
+    prior_partition = join_path(table_path, f"{partition_key}={partitions[idx - 1]}")
     prior_rows = count_parquet_rows(prior_partition)
     if prior_rows == 0:
         return prior_rows, None
