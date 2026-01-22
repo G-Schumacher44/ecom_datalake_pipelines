@@ -38,6 +38,7 @@ x-airflow-common: &airflow-common
     LOGS_BUCKET: "${LOGS_BUCKET:-}"
     REPORTS_BUCKET: "${REPORTS_BUCKET:-}"
     GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+    SILVER_PUBLISH_MODE: "${SILVER_PUBLISH_MODE:-staging}"
 
     # Path Overrides (optional - uses config.yml defaults if not set)
     BRONZE_BASE_PATH: "${BRONZE_BASE_PATH:-samples/bronze}"
