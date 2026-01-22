@@ -24,7 +24,9 @@ def normalize_schema(
     if schema is None:
         return None
     if table == "product_catalog" and "category" not in schema:
-        return {**schema, "category": pl.Utf8}
+        schema = {**schema, "category": pl.Utf8}
+    if table in get_dims_partitions() and "as_of_dt" not in schema:
+        return {**schema, "as_of_dt": pl.Date}
     return schema
 
 
@@ -110,6 +112,13 @@ def get_enriched_partitions() -> dict[str, str]:
     return load_settings().pipeline.enriched_partitions
 
 
+def get_dims_partitions() -> dict[str, str | None]:
+    spec = load_spec_safe()
+    if spec:
+        return {table.name: table.partition_key for table in spec.dims.tables}
+    return {}
+
+
 def is_gcs_path(path: str) -> bool:
     return path.startswith("gs://")
 
@@ -157,7 +166,24 @@ def read_partitioned(
     ingest_dt: str,
     lookback_days: int,
 ) -> pl.LazyFrame:
-    partition_key = get_silver_table_partitions().get(table)
+    dims_partitions = get_dims_partitions()
+    dims_base = os.getenv("SILVER_DIMS_PATH")
+    if table in dims_partitions:
+        if not dims_base:
+            spec = load_spec_safe()
+            dims_base = spec.dims.base_path if spec and spec.dims.base_path else ""
+        if dims_base:
+            dims_base = os.path.expandvars(dims_base)
+            if is_gcs_path(dims_base):
+                dims_base = os.getenv(
+                    "SILVER_DIMS_LOCAL_PATH", "/opt/airflow/data/silver/dims"
+                )
+            elif not os.path.isabs(dims_base):
+                dims_base = os.path.join("/opt/airflow", dims_base)
+            base_path = dims_base
+        partition_key = dims_partitions.get(table)
+    else:
+        partition_key = get_silver_table_partitions().get(table)
     if partition_key is None:
         schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
         return pl.scan_parquet(

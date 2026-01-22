@@ -121,6 +121,15 @@ def resolve_dims_base_path() -> str | None:
     return os.path.join(config.airflow_home, base_path)
 
 
+_resolved_dims_path = resolve_dims_base_path()
+if _resolved_dims_path:
+    COMMON_ENV.setdefault("SILVER_DIMS_PATH", _resolved_dims_path)
+    if _resolved_dims_path.startswith("gs://"):
+        COMMON_ENV.setdefault(
+            "SILVER_DIMS_LOCAL_PATH", f"{AIRFLOW_HOME}/data/silver/dims"
+        )
+
+
 def run_enriched_runner(func, **kwargs):
     """Wrapper to run enriched runners with resolved paths."""
     config = SettingsConfig()
