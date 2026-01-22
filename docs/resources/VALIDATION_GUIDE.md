@@ -53,6 +53,10 @@ The pipeline has **3 validation gates**:
 When `PIPELINE_ENV=dev|prod`, reports are written to GCS at:
 `gs://$REPORTS_BUCKET/validation_reports/<run_id>/`
 
+**GCS validation reads (no rsync):**  
+Validation reads `gs://` paths directly via `fsspec/gcsfs` in dev/prod.  
+`gcloud storage rsync` is used only for publish/sync steps (not for validation).
+
 ---
 
 ## Gate 2: Silver Quality Validation (✅ IMPLEMENTED)
