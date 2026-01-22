@@ -231,6 +231,26 @@ When `SILVER_PUBLISH_MODE=staging`, exports go to:
 
 ---
 
+## Recommended Local vs Docker Split
+
+For day-to-day development, keep your local shell in **local** mode and run
+Docker/Airflow in **dev** mode so GCS paths and staging behavior can be tested
+without changing your laptop defaults.
+
+**Local shell (direnv defaults):**
+- `PIPELINE_ENV=local`
+- local filesystem paths in `.envrc` (e.g. `data/bronze`, `data/silver/*`)
+- `SILVER_PUBLISH_MODE=direct`
+
+**Docker/Airflow (docker-compose defaults):**
+- `PIPELINE_ENV=dev`
+- GCS paths/buckets for Bronze/Silver/Enriched/Dims
+- `SILVER_PUBLISH_MODE=staging`
+
+This keeps local iterations fast while Docker validates staging + manifest flow.
+
+---
+
 ## Migration Guide: Local → Production
 
 ### Step 1: Update config.yml

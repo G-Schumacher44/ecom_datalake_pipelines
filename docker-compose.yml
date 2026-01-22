@@ -15,8 +15,8 @@ x-airflow-common: &airflow-common
     PYTHONPATH: "/opt/airflow"
 
     # Pipeline Environment (local, dev, prod)
-    PIPELINE_ENV: "${PIPELINE_ENV:-local}"
-    OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-}"
+    PIPELINE_ENV: "${PIPELINE_ENV:-dev}"
+    OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-dev}"
     CLOUDSDK_CONFIG: "/home/airflow/.config/gcloud"
     USE_SA_AUTH: "${USE_SA_AUTH:-false}"
 
@@ -34,16 +34,15 @@ x-airflow-common: &airflow-common
     GCS_BUCKET: "${GCS_BUCKET:-}"
     BQ_LOCATION: "${BQ_LOCATION:-US}"
     BQ_LOAD_ENABLED: "${BQ_LOAD_ENABLED:-}"
-    METRICS_BUCKET: "${METRICS_BUCKET:-}"
-    LOGS_BUCKET: "${LOGS_BUCKET:-}"
-    REPORTS_BUCKET: "${REPORTS_BUCKET:-}"
+    METRICS_BUCKET: "${METRICS_BUCKET:-data-reporting/pipeline_metrics}"
+    LOGS_BUCKET: "${LOGS_BUCKET:-data-reporting/pipeline_logs}"
+    REPORTS_BUCKET: "${REPORTS_BUCKET:-data-reporting/validation_reports}"
     GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+    BRONZE_BASE_PATH: "${BRONZE_BASE_PATH:-gs://gcs-automation-project-raw/ecom/raw}"
+    SILVER_BASE_PATH: "${SILVER_BASE_PATH:-gs://gcs-automation-project-silver/data/silver/base}"
+    SILVER_ENRICHED_PATH: "${SILVER_ENRICHED_PATH:-gs://gcs-automation-project-silver/data/silver/enriched}"
+    SILVER_DIMS_PATH: "${SILVER_DIMS_PATH:-gs://gcs-automation-project-silver/data/silver/dims}"
     SILVER_PUBLISH_MODE: "${SILVER_PUBLISH_MODE:-staging}"
-
-    # Path Overrides (optional - uses config.yml defaults if not set)
-    BRONZE_BASE_PATH: "${BRONZE_BASE_PATH:-samples/bronze}"
-    SILVER_BASE_PATH: "${SILVER_BASE_PATH:-data/silver/base}"
-    SILVER_ENRICHED_PATH: "${SILVER_ENRICHED_PATH:-data/silver/enriched}"
 
     # Feature Flags
     GOLD_PIPELINE_ENABLED: "${GOLD_PIPELINE_ENABLED:-false}"
