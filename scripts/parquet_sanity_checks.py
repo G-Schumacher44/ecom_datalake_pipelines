@@ -65,9 +65,7 @@ def main() -> int:
             print(f"  - {path}")
         return 1
 
-    total_rows = (
-        pl.scan_parquet(paths).select(pl.len().alias("rows")).collect().item()
-    )
+    total_rows = pl.scan_parquet(paths).select(pl.len().alias("rows")).collect().item()
     print(f"Files: {len(paths)}")
     print(f"Total rows: {total_rows}")
 
