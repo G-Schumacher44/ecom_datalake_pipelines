@@ -14,6 +14,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pyarrow.parquet as pq
+
 from src.settings import load_settings
 from src.specs import load_spec_safe
 
@@ -164,8 +166,6 @@ def resolve_run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
 
-import pyarrow.parquet as pq
-
 def generate_manifest(local_table_path: Path, remote_table_url: str) -> None:
     """Generate _MANIFEST.json for each partition in a table (local only)."""
     if not local_table_path.exists():
@@ -174,7 +174,7 @@ def generate_manifest(local_table_path: Path, remote_table_url: str) -> None:
     # Find all partitions (subdirectories)
     # Assumes Hive partitioning: table/key=value
     partitions = [p for p in local_table_path.iterdir() if p.is_dir() and "=" in p.name]
-    
+
     # Also handle unpartitioned tables (root level parquet files)
     root_files = list(local_table_path.glob("*.parquet"))
     if root_files:
@@ -187,7 +187,7 @@ def generate_manifest(local_table_path: Path, remote_table_url: str) -> None:
 
         total_rows = 0
         file_count = 0
-        
+
         for pfile in parquet_files:
             try:
                 meta = pq.read_metadata(pfile)
@@ -201,7 +201,7 @@ def generate_manifest(local_table_path: Path, remote_table_url: str) -> None:
             "file_count": file_count,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         manifest_path = partition_dir / "_MANIFEST.json"
         manifest_path.write_text(json.dumps(manifest, indent=2))
 
@@ -325,9 +325,7 @@ def main() -> None:
 
     if not has_select_arg(dbt_extra_args) and spec:
         model_list = [
-            table.dbt_model
-            for table in spec.silver_base.tables
-            if table.dbt_model
+            table.dbt_model for table in spec.silver_base.tables if table.dbt_model
         ]
         if model_list:
             dbt_extra_args = ["--select", *model_list, *dbt_extra_args]
@@ -401,7 +399,7 @@ def main() -> None:
                         if source_table.exists():
                             generate_manifest(source_table, dest_table)
                             gcloud_rsync(str(source_table), dest_table, delete=True)
-                        
+
                         # Sync Quarantine Table (if exists)
                         q_source = Path(quarantine_path) / table
                         # Assuming quarantine path follows standard structure relative to export base

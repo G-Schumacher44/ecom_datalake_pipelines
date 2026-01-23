@@ -72,7 +72,9 @@ def compute_product_performance(
     )
 
     return_items = (
-        return_items.with_columns(return_dt=_date_or_null(return_cols, "return_dt", "ingestion_ts"))
+        return_items.with_columns(
+            return_dt=_date_or_null(return_cols, "return_dt", "ingestion_ts")
+        )
         .join(order_date_map, on=["order_id", "product_id"], how="left")
         .with_columns(product_dt=pl.coalesce([pl.col("order_dt"), pl.col("return_dt")]))
         .drop(["order_dt", "return_dt"])
@@ -117,7 +119,9 @@ def compute_product_performance(
     )
 
     combined = combined.with_columns(
-        effective_units_in_carts=pl.when(pl.col("units_in_carts") < pl.col("units_sold"))
+        effective_units_in_carts=pl.when(
+            pl.col("units_in_carts") < pl.col("units_sold")
+        )
         .then(pl.col("units_sold"))
         .otherwise(pl.col("units_in_carts")),
     )

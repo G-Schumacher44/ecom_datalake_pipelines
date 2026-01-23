@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os
 import json
+import os
 import subprocess
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -49,7 +49,9 @@ def _load_table(base_path: str, table: str) -> pl.DataFrame:
         raise FileNotFoundError(f"Missing parquet for {table}: {glob_path}") from exc
 
 
-def _write_snapshot(df: pl.DataFrame, dims_path: str, table: str, run_date: str) -> None:
+def _write_snapshot(
+    df: pl.DataFrame, dims_path: str, table: str, run_date: str
+) -> None:
     if df.is_empty():
         raise ValueError(f"Snapshot for {table} is empty on {run_date}")
     output_dir = Path(dims_path) / table / f"snapshot_dt={run_date}"
@@ -76,7 +78,9 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
     silver_base_path_raw = silver_base_path
     silver_base_path = _resolve_local_base_path(
         silver_base_path,
-        os.getenv("SILVER_LOCAL_BASE_PATH", str(Path(AIRFLOW_HOME) / "data/silver/base")),
+        os.getenv(
+            "SILVER_LOCAL_BASE_PATH", str(Path(AIRFLOW_HOME) / "data/silver/base")
+        ),
     )
 
     logger.info("Building dims snapshot", run_date=run_date)
@@ -93,12 +97,13 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                 pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"),
             )
             df = df.filter(
-                pl.col("signup_date").is_not_null()
-                & (pl.col("signup_date") <= run_dt)
+                pl.col("signup_date").is_not_null() & (pl.col("signup_date") <= run_dt)
             )
         elif table == "product_catalog":
             base_df = df.with_columns(
-                pl.col("ingestion_dt").cast(pl.Date, strict=False).alias("ingestion_dt"),
+                pl.col("ingestion_dt")
+                .cast(pl.Date, strict=False)
+                .alias("ingestion_dt"),
             )
             df = base_df.with_columns(
                 pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"),
@@ -151,6 +156,12 @@ def publish_dims_latest(run_date: str, run_id: str) -> None:
 
     if dims_gcs_path:
         subprocess.run(
-            ["gcloud", "storage", "cp", str(latest_path), f"{dims_gcs_path}/_latest.json"],
+            [
+                "gcloud",
+                "storage",
+                "cp",
+                str(latest_path),
+                f"{dims_gcs_path}/_latest.json",
+            ],
             check=True,
         )

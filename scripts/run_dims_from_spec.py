@@ -13,8 +13,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.specs import load_spec_safe  # noqa: E402
 from src.runners.dims_snapshot import snapshot_dims  # noqa: E402
+from src.specs import load_spec_safe  # noqa: E402
 
 DEFAULT_MODELS = [
     "stg_ecommerce__customers",

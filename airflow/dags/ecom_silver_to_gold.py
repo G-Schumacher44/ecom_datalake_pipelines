@@ -7,7 +7,11 @@ import subprocess
 import pendulum
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import BranchPythonOperator, PythonOperator, ShortCircuitOperator
+from airflow.operators.python import (
+    BranchPythonOperator,
+    PythonOperator,
+    ShortCircuitOperator,
+)
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.utils.task_group import TaskGroup
@@ -16,14 +20,14 @@ from common import (
     COMMON_ENV,
     PIPELINE_ENV,
     SettingsConfig,
-    get_retry_config,
     get_dim_specs,
     get_dim_table_names,
     get_enriched_table_names,
+    get_retry_config,
     get_silver_base_table_names,
     make_runner_callable,
-    resolve_dims_base_path,
     resolve_bool,
+    resolve_dims_base_path,
 )
 
 from airflow import DAG
@@ -238,10 +242,10 @@ with DAG(
         env=COMMON_ENV,
         bash_command=(
             f"cd {AIRFLOW_HOME} && "
-            f"DIMS_PATH=\"${{SILVER_DIMS_PATH:-data/silver/dims}}\" "
-            f"&& if [[ \"$DIMS_PATH\" == gs://* ]]; then "
-            f"DIMS_PATH=\"${{SILVER_DIMS_LOCAL_PATH:-{AIRFLOW_HOME}/data/silver/dims}}\"; fi "
-            f"&& export SILVER_DIMS_PATH=\"$DIMS_PATH\" "
+            f'DIMS_PATH="${{SILVER_DIMS_PATH:-data/silver/dims}}" '
+            f'&& if [[ "$DIMS_PATH" == gs://* ]]; then '
+            f'DIMS_PATH="${{SILVER_DIMS_LOCAL_PATH:-{AIRFLOW_HOME}/data/silver/dims}}"; fi '
+            f'&& export SILVER_DIMS_PATH="$DIMS_PATH" '
             f"&& python -m src.validation.dims_snapshot "
             f"--run-date {{{{ ds }}}} "
             f"--run-id {{{{ run_id }}}} "
@@ -274,10 +278,10 @@ with DAG(
             f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
             f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
             f"&& export SILVER_ENRICHED_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched'] }}}}\" "
-            f"&& DIMS_PATH=\"${{SILVER_DIMS_PATH:-data/silver/dims}}\" "
-            f"&& if [[ \"$DIMS_PATH\" == gs://* ]]; then "
-            f"DIMS_PATH=\"${{SILVER_DIMS_LOCAL_PATH:-{AIRFLOW_HOME}/data/silver/dims}}\"; fi "
-            f"&& export SILVER_DIMS_PATH=\"$DIMS_PATH\" "
+            f'&& DIMS_PATH="${{SILVER_DIMS_PATH:-data/silver/dims}}" '
+            f'&& if [[ "$DIMS_PATH" == gs://* ]]; then '
+            f'DIMS_PATH="${{SILVER_DIMS_LOCAL_PATH:-{AIRFLOW_HOME}/data/silver/dims}}"; fi '
+            f'&& export SILVER_DIMS_PATH="$DIMS_PATH" '
             f"&& export DBT_DUCKDB_PATH=\"/tmp/dbt_duckdb/ecom_base_silver_{{{{ run_id | replace(':', '') }}}}.duckdb\" "
             f"&& python -m src.runners.base_silver "
             f"--vars '{{\"run_date\": \"{{{{ ds }}}}\", \"lookback_days\": {os.getenv('BASE_SILVER_LOOKBACK_DAYS', '0')}}}' "

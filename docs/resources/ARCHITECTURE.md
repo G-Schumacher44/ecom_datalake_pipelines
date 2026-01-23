@@ -126,7 +126,7 @@ gold_marts_build (dbt + BigQuery)
 
 ### Configuration Management
 
-DAGs use a lazy-loading configuration pattern via `SettingsConfig`:
+DAGs use a lazy-loading configuration pattern via `SettingsConfig` (an Airflow wrapper around the core `Settings` and `PipelineConfig` models from `src/settings.py`):
 
 ```python
 # airflow/dags/common.py

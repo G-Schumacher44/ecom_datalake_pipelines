@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 _NOT_SET = object()
 
+
 def validate_table(
     table: str,
     bronze_path: Path | str,
@@ -53,7 +54,7 @@ def validate_table(
     bronze_rows = count_parquet_rows(
         join_path(bronze_path, table),
         partition_key=bronze_pk,
-        partitions=bronze_parts_final, # type: ignore
+        partitions=bronze_parts_final,  # type: ignore
     )
     silver_rows = count_parquet_rows(
         join_path(silver_path, table),
@@ -71,9 +72,7 @@ def validate_table(
     if allow_empty and bronze_rows == 0 and total_processed == 0:
         pass_rate = 1.0
         status = "WARN"
-        logger.warning(
-            "%s: No rows processed (allowed empty source)", table
-        )
+        logger.warning("%s: No rows processed (allowed empty source)", table)
     elif total_processed > 0:
         pass_rate = silver_rows / total_processed
         status = None

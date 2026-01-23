@@ -79,10 +79,34 @@ ___
 
 5. **Spin up Airflow**
    ```bash
-   make airflow-init
-   make airflow-up
+   make up
    # Navigate to http://localhost:8080
+   # To stop: make down
    ```
+
+</details>
+
+<details>
+<summary> 📦 Sample Data Included</summary>
+
+The repository comes pre-loaded with **Bronze Parquet samples** in `samples/bronze/` to enable immediate testing without cloud dependencies.
+
+- **Tables**: `orders`, `order_items`, `customers`, `products`, `shopping_carts`, `cart_items`
+- **Date Range**: Includes slices from **Oct 2025** (simulated)
+- **Format**: Hive-partitioned Parquet with `_MANIFEST.json` files
+- **Use Case**: Run full Bronze → Silver → Enriched transformations locally using DuckDB and Polars.
+
+</details>
+
+<details>
+<summary> 🚀 Zero-Config Demo</summary>
+
+Want to see it in action instantly? Run the full local pipeline (Bronze -> Silver -> Enriched) with a single command line:
+
+```bash
+# Process sample data from Bronze to Enriched Silver (no Docker required)
+make local-silver && make local-dims && make local-enriched DATE=2025-10-15
+```
 
 </details>
 
@@ -210,7 +234,6 @@ ecom-datalake-pipelines/
 │   └── config/                 # Airflow configuration
 ├── config/
 │   ├── config.yml              # Pipeline settings (buckets, prefixes, targets)
-│   └── .env.example            # Environment variable template
 ├── dbt_duckdb/                 # Base Silver dbt project (DuckDB)
 │   ├── models/
 │   │   └── base_silver/        # Type-safe, integrity-checked Silver tables
@@ -400,18 +423,15 @@ dbt test --target dev
 <br>
 
 ```bash
-# Initialize Airflow (first time only)
-make airflow-init
-
-# Start Airflow services
-make airflow-up
+# Initialize and start Airflow services
+make up
 
 # Access Airflow UI
 open http://localhost:8080
 # Default credentials: airflow / airflow
 
 # Stop Airflow
-make airflow-down
+make down
 ```
 
 </details>
@@ -428,7 +448,7 @@ make test
 pytest tests/test_validation.py -v
 
 # Run with coverage
-pytest --cov=src/ecom_pipelines tests/
+pytest --cov=src tests/
 ```
 
 </details>

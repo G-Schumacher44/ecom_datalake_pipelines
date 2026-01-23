@@ -14,14 +14,14 @@ from common import (
     COMMON_ENV,
     PIPELINE_ENV,
     SettingsConfig,
-    get_retry_config,
     get_dim_specs,
     get_dim_table_names,
+    get_retry_config,
     resolve_dims_base_path,
 )
-from src.runners.dims_snapshot import snapshot_dims
 
 from airflow import DAG
+from src.runners.dims_snapshot import snapshot_dims
 
 # --- Task Callables ---
 
@@ -119,7 +119,7 @@ with DAG(
                 bash_command=(
                     f"cd {AIRFLOW_HOME} && "
                     f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
-                    f"&& export BRONZE_SYNC_TABLES=\"{table}\" "
+                    f'&& export BRONZE_SYNC_TABLES="{table}" '
                     f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
                     f"&& export DBT_DUCKDB_PATH=\"/tmp/dbt_duckdb/ecom_{table}_{{{{ run_id | replace(':', '') }}}}.duckdb\" "
                     f"&& python -m src.runners.base_silver "

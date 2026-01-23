@@ -18,6 +18,7 @@ def test_compute_product_performance_basic_metrics() -> None:
     )
     order_items = pl.DataFrame(
         {
+            "order_id": ["O1"],
             "product_id": [1],
             "quantity": [2],
             "unit_price": [20.0],
@@ -27,6 +28,8 @@ def test_compute_product_performance_basic_metrics() -> None:
     )
     return_items = pl.DataFrame(
         {
+            "return_id": ["R1"],
+            "order_id": ["O1"],
             "product_id": [1],
             "quantity_returned": [1],
             "refunded_amount": [20.0],
