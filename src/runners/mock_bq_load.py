@@ -97,7 +97,8 @@ def mock_bigquery_load(
                 # or handle complex type matching.
                 if str(observed_type) != str(expected_type):
                     schema_issues.append(
-                        f"Type mismatch for {col}: Expected {expected_type}, got {observed_type}"
+                        f"Type mismatch for {col}: Expected {expected_type}, "
+                        f"got {observed_type}"
                     )
 
         if schema_issues:
