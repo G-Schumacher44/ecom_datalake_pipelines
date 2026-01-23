@@ -46,10 +46,10 @@ def test_compute_product_performance_basic_metrics() -> None:
     )
 
     result = compute_product_performance(
-        products=products,
-        order_items=order_items,
-        return_items=return_items,
-        cart_items=cart_items,
+        products=products.lazy(),
+        order_items=order_items.lazy(),
+        return_items=return_items.lazy(),
+        cart_items=cart_items.lazy(),
     ).collect()
 
     assert result.shape[0] == 1

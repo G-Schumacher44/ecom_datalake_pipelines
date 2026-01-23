@@ -25,7 +25,9 @@ def test_compute_inventory_risk_outputs_expected_tier() -> None:
         }
     )
 
-    result = compute_inventory_risk(products, order_items, return_items).collect()
+    result = compute_inventory_risk(
+        products.lazy(), order_items.lazy(), returns.lazy()
+    ).collect()
     row = result.row(0, named=True)
 
     assert row["utilization_ratio"] == 0.5
@@ -59,7 +61,9 @@ def test_inventory_risk_tiers(inventory_quantity: int, expected_tier: str) -> No
         }
     )
 
-    result = compute_inventory_risk(products, order_items, return_items).collect()
+    result = compute_inventory_risk(
+        products.lazy(), order_items.lazy(), returns.lazy()
+    ).collect()
     row = result.row(0, named=True)
 
     assert row["risk_tier"] == expected_tier
