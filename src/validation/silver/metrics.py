@@ -14,9 +14,7 @@ from src.validation.common import (
     path_exists,
     read_parquet_safe,
 )
-from src.validation.silver.data import (
-    get_quarantine_breakdown,
-)
+from src.validation.silver.data import get_quarantine_breakdown
 from src.validation.silver.models import TableQualityMetrics
 
 logger = logging.getLogger(__name__)

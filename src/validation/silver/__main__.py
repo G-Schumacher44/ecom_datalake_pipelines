@@ -17,9 +17,7 @@ from src.runners.enriched.shared import (
 )
 from src.settings import load_settings
 from src.specs import load_spec_safe
-from src.validation.base_silver_schemas import (
-    REQUIRED_BASE_SILVER_COLUMNS,
-)
+from src.validation.base_silver_schemas import REQUIRED_BASE_SILVER_COLUMNS
 from src.validation.common import (
     get_overall_status,
     handle_exit,
@@ -185,11 +183,11 @@ def main() -> int:
     spec = load_spec_safe()
     allow_empty_map: dict[str, bool] = {}
     if spec:
-        for table in spec.silver_base.tables:
-            if table.quality and table.quality.sla is not None:
-                sla_thresholds[table.name] = table.quality.sla
-            if table.quality and table.quality.allow_empty:
-                allow_empty_map[table.name] = True
+        for table_spec in spec.silver_base.tables:
+            if table_spec.quality and table_spec.quality.sla is not None:
+                sla_thresholds[table_spec.name] = table_spec.quality.sla
+            if table_spec.quality and table_spec.quality.allow_empty:
+                allow_empty_map[table_spec.name] = True
         available_tables = {table.name for table in spec.silver_base.tables}
     else:
         available_tables = set(sla_thresholds.keys())

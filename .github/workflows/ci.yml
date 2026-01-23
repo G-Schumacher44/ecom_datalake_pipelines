@@ -46,18 +46,18 @@ jobs:
         run: |
           pip install -e ".[dbt]"
           mkdir -p data/silver/base/quarantine data/silver/enriched data/silver/dims data/metrics docs/validation_reports
-          
+
           # 1. Base Silver (dbt + Validation)
           make local-silver
-          
+
           # 2. Dimensions (dbt + Snapshot + Validation)
           # We use our new runner and validation module
           python scripts/run_dims_from_spec.py --run-date $DATE
           python -m src.validation.dims_snapshot --run-date $DATE --run-id "ci_${{ github.run_id }}"
-          
+
           # 3. Enriched Silver
           make local-enriched DATE=$DATE
-          
+
           # 4. Final Enriched Quality Gate
           python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt $DATE --run-id "ci_${{ github.run_id }}"
 
@@ -72,5 +72,3 @@ jobs:
           cd dbt_bigquery
           dbt deps
           dbt parse
-
-
