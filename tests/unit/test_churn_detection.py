@@ -27,10 +27,7 @@ def test_compute_customer_retention_signals_flags_danger_and_bronze() -> None:
     )
 
     result = compute_customer_retention_signals(
-        customers,
-        orders,
-        lookback_days=[30, 90],
-        reference_date=today,
+        customers.lazy(), orders.lazy(), reference_date=date(2020, 6, 1)
     ).collect()
 
     row_c1 = result.filter(pl.col("customer_id") == "c-1").row(0, named=True)

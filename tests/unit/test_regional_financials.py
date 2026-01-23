@@ -18,7 +18,7 @@ def test_compute_regional_financials_defaults_tax_rate() -> None:
         }
     )
 
-    result = compute_regional_financials(orders, customers).collect()
+    result = compute_regional_financials(orders.lazy(), customers.lazy()).collect()
     row = result.row(0, named=True)
 
     assert row["region"] == "west"
@@ -50,7 +50,7 @@ def test_compute_regional_financials_extracts_from_address() -> None:
         }
     )
 
-    result = compute_regional_financials(orders, customers).collect()
+    result = compute_regional_financials(orders.lazy(), customers.lazy()).collect()
 
     rows = result.sort("order_id").to_dicts()
 
