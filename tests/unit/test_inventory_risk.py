@@ -26,7 +26,7 @@ def test_compute_inventory_risk_outputs_expected_tier() -> None:
     )
 
     result = compute_inventory_risk(
-        products.lazy(), order_items.lazy(), returns.lazy()
+        products.lazy(), order_items.lazy(), return_items.lazy()
     ).collect()
     row = result.row(0, named=True)
 
@@ -62,7 +62,7 @@ def test_inventory_risk_tiers(inventory_quantity: int, expected_tier: str) -> No
     )
 
     result = compute_inventory_risk(
-        products.lazy(), order_items.lazy(), returns.lazy()
+        products.lazy(), order_items.lazy(), return_items.lazy()
     ).collect()
     row = result.row(0, named=True)
 

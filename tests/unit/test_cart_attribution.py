@@ -62,7 +62,7 @@ def test_compute_cart_attribution_summary_cart_status() -> None:
     )
 
     result = compute_cart_attribution_summary(
-        carts.lazy(), orders.lazy(), attribution.lazy()
+        carts.lazy(), orders.lazy(), cart_items.lazy()
     ).collect()
 
     status_map = dict(zip(result["cart_id"], result["cart_status"], strict=False))
