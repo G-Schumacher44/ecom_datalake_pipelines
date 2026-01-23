@@ -30,7 +30,7 @@ from common import (
     resolve_dims_base_path,
 )
 
-from airflow import DAG
+from airflow import DAG  # type: ignore
 from src.runners.enriched import (
     run_cart_attribution,
     run_cart_attribution_summary,
