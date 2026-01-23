@@ -61,7 +61,13 @@ jobs:
           # 4. Final Enriched Quality Gate
           python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt $DATE --run-id "ci_${{ github.run_id }}"
 
-      - name: Validate BigQuery Models
+      - name: Gold Logic Pre-flight (DuckDB)
+        env:
+          SILVER_ENRICHED_PATH: ${{ github.workspace }}/data/silver/enriched
+        run: |
+          python scripts/test_gold_logic_on_duckdb.py
+
+      - name: Validate BigQuery Models (Parse)
         run: |
           cd dbt_bigquery
           dbt deps
