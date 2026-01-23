@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.settings import load_settings
+from src.settings import load_settings  # noqa: E402
 
 
 def resolve_source_path(table_name: str, settings) -> str:
@@ -38,7 +38,9 @@ def resolve_source_path(table_name: str, settings) -> str:
 def transpile_bq_to_duckdb(sql: str, settings) -> str:
     """Convert BQ dbt SQL to DuckDB compatible SQL for local logic testing."""
     # 1. Replace {{ source('silver', 'table') }} with read_parquet(...)
-    source_pattern = r"""{{\s*source\s*\(\s*['"]silver['"]\s*,\s*['"](.+?)['"]\s*\)\s*}}"""
+    source_pattern = (
+        r"{\{\s*source\s*\(\s*['\"]silver['\"]\s*,\s*['\"](.+?)['\"]\s*\)\s*\}\}"
+    )
     
     def replace_source(match):
         table_name = match.group(1)
