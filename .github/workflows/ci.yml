@@ -30,36 +30,35 @@ jobs:
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
-      - name: dbt validation
+      - name: Localized E2E Pipeline (Samples)
+        env:
+          PIPELINE_ENV: local
+          BRONZE_BASE_PATH: ${{ github.workspace }}/samples/bronze
+          SILVER_BASE_PATH: ${{ github.workspace }}/data/silver/base
+          SILVER_ENRICHED_PATH: ${{ github.workspace }}/data/silver/enriched
+          DATE: "2025-10-15"
         run: |
           pip install -e ".[dbt]"
-          export BRONZE_BASE_PATH=$(pwd)/samples/bronze
-          export SILVER_BASE_PATH=$(pwd)/data/silver/base
-          mkdir -p /tmp/dbt_duckdb
-          cd dbt_duckdb
-          dbt deps
-          dbt build --target dev --project-dir . --profiles-dir .
-          cd ../dbt_bigquery
+          mkdir -p data/silver/base/quarantine data/silver/enriched data/silver/dims data/metrics docs/validation_reports
+          
+          # 1. Base Silver (dbt + Validation)
+          make local-silver
+          
+          # 2. Dimensions (dbt + Snapshot + Validation)
+          # We use our new runner and validation module
+          python scripts/run_dims_from_spec.py --run-date $DATE
+          python -m src.validation.dims_snapshot --run-date $DATE --run-id "ci_${{ github.run_id }}"
+          
+          # 3. Enriched Silver
+          make local-enriched DATE=$DATE
+          
+          # 4. Final Enriched Quality Gate
+          python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt $DATE --run-id "ci_${{ github.run_id }}"
+
+      - name: Validate BigQuery Models
+        run: |
+          cd dbt_bigquery
           dbt deps
           dbt parse
-      - name: Validation Integration Test
-        run: |
-          # Test Bronze Validation
-          python -m src.validation.bronze_quality --bronze-path samples/bronze --output-report bronze_ci.md
 
-          # Test Silver Validation (using new refactored package)
-          # Note: dbt build in previous step populated data/silver/base
-          mkdir -p data/silver/base/quarantine
-          python -m src.validation.silver \
-            --bronze-path samples/bronze \
-            --silver-path data/silver/base \
-            --quarantine-path data/silver/base/quarantine \
-            --output-report silver_ci.md
 
-          # Test Enriched Validation (Schema Only - no data yet but should run)
-          # We create the dir to avoid FileNotFoundError on path resolution
-          mkdir -p data/silver/enriched
-          python -m src.validation.enriched \
-            --enriched-path data/silver/enriched \
-            --ingest-dt 2020-01-01 \
-            --output-report enriched_ci.md
