@@ -11,8 +11,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/airflow
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
     AIRFLOW__WEBSERVER__SECRET_KEY: "${AIRFLOW__WEBSERVER__SECRET_KEY:-}"
     AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY:-}"
     PYTHONPATH: "/opt/airflow"
@@ -21,6 +21,7 @@ x-airflow-common: &airflow-common
     PIPELINE_ENV: "${PIPELINE_ENV:-dev}"
     OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-dev}"
     CLOUDSDK_CONFIG: "/home/airflow/.config/gcloud"
+    GOOGLE_APPLICATION_CREDENTIALS: "/home/airflow/.config/gcloud/application_default_credentials.json"
     USE_SA_AUTH: "${USE_SA_AUTH:-false}"
 
     # Redirect writable paths to /tmp inside container to avoid macOS Docker volume locking (Errno 35)
@@ -37,7 +38,6 @@ x-airflow-common: &airflow-common
     GCS_BUCKET: "${GCS_BUCKET:-}"
     BQ_LOCATION: "${BQ_LOCATION:-US}"
     BQ_LOAD_ENABLED: "${BQ_LOAD_ENABLED:-}"
-    GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
     # Use docker.env for GCS buckets and paths to avoid host env overrides.
 
     # Feature Flags
@@ -62,7 +62,7 @@ x-airflow-common: &airflow-common
     - airflow-data:/opt/airflow/data
     - ./docs:/opt/airflow/docs
     # ADC (default): mount gcloud application-default credentials
-    - ${CLOUDSDK_CONFIG_PATH:-~/.config/gcloud}:/home/airflow/.config/gcloud:rw
+    # - ${CLOUDSDK_CONFIG_PATH:-~/.config/gcloud}:/home/airflow/.config/gcloud:rw
     # Optional service account key (set USE_SA_AUTH=true + GOOGLE_APPLICATION_CREDENTIALS)
     # - ${GCP_SA_KEY_PATH}:/opt/airflow/.gcp/sa.json:ro
 
@@ -81,8 +81,8 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
+      POSTGRES_USER: "${POSTGRES_USER:-airflow}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-airflow}"
       POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data

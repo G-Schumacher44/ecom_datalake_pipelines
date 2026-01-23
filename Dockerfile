@@ -35,7 +35,6 @@ COPY --chown=airflow:root src/ ./src/
 COPY --chown=airflow:root config/ ./config/
 COPY --chown=airflow:root airflow/dags/ ./dags/
 COPY --chown=airflow:root samples/ ./samples/
-COPY --chown=airflow:root docs/ ./docs/
 COPY --chown=airflow:root scripts/ ./scripts/
 
 # Install Python dependencies
@@ -77,7 +76,7 @@ RUN python -c "from src.settings import load_settings; print('✅ Package instal
 # Set environment defaults (can be overridden in docker-compose or Cloud Composer)
 ENV PIPELINE_ENV=local \
     AIRFLOW__CORE__LOAD_EXAMPLES=False \
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG=False
 
 # Default command (overridden by docker-compose)
 CMD ["airflow", "webserver"]
