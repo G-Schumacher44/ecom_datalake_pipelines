@@ -55,22 +55,17 @@ Thumbs.db
 .coverage
 htmlcov/
 
+# Environment files (use env vars instead)
+.env
+.env.*
+.gcloud/
+
 # Documentation (not needed in runtime image)
-docs/img/
-docs/planning/
-docs/furture_state/
+docs/
 README.md
 CHANGELOG.md
 CONTRIBUTING.md
 LICENSE
-
-# CI/CD
-.pre-commit-config.yaml
-.github/
-
-# Environment files (use env vars instead)
-.env
-.env.*
 
 # dbt artifacts (generated at runtime)
 dbt_duckdb/target/

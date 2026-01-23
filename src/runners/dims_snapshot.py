@@ -100,35 +100,62 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                 pl.col("signup_date").is_not_null() & (pl.col("signup_date") <= run_dt)
             )
         elif table == "product_catalog":
-            base_df = df.with_columns(
-                pl.col("ingestion_dt")
-                .cast(pl.Date, strict=False)
-                .alias("ingestion_dt"),
-            )
+            # Cast ingestion_dt to Date if it exists
+            if "ingestion_dt" in df.columns:
+                base_df = df.with_columns(
+                    pl.col("ingestion_dt")
+                    .cast(pl.Date, strict=False)
+                    .alias("ingestion_dt"),
+                )
+            else:
+                logger.warning(
+                    f"ingestion_dt not found in {table} source; "
+                    "hive partitioning might have failed or table is unpartitioned"
+                )
+                base_df = df
+
+            # Filter for data valid ON or BEFORE the run date
             df = base_df.with_columns(
                 pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"),
             )
-            df = df.filter(
-                pl.col("ingestion_dt").is_not_null()
-                & (pl.col("ingestion_dt") <= run_dt)
-            )
-            if df.is_empty() and allow_fallback:
-                max_dt = (
-                    base_df.select(pl.col("ingestion_dt").max()).item()
-                    if "ingestion_dt" in base_df.columns
-                    else None
+
+            if "ingestion_dt" in df.columns:
+                df = df.filter(
+                    pl.col("ingestion_dt").is_not_null()
+                    & (pl.col("ingestion_dt") <= run_dt)
                 )
+
+            if df.is_empty() and allow_fallback:
+                max_dt = None
+                if "ingestion_dt" in base_df.columns:
+                    # Collect min/max to find latest available
+                    max_dt_series = base_df.select(pl.col("ingestion_dt").max()).to_series()
+                    if len(max_dt_series) > 0 and max_dt_series[0] is not None:
+                        max_dt = max_dt_series[0]
+
                 if max_dt:
                     logger.warning(
-                        "Product catalog empty for run_date; using latest available",
+                        f"Product catalog empty for {run_date}; "
+                        f"falling back to latest available partition: {max_dt}",
                         run_date=run_date,
                         fallback_date=str(max_dt),
                     )
                     df = base_df.filter(pl.col("ingestion_dt") == max_dt).with_columns(
                         pl.lit(run_dt).cast(pl.Date).alias("as_of_dt")
                     )
+                else:
+                    logger.warning(
+                        f"No fallback possible for {table}: source is empty or has no ingestion_dt"
+                    )
         else:
             df = df.with_columns(pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"))
+
+        if df.is_empty():
+            logger.error(
+                f"Snapshot for {table} is empty for {run_date}. "
+                f"allow_fallback={allow_fallback}, pipeline_env={pipeline_env}"
+            )
+
         _write_snapshot(df, dims_local_path, table, run_date)
 
     if dims_gcs_path:
