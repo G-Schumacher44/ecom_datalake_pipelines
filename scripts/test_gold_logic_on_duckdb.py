@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 
 import duckdb
-import polars as pl
 
 # Ensure src is in path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.settings import load_settings
+
 
 def resolve_source_path(table_name: str, settings) -> str:
     """Map source('silver', '...') to local parquet path."""
@@ -56,7 +56,7 @@ def main():
     settings = load_settings()
     models_dir = PROJECT_ROOT / "dbt_bigquery" / "models" / "gold_marts"
     
-    print(f"--- Gold Logic Pre-flight (DuckDB) ---")
+    print("--- Gold Logic Pre-flight (DuckDB) ---")
     print(f"Models directory: {models_dir}")
     
     con = duckdb.connect(database=":memory:")
@@ -87,7 +87,7 @@ def main():
             print(f"     Error: {str(e)}")
             fail_count += 1
             
-    print(f"\n--- Summary ---")
+    print("\n--- Summary ---")
     print(f"Passed: {success_count}")
     print(f"Failed: {fail_count}")
     
