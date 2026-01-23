@@ -32,4 +32,3 @@ repos:
           - polars>=1.0.0
           - pandas-stubs
         args: ["--ignore-missing-imports", "--no-incremental"]
-

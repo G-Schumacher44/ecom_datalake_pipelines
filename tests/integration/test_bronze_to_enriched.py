@@ -15,10 +15,7 @@ import pytest
 from src.settings import ValidationConfig
 from src.transforms.customer_lifetime_value import compute_customer_lifetime_value
 from src.transforms.product_performance import compute_product_performance
-from src.validation.enriched.metrics import (
-    compute_null_rates,
-    evaluate_sanity_checks,
-)
+from src.validation.enriched.metrics import compute_null_rates, evaluate_sanity_checks
 
 
 @pytest.fixture

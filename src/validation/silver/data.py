@@ -6,11 +6,7 @@ from pathlib import Path
 import polars as pl
 from polars.exceptions import ColumnNotFoundError, ComputeError, SchemaError
 
-from src.validation.common import (
-    is_gcs_path,
-    path_exists,
-    read_parquet_safe,
-)
+from src.validation.common import is_gcs_path, path_exists, read_parquet_safe
 
 logger = logging.getLogger(__name__)
 

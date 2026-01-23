@@ -7,14 +7,8 @@ from .commerce import (
     run_product_performance,
     run_sales_velocity,
 )
-from .customer import (
-    run_customer_lifetime_value,
-    run_customer_retention,
-)
-from .finance import (
-    run_regional_financials,
-    run_shipping_economics,
-)
+from .customer import run_customer_lifetime_value, run_customer_retention
+from .finance import run_regional_financials, run_shipping_economics
 from .ops import run_daily_business_metrics
 
 __all__ = [
