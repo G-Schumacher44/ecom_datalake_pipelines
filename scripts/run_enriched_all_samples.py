@@ -46,17 +46,14 @@ def resolve_valid_dates(base_path: Path) -> list[str]:
     else:
         partition_map = DEFAULT_PARTITION_MAP
     date_sets = [
-        list_dates(base_path, table, key)
-        for table, key in partition_map.items()
+        list_dates(base_path, table, key) for table, key in partition_map.items()
     ]
     if not date_sets:
         return []
     return sorted(set.intersection(*date_sets))
 
 
-def run_enriched_for_date(
-    base_path: Path, output_path: str, ingest_dt: str
-) -> None:
+def run_enriched_for_date(base_path: Path, output_path: str, ingest_dt: str) -> None:
     functions = [
         enriched.run_cart_attribution,
         enriched.run_cart_attribution_summary,
