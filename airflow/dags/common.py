@@ -4,6 +4,7 @@ import os
 from datetime import timedelta
 
 from src.settings import RetryConfig, load_settings
+from src.specs import load_spec_safe
 
 # --- Configuration Helper (Lazy Loading) ---
 
@@ -78,6 +79,8 @@ COMMON_ENV = {
     "SILVER_BASE_PATH": os.getenv("SILVER_BASE_PATH", ""),
     "SILVER_ENRICHED_PATH": os.getenv("SILVER_ENRICHED_PATH", ""),
     "SILVER_ENRICHED_LOCAL_PATH": os.getenv("SILVER_ENRICHED_LOCAL_PATH", ""),
+    "SILVER_DIMS_PATH": os.getenv("SILVER_DIMS_PATH", ""),
+    "SILVER_DIMS_LOCAL_PATH": os.getenv("SILVER_DIMS_LOCAL_PATH", ""),
     "SILVER_QUARANTINE_PATH": os.getenv("SILVER_QUARANTINE_PATH", ""),
     "METRICS_BUCKET": os.getenv("METRICS_BUCKET", ""),
     "LOGS_BUCKET": os.getenv("LOGS_BUCKET", ""),
@@ -97,6 +100,34 @@ def resolve_bool(env_key: str, default: bool = False) -> bool:
     if env_override is None:
         return default
     return env_override.lower() in {"true", "1", "yes"}
+
+
+def resolve_dims_base_path() -> str | None:
+    """Resolve the dims snapshot base path, honoring env and spec defaults."""
+    env_override = os.getenv("SILVER_DIMS_PATH")
+    if env_override:
+        base_path = env_override
+    else:
+        spec = load_spec_safe()
+        if not spec or not spec.dims or not spec.dims.base_path:
+            return None
+        base_path = spec.dims.base_path
+
+    base_path = os.path.expandvars(base_path)
+    if base_path.startswith("gs://") or os.path.isabs(base_path):
+        return base_path
+
+    config = SettingsConfig()
+    return os.path.join(config.airflow_home, base_path)
+
+
+_resolved_dims_path = resolve_dims_base_path()
+if _resolved_dims_path:
+    COMMON_ENV.setdefault("SILVER_DIMS_PATH", _resolved_dims_path)
+    if _resolved_dims_path.startswith("gs://"):
+        COMMON_ENV.setdefault(
+            "SILVER_DIMS_LOCAL_PATH", f"{AIRFLOW_HOME}/data/silver/dims"
+        )
 
 
 def run_enriched_runner(func, **kwargs):
@@ -175,3 +206,34 @@ def get_retry_config(environment: str | None = None) -> dict:
         "retry_exponential_backoff": retry_cfg.retry_exponential_backoff,
         "max_retry_delay": timedelta(minutes=retry_cfg.max_retry_delay_minutes),
     }
+
+
+def get_dim_specs() -> list[dict[str, str]]:
+    """Return dim table specs (name + dbt_model) from spec or defaults."""
+    spec = load_spec_safe()
+    if spec:
+        return [{"name": t.name, "dbt_model": t.dbt_model} for t in spec.dims.tables]
+    return [
+        {"name": "customers", "dbt_model": "stg_ecommerce__customers"},
+        {"name": "product_catalog", "dbt_model": "stg_ecommerce__product_catalog"},
+    ]
+
+
+def get_dim_table_names() -> list[str]:
+    return [t["name"] for t in get_dim_specs()]
+
+
+def get_silver_base_table_names() -> list[str]:
+    spec = load_spec_safe()
+    if spec:
+        return [t.name for t in spec.silver_base.tables]
+    config = SettingsConfig()
+    return list(config.pipeline.sla_thresholds.keys())
+
+
+def get_enriched_table_names() -> list[str]:
+    spec = load_spec_safe()
+    if spec:
+        return [t.name for t in spec.silver_enriched.tables]
+    config = SettingsConfig()
+    return list(config.pipeline.enriched_tables)

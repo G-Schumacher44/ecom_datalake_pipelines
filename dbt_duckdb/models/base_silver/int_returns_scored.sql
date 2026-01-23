@@ -22,7 +22,8 @@ dim_orders as (
 dim_customers as (
     select distinct
         customer_id
-    from {{ silver_parquet('customers') }}
+    from {{ dims_parquet('customers') }}
+    where {{ run_date_filter('snapshot_dt') }}
 ),
 
 cleaned as (

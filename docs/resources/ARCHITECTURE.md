@@ -6,7 +6,7 @@
 graph TD
     A[Bronze Layer<br/>Parquet in GCS] -->|Bronze Quality Check| B[Base Silver<br/>dbt + DuckDB]
     B -->|Silver Quality Check| C[Enriched Silver<br/>Polars Transforms]
-    C -->|Enriched Quality Check| D[GCS Sync<br/>gcloud storage rsync]
+    C -->|Enriched Quality Check| D[GCS Sync<br/>gcloud storage rsync (publish)]
     D --> E[BigQuery Load<br/>Parquet Import]
     E --> F[Gold Marts<br/>dbt + BigQuery]
 
@@ -22,7 +22,7 @@ Base Silver (dbt + DuckDB)
     ↓  [Silver Quality Validation + Optional Profile]
 Enriched Silver (Polars transforms)
     ↓  [Enriched Quality Validation]
-    ↓  [Sync to GCS with gcloud storage rsync]
+    ↓  [Sync to GCS with gcloud storage rsync (publish only)]
 BigQuery Load (Parquet import)
     ↓
 Gold Marts (dbt + BigQuery)
@@ -85,13 +85,13 @@ setup_config
     ↓
 trigger_dim_refresh (wait for completion)
     ↓
+validate_dims_quality
+    ↓
 validate_bronze_quality
     ↓
 base_silver (dbt - all fact tables)
     ↓
 validate_silver_quality
-    ↓
-sync_silver_base_to_gcs
     ↓
 enriched_silver (TaskGroup - 10 parallel tasks)
     ├─ int_attributed_purchases
@@ -126,7 +126,7 @@ gold_marts_build (dbt + BigQuery)
 
 ### Configuration Management
 
-DAGs use a lazy-loading configuration pattern via `SettingsConfig`:
+DAGs use a lazy-loading configuration pattern via `SettingsConfig` (an Airflow wrapper around the core `Settings` and `PipelineConfig` models from `src/settings.py`):
 
 ```python
 # airflow/dags/common.py
@@ -263,7 +263,7 @@ with DAG(
 
 - **dbt tasks**: Built-in idempotency via table materialization
 - **Polars transforms**: Deterministic, safe to re-run
-- **GCS sync**: `gcloud storage rsync` with `--delete-unmatched-destination-objects` ensures atomic state
+- **GCS sync**: `gcloud storage rsync` with `--delete-unmatched-destination-objects` is used for publish only (validation reads gs:// directly)
 - **BigQuery loads**: `WRITE_TRUNCATE` disposition for partition-level idempotency
 
 ### Failure Handling

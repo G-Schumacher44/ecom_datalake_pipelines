@@ -5,6 +5,7 @@ __pycache__/
 
 .env
 .env.*
+docker.env
 !.env.example
 .envrc
 .venv/
@@ -53,3 +54,5 @@ airflow/plugins/__pycache__/
 .vscode/.ropeproject/
 .DS_Store
 .claude/*
+src/*.egg-info/
+.gcloud/*

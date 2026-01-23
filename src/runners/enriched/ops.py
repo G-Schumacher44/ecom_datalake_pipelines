@@ -23,4 +23,8 @@ def run_daily_business_metrics(
         returns=tables["returns"],
         carts=tables["shopping_carts"],
         ratio_epsilon=settings.enriched_ratio_epsilon,
+        rate_precision=settings.rate_precision,
+        rate_cap_min=settings.rate_cap_min,
+        rate_cap_max=settings.rate_cap_max,
+        rate_cap_enabled=settings.rate_cap_enabled,
     )

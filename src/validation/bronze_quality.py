@@ -23,20 +23,29 @@ from typing import Any
 
 from src.observability import get_logger
 from src.observability.metrics import write_data_quality_metric
-from src.runners.enriched.shared import get_table_partitions
+from src.settings import load_settings
+from src.specs import load_spec_safe
 from src.validation.common import (
     ValidationStatus,
     handle_exit,
     is_gcs_path,
     resolve_layer_paths,
+    resolve_reports_enabled,
 )
 
 logger = get_logger(__name__)
 
 
+def get_bronze_partitions() -> dict[str, str | None]:
+    spec = load_spec_safe()
+    if spec:
+        return {table.name: table.partition_key for table in spec.bronze.tables}
+    return load_settings().pipeline.table_partitions
+
+
 def get_partition_glob(table: str) -> str:
     """Get the partition glob for a table from centralized config."""
-    key = get_table_partitions().get(table, "ingest_dt")
+    key = get_bronze_partitions().get(table, "ingest_dt")
     return f"{key}=*"
 
 
@@ -97,6 +106,11 @@ def parse_args() -> argparse.Namespace:
         default="docs/validation_reports/BRONZE_QUALITY.md",
         help="Path to write Markdown report.",
     )
+    parser.add_argument(
+        "--spec-path",
+        default=None,
+        help="Path to spec directory or file (overrides ECOM_SPEC_PATH).",
+    )
     return parser.parse_args()
 
 
@@ -146,18 +160,19 @@ def list_partitions(
     if is_gcs_path(root):
         import fsspec
 
-        key = get_table_partitions().get(table, "ingest_dt")
+        key = get_bronze_partitions().get(table, "ingest_dt")
         fs = fsspec.filesystem("gcs")
         if partition_values:
-            prefixes = []
+            found_prefixes = []
             for value in partition_values:
-                partition_path = f"{root}/{table}/{key}={value}"
-                if fs.exists(partition_path):
-                    prefixes.append(partition_path)
-            return sorted(prefixes)
-        matches = fs.glob(f"{root}/{table}/{key}=*/*")
-        if not matches:
-            matches = fs.glob(f"{root}/{table}/{partition_glob}")
+                partition_path_str = f"{root}/{table}/{key}={value}"
+                if fs.exists(partition_path_str):
+                    found_prefixes.append(partition_path_str)
+            return sorted(found_prefixes)
+
+        # Optimization: Just list the partition directories, not every file inside them.
+        # This prevents hangs on large GCS buckets.
+        matches = fs.glob(f"{root}/{table}/{partition_glob}")
         prefixes: set[str] = set()
         for match in matches:
             path = match
@@ -175,11 +190,11 @@ def list_partitions(
 
     if partition_values:
         paths = []
-        key = get_table_partitions().get(table, "ingest_dt")
+        key = get_bronze_partitions().get(table, "ingest_dt")
         for value in partition_values:
-            partition_path = Path(root, table, f"{key}={value}")
-            if partition_path.is_dir():
-                paths.append(str(partition_path))
+            local_partition_path = Path(root, table, f"{key}={value}")
+            if local_partition_path.is_dir():
+                paths.append(str(local_partition_path))
         return sorted(paths)
 
     return sorted(str(p) for p in Path(root, table).glob(partition_glob) if p.is_dir())
@@ -312,6 +327,8 @@ def generate_report(metrics: list[TableMetrics], output_path: str, run_id: str) 
 
 def main() -> int:
     args = parse_args()
+    if args.spec_path:
+        os.environ["ECOM_SPEC_PATH"] = args.spec_path
 
     from src.observability.config import get_config
     from src.settings import load_settings
@@ -336,12 +353,16 @@ def main() -> int:
             return 1
 
     # Resolve paths using shared library
-    paths = resolve_layer_paths(args.config, bronze_over=args.bronze_path)
+    paths = resolve_layer_paths(
+        args.config,
+        bronze_over=args.bronze_path,
+        spec_path=args.spec_path,
+    )
     bronze_root = str(paths["bronze"])
 
     logger.info(f"Starting Bronze quality validation (run_id={run_id})")
 
-    expected_tables = list(get_table_partitions().keys())
+    expected_tables = list(get_bronze_partitions().keys())
     available_tables: list[str] | None = None
 
     if not is_gcs_path(bronze_root):
@@ -407,7 +428,10 @@ def main() -> int:
         report_filename = Path(args.output_report).name
         report_path = obs_config.get_run_report_path(run_id, report_filename)
 
-    generate_report(metrics, report_path, run_id)
+    if resolve_reports_enabled(args.spec_path):
+        generate_report(metrics, report_path, run_id)
+    else:
+        report_path = "(reports disabled)"
     logger.info(f"✅ Bronze quality validation completed: {overall_status}")
 
     return handle_exit(

@@ -28,14 +28,10 @@ def test_compute_customer_lifetime_value_segments() -> None:
     )
 
     result = compute_customer_lifetime_value(
-        customers=customers,
-        orders=orders,
-        returns=returns,
-        reference_date=date(2020, 2, 20),
-        churn_days=90,
-        whale_clv=10000.0,
-        whale_orders=20,
-        medium_clv=2000.0,
+        customers=customers.lazy(),
+        orders=orders.lazy(),
+        returns=returns.lazy(),
+        reference_date=date(2020, 3, 1),
     ).collect()
 
     cust1 = result.filter(pl.col("customer_id") == "CUST-1").row(0, named=True)
@@ -46,7 +42,6 @@ def test_compute_customer_lifetime_value_segments() -> None:
     assert cust1["return_count"] == 1
     assert cust1["customer_segment"] == "regular"
     assert cust1["predicted_clv_bucket"] == "medium_value"
-    assert cust1["actual_clv_bucket"] == "low_value"
-
+    assert cust1["actual_clv_bucket"] == "medium_value"
     assert cust2["order_count"] == 1
     assert cust2["customer_segment"] == "one-timer"

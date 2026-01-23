@@ -16,6 +16,12 @@ def test_semantic_checks_cart_attribution() -> None:
     )
 
     config = MagicMock()
+    settings = MagicMock()
+    settings.cart_abandoned_min_value = 0.0
+    settings.rate_cap_min = 0.0
+    settings.rate_cap_max = 1.0
+    settings.return_units_max_ratio = 2.0
+
     config.semantic_checks = {
         "int_cart_attribution": [
             {
@@ -37,7 +43,9 @@ def test_semantic_checks_cart_attribution() -> None:
         ]
     }
 
-    issues = evaluate_semantic_checks(df, "int_cart_attribution", config, 0.0001)
+    issues = evaluate_semantic_checks(
+        df, "int_cart_attribution", config, settings, 0.0001
+    )
 
     assert "converted_requires_order_id: 1 rows" in issues
     assert "abandoned_requires_null_order_id: 1 rows" in issues
@@ -59,6 +67,12 @@ def test_semantic_checks_product_performance() -> None:
     )
 
     config = MagicMock()
+    settings = MagicMock()
+    settings.cart_abandoned_min_value = 0.0
+    settings.rate_cap_min = 0.0
+    settings.rate_cap_max = 1.0
+    settings.return_units_max_ratio = 2.0
+
     config.semantic_checks = {
         "int_product_performance": [
             {
@@ -80,7 +94,9 @@ def test_semantic_checks_product_performance() -> None:
         ]
     }
 
-    issues = evaluate_semantic_checks(df, "int_product_performance", config, 0.0001)
+    issues = evaluate_semantic_checks(
+        df, "int_product_performance", config, settings, 0.0001
+    )
 
     assert "units_returned_le_units_sold: 1 rows" in issues
     assert "return_rate_le_one: 1 rows" in issues
@@ -99,6 +115,12 @@ def test_semantic_checks_shipping_economics() -> None:
     )
 
     config = MagicMock()
+    settings = MagicMock()
+    settings.cart_abandoned_min_value = 0.0
+    settings.rate_cap_min = 0.0
+    settings.rate_cap_max = 1.0
+    settings.return_units_max_ratio = 2.0
+
     config.semantic_checks = {
         "int_shipping_economics": [
             {
@@ -115,7 +137,9 @@ def test_semantic_checks_shipping_economics() -> None:
         ]
     }
 
-    issues = evaluate_semantic_checks(df, "int_shipping_economics", config, 0.0001)
+    issues = evaluate_semantic_checks(
+        df, "int_shipping_economics", config, settings, 0.0001
+    )
 
     assert "shipping_margin_matches_components: 1 rows" in issues
     assert "shipping_margin_pct_null_when_zero_cost: 1 rows" in issues

@@ -18,6 +18,7 @@ def test_compute_product_performance_basic_metrics() -> None:
     )
     order_items = pl.DataFrame(
         {
+            "order_id": ["O1"],
             "product_id": [1],
             "quantity": [2],
             "unit_price": [20.0],
@@ -27,6 +28,8 @@ def test_compute_product_performance_basic_metrics() -> None:
     )
     return_items = pl.DataFrame(
         {
+            "return_id": ["R1"],
+            "order_id": ["O1"],
             "product_id": [1],
             "quantity_returned": [1],
             "refunded_amount": [20.0],
@@ -43,10 +46,10 @@ def test_compute_product_performance_basic_metrics() -> None:
     )
 
     result = compute_product_performance(
-        products=products,
-        order_items=order_items,
-        return_items=return_items,
-        cart_items=cart_items,
+        products=products.lazy(),
+        order_items=order_items.lazy(),
+        return_items=return_items.lazy(),
+        cart_items=cart_items.lazy(),
     ).collect()
 
     assert result.shape[0] == 1

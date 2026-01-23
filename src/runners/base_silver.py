@@ -6,13 +6,18 @@ for executing dbt models with proper environment setup and path handling.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
+import pyarrow.parquet as pq
+
 from src.settings import load_settings
+from src.specs import load_spec_safe
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,38 @@ STANDARD_TABLES = [
     "returns",
     "return_items",
 ]
+
+
+def extract_spec_path(argv: list[str]) -> tuple[str | None, list[str]]:
+    """Extract --spec-path from argv and return cleaned args."""
+    spec_path: str | None = None
+    cleaned: list[str] = []
+    skip_next = False
+    for idx, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg.startswith("--spec-path"):
+            if arg == "--spec-path":
+                if idx + 1 < len(argv):
+                    spec_path = argv[idx + 1]
+                    skip_next = True
+            else:
+                _, value = arg.split("=", 1)
+                spec_path = value
+            continue
+        cleaned.append(arg)
+    return spec_path, cleaned
+
+
+def has_select_arg(argv: list[str]) -> bool:
+    """Return True if dbt selection is already present in argv."""
+    for arg in argv:
+        if arg in {"--select", "--models"}:
+            return True
+        if arg.startswith("--select=") or arg.startswith("--models="):
+            return True
+    return False
 
 
 def check_virtiofs_deadlock(bronze_path: Path) -> None:
@@ -63,7 +100,9 @@ def ensure_local_directories(silver_path: Path, quarantine_path: Path) -> None:
     logger.info("Ensuring local directory structure exists...")
     silver_path.mkdir(parents=True, exist_ok=True)
     quarantine_path.mkdir(parents=True, exist_ok=True)
-    for table in STANDARD_TABLES:
+    spec = load_spec_safe()
+    table_names = [t.name for t in spec.silver_base.tables] if spec else STANDARD_TABLES
+    for table in table_names:
         (silver_path / table).mkdir(parents=True, exist_ok=True)
         (quarantine_path / table).mkdir(parents=True, exist_ok=True)
 
@@ -93,6 +132,11 @@ def gcloud_rsync(source: str, destination: str, delete: bool) -> None:
         cmd.append("--delete-unmatched-destination-objects")
     cmd.extend([source, destination])
     logger.info(f"Syncing {source} -> {destination}")
+    subprocess.run(cmd, check=True, env=gcloud_env())
+
+
+def gcloud_env() -> dict[str, str]:
+    """Build gcloud environment overrides for auth."""
     env = os.environ.copy()
     creds = env.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
     if use_sa_auth() and creds:
@@ -103,7 +147,63 @@ def gcloud_rsync(source: str, destination: str, delete: bool) -> None:
         if adc_path.exists():
             # Ensure gcloud uses ADC refresh token without interactive login.
             env["CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE"] = str(adc_path)
-    subprocess.run(cmd, check=True, env=env)
+    return env
+
+
+def gcloud_copy_file(source: Path, destination: str) -> None:
+    """Copy a local file to GCS using gcloud storage cp."""
+    cmd = ["gcloud", "storage", "cp", str(source), destination]
+    logger.info(f"Uploading {source} -> {destination}")
+    subprocess.run(cmd, check=True, env=gcloud_env())
+
+
+def resolve_run_id() -> str:
+    """Resolve a stable run_id for publish staging."""
+    for key in ("RUN_ID", "AIRFLOW_CTX_DAG_RUN_ID", "AIRFLOW_CTX_EXECUTION_DATE"):
+        value = os.getenv(key, "").strip()
+        if value:
+            return value.replace(":", "").replace("+", "").replace(" ", "_")
+    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+
+def generate_manifest(local_table_path: Path, remote_table_url: str) -> None:
+    """Generate _MANIFEST.json for each partition in a table (local only)."""
+    if not local_table_path.exists():
+        return
+
+    # Find all partitions (subdirectories)
+    # Assumes Hive partitioning: table/key=value
+    partitions = [p for p in local_table_path.iterdir() if p.is_dir() and "=" in p.name]
+
+    # Also handle unpartitioned tables (root level parquet files)
+    root_files = list(local_table_path.glob("*.parquet"))
+    if root_files:
+        partitions.append(local_table_path)
+
+    for partition_dir in partitions:
+        parquet_files = list(partition_dir.glob("*.parquet"))
+        if not parquet_files:
+            continue
+
+        total_rows = 0
+        file_count = 0
+
+        for pfile in parquet_files:
+            try:
+                meta = pq.read_metadata(pfile)
+                total_rows += meta.num_rows
+                file_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to read metadata for {pfile}: {e}")
+
+        manifest = {
+            "total_rows": total_rows,
+            "file_count": file_count,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        manifest_path = partition_dir / "_MANIFEST.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2))
 
 
 def run_dbt(
@@ -149,15 +249,23 @@ def run_dbt(
 
 def main() -> None:
     """Main entry point."""
+    spec_path, dbt_extra_args = extract_spec_path(sys.argv[1:])
+    if spec_path:
+        os.environ["ECOM_SPEC_PATH"] = spec_path
     # Load settings to resolve defaults if env vars missing
     settings = load_settings()
 
     # Resolve paths (Env vars take precedence over config)
     airflow_home = os.getenv("AIRFLOW_HOME", "/opt/airflow")
-    bronze_path_raw = os.getenv("BRONZE_BASE_PATH", "samples/bronze")
-    silver_path_raw = os.getenv("SILVER_BASE_PATH", "data/silver/base")
-    quarantine_path_raw = os.getenv(
-        "SILVER_QUARANTINE_PATH", f"{silver_path_raw}/quarantine"
+    spec = load_spec_safe(spec_path)
+    bronze_path_raw = os.getenv("BRONZE_BASE_PATH") or (
+        spec.bronze.base_path if spec else "samples/bronze"
+    )
+    silver_path_raw = os.getenv("SILVER_BASE_PATH") or (
+        spec.silver_base.base_path if spec else "data/silver/base"
+    )
+    quarantine_path_raw = os.getenv("SILVER_QUARANTINE_PATH") or (
+        spec.silver_base.quarantine_path if spec else f"{silver_path_raw}/quarantine"
     )
 
     bronze_path_effective = bronze_path_raw
@@ -215,9 +323,12 @@ def main() -> None:
     check_virtiofs_deadlock(bronze_path)
     ensure_local_directories(silver_path, quarantine_path)
 
-    # Pass remaining CLI arguments to dbt
-    # sys.argv[0] is the script name, so we take everything after
-    dbt_extra_args = sys.argv[1:]
+    if not has_select_arg(dbt_extra_args) and spec:
+        model_list = [
+            table.dbt_model for table in spec.silver_base.tables if table.dbt_model
+        ]
+        if model_list:
+            dbt_extra_args = ["--select", *model_list, *dbt_extra_args]
 
     run_dbt(dbt_args=dbt_extra_args)
 
@@ -231,8 +342,80 @@ def main() -> None:
             export_base = silver_path_raw
 
         if export_base and is_gcs_path(export_base):
-            logger.info(f"Exporting local silver to GCS: {export_base}")
-            gcloud_rsync(str(silver_path), export_base, delete=True)
+            publish_mode = (
+                os.getenv("SILVER_PUBLISH_MODE")
+                or settings.pipeline.silver_publish_mode
+                or "direct"
+            ).lower()
+            if publish_mode == "staging":
+                run_id = resolve_run_id()
+                staging_base = f"{export_base.rstrip('/')}/_staging/{run_id}"
+                logger.info(
+                    "Exporting local silver to staging: %s",
+                    staging_base,
+                )
+                gcloud_rsync(str(silver_path), staging_base, delete=True)
+                table_names = (
+                    [table.name for table in spec.silver_base.tables]
+                    if spec
+                    else STANDARD_TABLES
+                )
+                manifest = {
+                    "run_id": run_id,
+                    "staging_path": staging_base,
+                    "tables": table_names,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                manifest_file = Path("/tmp") / "silver_manifest.json"
+                manifest_file.write_text(json.dumps(manifest, indent=2))
+                gcloud_copy_file(
+                    manifest_file,
+                    f"{staging_base}/_MANIFEST.json",
+                )
+                pointer = {
+                    "run_id": run_id,
+                    "staging_path": staging_base,
+                    "published_at": datetime.now(timezone.utc).isoformat(),
+                }
+                pointer_file = Path("/tmp") / "silver_latest.json"
+                pointer_file.write_text(json.dumps(pointer, indent=2))
+                gcloud_copy_file(
+                    pointer_file,
+                    f"{export_base.rstrip('/')}/_latest.json",
+                )
+            else:
+                tables_env = os.getenv("BRONZE_SYNC_TABLES", "").strip()
+                if tables_env:
+                    tables = [t.strip() for t in tables_env.split(",") if t.strip()]
+                    logger.info(
+                        "Exporting local silver to GCS (targeted): %s",
+                        export_base,
+                        extra={"tables": tables},
+                    )
+                    for table in tables:
+                        # Sync Base Table
+                        source_table = Path(silver_path) / table
+                        dest_table = f"{export_base.rstrip('/')}/{table}"
+                        if source_table.exists():
+                            generate_manifest(source_table, dest_table)
+                            gcloud_rsync(str(source_table), dest_table, delete=True)
+
+                        # Sync Quarantine Table (if exists)
+                        q_source = Path(quarantine_path) / table
+                        # Assuming quarantine path follows standard structure
+                        # relative to export base. If export_base is .../silver/base,
+                        # quarantine is .../silver/base/quarantine
+                        q_dest = f"{export_base.rstrip('/')}/quarantine/{table}"
+                        if q_source.exists():
+                            gcloud_rsync(str(q_source), q_dest, delete=True)
+                else:
+                    logger.info("Exporting local silver to GCS (full): %s", export_base)
+                    # Generate manifests for all tables in silver_path
+                    for table_dir in Path(silver_path).iterdir():
+                        if table_dir.is_dir() and table_dir.name != "quarantine":
+                            dest_table = f"{export_base.rstrip('/')}/{table_dir.name}"
+                            generate_manifest(table_dir, dest_table)
+                    gcloud_rsync(str(silver_path), export_base, delete=True)
 
 
 if __name__ == "__main__":

@@ -78,7 +78,7 @@ class TestCollectParquetFiles:
 
         files = collect_parquet_files(tmp_path)
         assert len(files) == 1
-        assert files[0].name == "valid.parquet"
+        assert Path(files[0]).name == "valid.parquet"
 
     def test_empty_directory_returns_empty(self, tmp_path: Path) -> None:
         files = collect_parquet_files(tmp_path)

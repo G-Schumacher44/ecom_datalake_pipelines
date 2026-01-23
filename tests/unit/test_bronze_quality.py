@@ -16,7 +16,7 @@ def _write_manifest(path: Path, rows: int = 1) -> None:
 def test_bronze_quality_passes_with_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    table_path = tmp_path / "orders" / "order_dt=2020-01-01"
+    table_path = tmp_path / "orders" / "ingest_dt=2020-01-01"
     table_path.mkdir(parents=True)
     _write_manifest(table_path, rows=10)
 
@@ -28,20 +28,22 @@ def test_bronze_quality_passes_with_manifest(
             config="config/config.yml",
             bronze_path=str(tmp_path),
             fail_on_issues=True,
+            partition_date=None,
+            lookback_days=0,
             run_id="test",
             output_report=str(tmp_path / "report.md"),
             tables=None,
-            enforce_quality=False,
+            enforce_quality=True,
+            spec_path=None,
         ),
     )
-
     assert bronze_quality.main() == 0
 
 
 def test_bronze_quality_fails_without_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    table_path = tmp_path / "orders" / "order_dt=2020-01-01"
+    table_path = tmp_path / "orders" / "ingest_dt=2020-01-01"
     table_path.mkdir(parents=True)
 
     monkeypatch.setenv("PIPELINE_ENV", "local")
@@ -52,11 +54,13 @@ def test_bronze_quality_fails_without_manifest(
             config="config/config.yml",
             bronze_path=str(tmp_path),
             fail_on_issues=True,
+            partition_date=None,
+            lookback_days=0,
             run_id="test",
             output_report=str(tmp_path / "report.md"),
             tables=None,
-            enforce_quality=False,
+            enforce_quality=True,
+            spec_path=None,
         ),
     )
-
     assert bronze_quality.main() == 1

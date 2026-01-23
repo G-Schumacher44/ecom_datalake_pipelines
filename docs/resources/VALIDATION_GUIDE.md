@@ -53,13 +53,44 @@ The pipeline has **3 validation gates**:
 When `PIPELINE_ENV=dev|prod`, reports are written to GCS at:
 `gs://$REPORTS_BUCKET/validation_reports/<run_id>/`
 
+**GCS validation reads (no rsync):**  
+Validation reads `gs://` paths directly via `fsspec/gcsfs` in dev/prod.  
+`gcloud storage rsync` is used only for publish/sync steps (not for validation).
+
+---
+
+## Gate 1.5: Dimension Quality Validation (✅ IMPLEMENTED)
+
+### What It Does
+
+Immediately after dimension snapshots are refreshed (and before fact processing), this lightweight gate:
+
+1. **Verifies snapshot existence** for the current run date (`snapshot_dt`).
+2. **Checks readability** (opens parquet files to ensure validity).
+3. **Validates schema** (checks required columns like `customer_id`).
+4. **Checks for critical nulls** (e.g., null primary keys).
+5. **Prevents full scans**: Unlike Gate 2, this only checks the daily snapshot, avoiding expensive historical scans of the Bronze layer.
+
+### Output Files
+
+- **Markdown Report:** `docs/validation_reports/DIMS_QUALITY_<run_id>.md` (or GCS equivalent).
+
+### Integration with Airflow
+
+```python
+validate_dims_quality = BashOperator(
+    task_id="validate_dims_quality",
+    bash_command="python -m src.validation.dims_snapshot --run-date {{ ds }} ..."
+)
+```
+
 ---
 
 ## Gate 2: Silver Quality Validation (✅ IMPLEMENTED)
 
 ### What It Does
 
-After dbt processes Bronze → Silver, this validator:
+After dbt processes Bronze → Silver, this validator checks **Fact Tables Only** (Orders, Items, etc.):
 
 1. **Counts rows** in Bronze, Silver, and Quarantine
 2. **Calculates pass rates** (Silver / (Silver + Quarantine))
@@ -77,13 +108,13 @@ After dbt processes Bronze → Silver, this validator:
 
 ```bash
 # Run after dbt completes
-python src/validation/silver_quality.py
+python -m src.validation.silver
 ```
 
 #### With Custom Paths
 
 ```bash
-python src/validation/silver_quality.py \
+python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --quarantine-path data/silver/base/quarantine \
@@ -93,7 +124,7 @@ python src/validation/silver_quality.py \
 #### In Hard Fail Mode (Stops Pipeline on SLA Breach)
 
 ```bash
-python src/validation/silver_quality.py \
+python -m src.validation.silver \
   --enforce-quality
 ```
 
@@ -443,8 +474,8 @@ python src/validation/silver_quality.py --enforce-quality
 - [x] SLA threshold validation
 
 ### Next Steps ⏭️
-- [ ] Bronze metadata validation
-- [ ] Enhanced Pydantic validation (all 8 tables)
+- [x] Bronze metadata validation
+- [x] Enhanced Pydantic validation (all 8 tables)
 - [ ] Historical baseline comparison
 - [ ] Anomaly detection
 - [ ] Alerting integration (Slack/PagerDuty)
@@ -454,7 +485,7 @@ python src/validation/silver_quality.py --enforce-quality
 ## Files Reference
 
 ### Validation Scripts
-- `src/validation/silver_quality.py` - Silver quality validator
+- `src/validation/silver/__main__.py` - Silver quality validator
 - `scripts/validate_bronze_samples.py` - Bronze Pydantic validation
 - `scripts/describe_parquet_samples.py` - Bronze schema profiling
 

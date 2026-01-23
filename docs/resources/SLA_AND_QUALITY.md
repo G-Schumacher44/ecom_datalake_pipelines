@@ -113,14 +113,16 @@ This is a lightweight SLA/quality spec for the simulated pipeline.
 | --- | --- | --- | --- |
 | cart_items | 9.6GB | 15-20 min | 9.6GB |
 | shopping_carts | 3.0GB | 8-12 min | 3.0GB |
-| customers | 2.2GB | 6-8 min | 2.2GB |
+| customers | 2.2GB | 1-2 min* | 2.2GB |
 | order_items | 1.3GB | 4-6 min | 1.3GB |
 | orders | 717MB | 2-3 min | 717MB |
-| product_catalog | 80MB | 30-60 sec | 80MB |
+| product_catalog | 80MB | 10-20 sec* | 80MB |
 | return_items | 45MB | 15-30 sec | 45MB |
 | returns | 33MB | 15-30 sec | 33MB |
 
-**Total Base Silver**: 30-50 minutes (parallel execution)
+*\*Optimized via local manifest generation and batched GCS rsync.*
+
+**Total Base Silver**: 15-25 minutes (parallel execution)
 
 **Peak memory**: ~9.6GB (cart_items table)
 
@@ -140,7 +142,7 @@ This is a lightweight SLA/quality spec for the simulated pipeline.
 
 ### Overall Pipeline SLA
 
-- **Total processing time**: 60-100 minutes (Base + Enriched in sequence)
+- **Total processing time**: 45-75 minutes (Base + Enriched in sequence)
 - **Peak memory usage**: ~9.6GB (Base Silver cart_items table)
 - **Temp storage**: <10GB (ephemeral `/tmp/` files deleted after upload)
 - **GCS egress cost**: ~$2-3/month for read/write operations
