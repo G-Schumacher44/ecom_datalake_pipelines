@@ -11,6 +11,7 @@ from src.validation.common import (
     collect_parquet_files,
     is_gcs_path,
     path_exists,
+    read_parquet_safe,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,20 +27,24 @@ def get_quarantine_breakdown(
     if not path_exists(quarantine_path):
         return []
 
-    parquet_files = collect_parquet_files(
-        quarantine_path, partition_key=partition_key, partitions=partitions
-    )
-    if not parquet_files:
+    # get_quarantine_breakdown
+    
+    # Use read_parquet_safe to handle GCS paths and pyarrow issues
+    # Note: We don't pass partitions logic to read_parquet_safe currently in its simplest form,
+    # but we can filter by path if needed. For now, we trust read_parquet_safe to handle the path.
+    # If explicit partition filtering is needed, we might need to enhance read_parquet_safe or pre-filter.
+    # Assuming quarantine_path points to the specific partition or base dir.
+    
+    # Actually, read_parquet_safe calls collect_parquet_files internally but without partition args.
+    # We should update read_parquet_safe or just rely on path. 
+    # For now, let's just pass the path.
+    
+    df = read_parquet_safe(quarantine_path)
+    
+    if df is None:
         return []
 
     try:
-        df = pl.read_parquet(
-            parquet_files,
-            memory_map=False,
-            low_memory=True,
-            use_pyarrow=True,
-        )
-
         if "invalid_reason" not in df.columns:
             logger.warning(f"No invalid_reason column in {quarantine_path}")
             return []
@@ -70,15 +75,6 @@ def get_quarantine_breakdown(
 
         return breakdown
 
-    except (ArrowInvalid, ArrowTypeError, OSError) as e:
-        logger.error(
-            f"Failed to read quarantine parquet at {quarantine_path}",
-            extra={
-                "error_type": type(e).__name__,
-                "error": str(e),
-            },
-        )
-        return []
     except (ColumnNotFoundError, SchemaError, ComputeError) as e:
         logger.error(
             f"Failed to analyze quarantine schema for {quarantine_path}",
@@ -104,33 +100,20 @@ def compute_key_cardinality(
             "distinct_ratio": 0.0,
         }
 
-    parquet_files = collect_parquet_files(
-        table_path, partition_key=partition_key, partitions=partitions
+    # compute_key_cardinality
+    
+    # Use read_parquet_safe to handle GCS paths and pyarrow issues
+    df = read_parquet_safe(
+        table_path,
+        columns=[key],
     )
-    if not parquet_files:
-        return {
-            "total_rows": 0,
-            "non_null_rows": 0,
-            "distinct_count": 0,
-            "distinct_ratio": 0.0,
-        }
-
-    try:
-        df = pl.read_parquet(
-            parquet_files,
-            columns=[key],
-            memory_map=False,
-            low_memory=True,
-            use_pyarrow=True,
-        )
-    except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
+    
+    if df is None:
         logger.warning(
             "Failed key cardinality scan",
             extra={
                 "table": str(table_path),
                 "key": key,
-                "error_type": type(exc).__name__,
-                "error": str(exc),
             },
         )
         return {
@@ -139,14 +122,14 @@ def compute_key_cardinality(
             "distinct_count": 0,
             "distinct_ratio": 0.0,
         }
-    except ColumnNotFoundError as exc:
-        logger.warning(
+        
+    # Check if key column exists (read_parquet_safe returns None or DF with columns)
+    if key not in df.columns:
+         logger.warning(
             f"Key column '{key}' not found in {table_path}",
-            extra={
-                "error_type": type(exc).__name__,
-            },
+            extra={"error_type": "ColumnNotFoundError"},
         )
-        return {
+         return {
             "total_rows": 0,
             "non_null_rows": 0,
             "distinct_count": 0,

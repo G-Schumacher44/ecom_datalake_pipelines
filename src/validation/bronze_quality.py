@@ -169,9 +169,10 @@ def list_partitions(
                 if fs.exists(partition_path):
                     prefixes.append(partition_path)
             return sorted(prefixes)
-        matches = fs.glob(f"{root}/{table}/{key}=*/*")
-        if not matches:
-            matches = fs.glob(f"{root}/{table}/{partition_glob}")
+
+        # Optimization: Just list the partition directories, not every file inside them.
+        # This prevents hangs on large GCS buckets.
+        matches = fs.glob(f"{root}/{table}/{partition_glob}")
         prefixes: set[str] = set()
         for match in matches:
             path = match

@@ -20,6 +20,7 @@ from src.validation.silver.models import TableQualityMetrics
 
 logger = logging.getLogger(__name__)
 
+_NOT_SET = object()
 
 def validate_table(
     table: str,
@@ -31,6 +32,7 @@ def validate_table(
     partition_key: str | None = None,
     partitions: list[str] | None = None,
     bronze_partition_key: str | None = None,
+    bronze_partitions: list[str] | None | object = _NOT_SET,
 ) -> TableQualityMetrics:
     """Validate quality for a single table."""
     logger.info(f"Validating {table}...")
@@ -40,10 +42,18 @@ def validate_table(
         bronze_partition_key if bronze_partition_key is not None else partition_key
     )
 
+    # Resolve bronze partitions:
+    # 1. If explicit argument provided (including None), use it.
+    # 2. If not provided (Sentinel), fallback to shared 'partitions'.
+    if bronze_partitions is _NOT_SET:
+        bronze_parts_final = partitions
+    else:
+        bronze_parts_final = bronze_partitions  # type: ignore
+
     bronze_rows = count_parquet_rows(
         join_path(bronze_path, table),
         partition_key=bronze_pk,
-        partitions=partitions,
+        partitions=bronze_parts_final, # type: ignore
     )
     silver_rows = count_parquet_rows(
         join_path(silver_path, table),

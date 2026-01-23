@@ -12,6 +12,35 @@ This project includes a suite of CLI scripts designed to automate Bronze layer p
 | `pull_bronze_sample.sh` | Pull sample partitions from GCS | Local Bronze samples for profiling |
 | `report_bronze_sizes.sh` | Generate bucket size report | Markdown report with table-level storage metrics |
 | `bootstrap_airflow.sh` | Initialize Airflow environment | Airflow directories and Docker containers |
+| `dims_snapshot.py` | Validate Dimension snapshots | Quality report for dimension tables |
+
+---
+
+## 🔍 Dimension Validation: `src.validation.dims_snapshot`
+
+A lightweight quality gate designed to validate dimension snapshots (`customers`, `product_catalog`) without the overhead of scanning historical Bronze data.
+
+### Core Functionality
+
+- **Partition Verification**: Ensures the `snapshot_dt` partition exists and is readable.
+- **Schema Validation**: Confirms all required columns defined in `base_silver_schemas.py` are present.
+- **Integrity Checks**: Performs null checks on primary keys (e.g., `customer_id`).
+- **GCS Optimized**: Uses `_MANIFEST.json` for near-instant file discovery on cloud storage.
+
+### Basic Usage
+
+```bash
+# Validate today's dimension snapshots
+python -m src.validation.dims_snapshot --run-date 2025-10-06 --run-id "manual_run_123"
+```
+
+### Key Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `--run-date` | The snapshot date (YYYY-MM-DD) to validate. |
+| `--run-id` | Airflow run ID (used for GCS report organization). |
+| `--enforce-quality` | Exit non-zero on any validation failure. |
 
 ---
 

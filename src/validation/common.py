@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,19 +75,69 @@ def collect_parquet_files(
     partition_key: str | None = None,
     partitions: list[str] | None = None,
 ) -> list[Union[Path, str]]:
-    """Collect valid Parquet files under a path, skipping corrupt files."""
+    """Collect valid Parquet files under a path, using manifest if available."""
     path_str = str(path)
     candidates: list[Union[Path, str]] = []
+    
     if is_gcs_path(path_str):
         fs = get_gcs_filesystem()
+        
+        # 1. Try to read from _MANIFEST.json first (Fastest)
+        manifest_path = f"{path_str.rstrip('/')}/_MANIFEST.json"
+        try:
+            if fs.exists(manifest_path):
+                with fs.open(manifest_path, "r") as f:
+                    manifest = json.load(f)
+                    
+                files = manifest.get("files", [])
+                base_dir = path_str.rstrip('/')
+                
+                # Filter files based on requested partitions
+                for file_entry in files:
+                    file_rel_path = file_entry.get("path") if isinstance(file_entry, dict) else file_entry
+                    if not file_rel_path:
+                        continue
+                        
+                    full_path = f"{base_dir}/{file_rel_path}"
+                    
+                    if partition_key and partitions:
+                        match = False
+                        for val in partitions:
+                            if f"/{partition_key}={val}/" in full_path:
+                                match = True
+                                break
+                        if not match:
+                            continue
+                    
+                    # Ensure GCS URIs have the prefix for polars
+                    if not full_path.startswith("gs://"):
+                         full_path = f"gs://{full_path.lstrip('/')}"
+                            
+                    candidates.append(str(full_path))
+                
+                if candidates:
+                    logger.info(f"Collected {len(candidates)} files from manifest. Sample: {candidates[0]} (type: {type(candidates[0])})")
+                    return sorted(candidates)
+        except Exception as exc:
+            logger.warning(f"Failed to use manifest for file collection at {manifest_path}, falling back to glob: {exc}")
+
+        # 2. Fallback to glob (Slow)
+        def _ensure_gs(p):
+            p_str = str(p)
+            return f"gs://{p_str}" if not p_str.startswith("gs://") else p_str
+
         if partition_key and partitions:
             for value in partitions:
                 partition_path = f"{path_str.rstrip('/')}/{partition_key}={value}"
                 if not fs.exists(partition_path):
                     continue
-                candidates.extend(fs.glob(f"{partition_path}/**/*.parquet"))
+                candidates.extend([_ensure_gs(p) for p in fs.glob(f"{partition_path}/**/*.parquet")])
         else:
-            candidates = fs.glob(f"{path_str.rstrip('/')}/**/*.parquet")
+            candidates = [_ensure_gs(p) for p in fs.glob(f"{path_str.rstrip('/')}/**/*.parquet")]
+        
+        if candidates:
+             logger.info(f"Collected {len(candidates)} files via glob. Sample: {candidates[0]} (type: {type(candidates[0])})")
+             
         return sorted(candidates)
 
     path_obj = Path(path_str)
@@ -133,35 +184,70 @@ def count_parquet_rows(
     partition_key: str | None = None,
     partitions: list[str] | None = None,
 ) -> int:
-    """Count total rows in all Parquet files in a directory."""
+    """Count total rows in all Parquet files in a directory.
+
+    Optimized to use _MANIFEST.json if available to avoid recursive file scans.
+    """
     if not path_exists(path):
         logger.warning(f"Path does not exist: {path}")
         return 0
 
-    parquet_files = collect_parquet_files(
-        path, partition_key=partition_key, partitions=partitions
-    )
-    if not parquet_files:
-        logger.warning(f"No Parquet files found in: {path}")
-        return 0
+    path_str = str(path)
+    is_gcs = is_gcs_path(path_str)
+    fs = get_gcs_filesystem() if is_gcs else None
+
+    # 1. Determine which subdirectories (partitions) to scan
+    target_dirs = []
+    if partition_key:
+        if partitions:
+            # Targeted partitions
+            target_dirs = [f"{path_str.rstrip('/')}/{partition_key}={v}" for val in partitions for v in (val.split(',') if ',' in val else [val])]
+        else:
+            # Full scan: list all partition directories
+            partition_values = list_partitions(path, partition_key)
+            target_dirs = [f"{path_str.rstrip('/')}/{partition_key}={v}" for v in partition_values]
+    else:
+        # Unpartitioned table
+        target_dirs = [path_str]
 
     total_rows = 0
-    for file_path in parquet_files:
+    manifest_name = "_MANIFEST.json"
+
+    for d in target_dirs:
+        manifest_found = False
+        m_path = f"{d.rstrip('/')}/{manifest_name}"
+        
+        # Try manifest first (Fast)
         try:
-            if isinstance(file_path, Path):
-                parquet_file = pq.ParquetFile(file_path)
+            if is_gcs:
+                if fs.exists(m_path):
+                    with fs.open(m_path, "r") as f:
+                        data = json.load(f)
+                        total_rows += int(data.get("total_rows", 0))
+                        manifest_found = True
             else:
-                fs = get_gcs_filesystem()
-                with fs.open(file_path, "rb") as handle:
-                    parquet_file = pq.ParquetFile(handle)
-            total_rows += parquet_file.metadata.num_rows
-        except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
-            logger.error(
-                f"Failed to read {file_path}",
-                error_type=type(exc).__name__,
-                error=str(exc),
-            )
-            continue
+                m_file = Path(m_path)
+                if m_file.exists():
+                    data = json.loads(m_file.read_text())
+                    total_rows += int(data.get("total_rows", 0))
+                    manifest_found = True
+        except Exception as exc:
+            logger.warning(f"Failed to read manifest at {m_path}: {exc}")
+
+        # Fallback to parquet scan if manifest missing or failed (Slow)
+        if not manifest_found:
+            files = collect_parquet_files(d)
+            for file_path in files:
+                try:
+                    if is_gcs:
+                        with fs.open(file_path, "rb") as handle:
+                            parquet_file = pq.ParquetFile(handle)
+                            total_rows += parquet_file.metadata.num_rows
+                    else:
+                        parquet_file = pq.ParquetFile(file_path)
+                        total_rows += parquet_file.metadata.num_rows
+                except Exception as exc:
+                    logger.error(f"Failed to read rows from {file_path}: {exc}")
 
     return total_rows
 
@@ -186,15 +272,16 @@ def read_parquet_safe(
         return None
     demo_mode = os.getenv("DEMO_MODE", "").lower() in {"1", "true", "yes", "on"}
     try:
+        # Prefer Polars native reader (use_pyarrow=False) to avoid GCSFile type issues with PyArrow
         return pl.read_parquet(
             parquet_files,
             columns=columns,
             n_rows=n_rows,
             memory_map=False,
             low_memory=True,
-            use_pyarrow=not demo_mode,
+            use_pyarrow=False, 
         )
-    except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
+    except (ArrowInvalid, ArrowTypeError, OSError, ValueError, TypeError, pl.exceptions.ComputeError) as exc:
         logger.warning(
             "Failed to read parquet; falling back to per-file read",
             path=str(path),
