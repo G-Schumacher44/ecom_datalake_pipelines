@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Dict
+
 import polars as pl
 
 # Schema for int_attributed_purchases

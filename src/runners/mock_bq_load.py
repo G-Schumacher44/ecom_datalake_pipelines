@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+
 from src.validation.enriched_schemas import ENRICHED_SCHEMAS
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ def mock_bigquery_load(
         # Use scan to get schema without loading all data
         lf = pl.scan_parquet(parquet_files)
         observed_schema = lf.schema
-        
+
         # 1. Basic Counts
         df = lf.collect()
         row_count = df.height
@@ -84,15 +85,15 @@ def mock_bigquery_load(
         # 2. Schema Validation (New)
         target_schema = ENRICHED_SCHEMAS.get(table)
         schema_issues = []
-        
+
         if target_schema:
             for col, expected_type in target_schema.items():
                 if col not in observed_schema:
                     schema_issues.append(f"Missing column: {col}")
                     continue
-                
+
                 observed_type = observed_schema[col]
-                # Compare types - convert to string for simple comparison if needed, 
+                # Compare types - convert to string for simple comparison if needed,
                 # or handle complex type matching.
                 if str(observed_type) != str(expected_type):
                     schema_issues.append(
@@ -105,7 +106,7 @@ def mock_bigquery_load(
                 extra={
                     "table": table,
                     "issues": schema_issues,
-                }
+                },
             )
             return {
                 "table": f"{project_id}.{dataset}.{table}",
