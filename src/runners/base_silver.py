@@ -164,6 +164,48 @@ def resolve_run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
 
+import pyarrow.parquet as pq
+
+def generate_manifest(local_table_path: Path, remote_table_url: str) -> None:
+    """Generate _MANIFEST.json for each partition in a table (local only)."""
+    if not local_table_path.exists():
+        return
+
+    # Find all partitions (subdirectories)
+    # Assumes Hive partitioning: table/key=value
+    partitions = [p for p in local_table_path.iterdir() if p.is_dir() and "=" in p.name]
+    
+    # Also handle unpartitioned tables (root level parquet files)
+    root_files = list(local_table_path.glob("*.parquet"))
+    if root_files:
+        partitions.append(local_table_path)
+
+    for partition_dir in partitions:
+        parquet_files = list(partition_dir.glob("*.parquet"))
+        if not parquet_files:
+            continue
+
+        total_rows = 0
+        file_count = 0
+        
+        for pfile in parquet_files:
+            try:
+                meta = pq.read_metadata(pfile)
+                total_rows += meta.num_rows
+                file_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to read metadata for {pfile}: {e}")
+
+        manifest = {
+            "total_rows": total_rows,
+            "file_count": file_count,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        
+        manifest_path = partition_dir / "_MANIFEST.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2))
+
+
 def run_dbt(
     project_dir: str = "dbt_duckdb",
     profiles_dir: str = "dbt_duckdb",
@@ -344,8 +386,37 @@ def main() -> None:
                     f"{export_base.rstrip('/')}/_latest.json",
                 )
             else:
-                logger.info("Exporting local silver to GCS: %s", export_base)
-                gcloud_rsync(str(silver_path), export_base, delete=True)
+                tables_env = os.getenv("BRONZE_SYNC_TABLES", "").strip()
+                if tables_env:
+                    tables = [t.strip() for t in tables_env.split(",") if t.strip()]
+                    logger.info(
+                        "Exporting local silver to GCS (targeted): %s",
+                        export_base,
+                        extra={"tables": tables},
+                    )
+                    for table in tables:
+                        # Sync Base Table
+                        source_table = Path(silver_path) / table
+                        dest_table = f"{export_base.rstrip('/')}/{table}"
+                        if source_table.exists():
+                            generate_manifest(source_table, dest_table)
+                            gcloud_rsync(str(source_table), dest_table, delete=True)
+                        
+                        # Sync Quarantine Table (if exists)
+                        q_source = Path(quarantine_path) / table
+                        # Assuming quarantine path follows standard structure relative to export base
+                        # If export_base is .../silver/base, quarantine is .../silver/base/quarantine
+                        q_dest = f"{export_base.rstrip('/')}/quarantine/{table}"
+                        if q_source.exists():
+                            gcloud_rsync(str(q_source), q_dest, delete=True)
+                else:
+                    logger.info("Exporting local silver to GCS (full): %s", export_base)
+                    # Generate manifests for all tables in silver_path
+                    for table_dir in Path(silver_path).iterdir():
+                        if table_dir.is_dir() and table_dir.name != "quarantine":
+                            dest_table = f"{export_base.rstrip('/')}/{table_dir.name}"
+                            generate_manifest(table_dir, dest_table)
+                    gcloud_rsync(str(silver_path), export_base, delete=True)
 
 
 if __name__ == "__main__":

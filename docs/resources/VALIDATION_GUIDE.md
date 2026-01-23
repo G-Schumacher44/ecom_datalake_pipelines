@@ -59,11 +59,38 @@ Validation reads `gs://` paths directly via `fsspec/gcsfs` in dev/prod.
 
 ---
 
+## Gate 1.5: Dimension Quality Validation (✅ IMPLEMENTED)
+
+### What It Does
+
+Immediately after dimension snapshots are refreshed (and before fact processing), this lightweight gate:
+
+1. **Verifies snapshot existence** for the current run date (`snapshot_dt`).
+2. **Checks readability** (opens parquet files to ensure validity).
+3. **Validates schema** (checks required columns like `customer_id`).
+4. **Checks for critical nulls** (e.g., null primary keys).
+5. **Prevents full scans**: Unlike Gate 2, this only checks the daily snapshot, avoiding expensive historical scans of the Bronze layer.
+
+### Output Files
+
+- **Markdown Report:** `docs/validation_reports/DIMS_QUALITY_<run_id>.md` (or GCS equivalent).
+
+### Integration with Airflow
+
+```python
+validate_dims_quality = BashOperator(
+    task_id="validate_dims_quality",
+    bash_command="python -m src.validation.dims_snapshot --run-date {{ ds }} ..."
+)
+```
+
+---
+
 ## Gate 2: Silver Quality Validation (✅ IMPLEMENTED)
 
 ### What It Does
 
-After dbt processes Bronze → Silver, this validator:
+After dbt processes Bronze → Silver, this validator checks **Fact Tables Only** (Orders, Items, etc.):
 
 1. **Counts rows** in Bronze, Silver, and Quarantine
 2. **Calculates pass rates** (Silver / (Silver + Quarantine))

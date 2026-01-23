@@ -99,6 +99,8 @@ with DAG(
             f"cd {AIRFLOW_HOME} && python -m src.validation.bronze_quality "
             f"--bronze-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}} "
             f"{dim_tables_arg}"
+            f"--partition-date {{{{ ds }}}} "
+            f"--lookback-days {os.getenv('BRONZE_VALIDATION_LOOKBACK_DAYS', '0')} "
             f"--output-report docs/validation_reports/BRONZE_DIMS_{{{{ run_id | replace(':', '') }}}}.md "
             f"--run-id {{{{ run_id }}}} "
             + (" --enforce-quality" if PIPELINE_ENV in {"dev", "prod"} else "")
@@ -125,24 +127,6 @@ with DAG(
                 ),
             )
 
-    # 5. Validate Dim Quality
-    validate_dim_quality = BashOperator(
-        task_id="validate_dim_quality",
-        env=COMMON_ENV,
-        bash_command=(
-            f"cd {AIRFLOW_HOME} && "
-            f"BRONZE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
-            f"SILVER_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
-            f"&& python -m src.validation.silver "
-            f'--bronze-path "$BRONZE_PATH" '
-            f'--silver-path "$SILVER_PATH" '
-            f'--quarantine-path "$SILVER_PATH/quarantine" '
-            f"{dim_tables_arg}"
-            f"--run-id {{{{ run_id }}}} "
-            f"--output-report docs/validation_reports/SILVER_DIMS_{{{{ run_id | replace(':', '') }}}}.md "
-            + (" --enforce-quality" if PIPELINE_ENV == "prod" else "")
-        ),
-    )
     validate_dims_snapshot = BashOperator(
         task_id="validate_dims_snapshot",
         env=COMMON_ENV,
@@ -171,7 +155,6 @@ with DAG(
         setup_config
         >> validate_bronze_dims
         >> refresh_dims_group
-        >> validate_dim_quality
         >> snapshot_dims_task
         >> validate_dims_snapshot
         >> publish_dims_latest_task

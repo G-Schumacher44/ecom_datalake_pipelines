@@ -99,6 +99,7 @@ ___
 - **Quality gates**: Primary key uniqueness, foreign key referential integrity, and non-negative numeric constraints.
 - **Airflow orchestration**: DAGs for backfill, incremental processing, and partition-level recovery.
 - **Observability**: Audit JSON emitted per table/partition, ready for SLA dashboards and alerting.
+- **Dimension snapshot validation**: Lightweight quality gate for dimension snapshots (customers, products) ensuring schema and primary key integrity without expensive historical scans.
 - **Self-documenting profiling**: Bronze profiling script auto-generates schema maps, data dictionaries, and quality reports from live data samples.
 
 ### 🧭 Orientation & Getting Started

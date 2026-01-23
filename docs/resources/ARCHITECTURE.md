@@ -85,13 +85,13 @@ setup_config
     ↓
 trigger_dim_refresh (wait for completion)
     ↓
+validate_dims_quality
+    ↓
 validate_bronze_quality
     ↓
 base_silver (dbt - all fact tables)
     ↓
 validate_silver_quality
-    ↓
-sync_silver_base_to_gcs
     ↓
 enriched_silver (TaskGroup - 10 parallel tasks)
     ├─ int_attributed_purchases

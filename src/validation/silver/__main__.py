@@ -205,6 +205,14 @@ def main() -> int:
     for table in tables:
         silver_partition_key = get_silver_table_partitions().get(table, "ingest_dt")
         bronze_partition_key = get_table_partitions().get(table, "ingest_dt")
+
+        # Only apply date partition filter to Bronze if it uses standard ingestion dates.
+        # For dimensions (signup_date, category), we want to compare the snapshot 
+        # against the total bronze volume.
+        bronze_partitions = partition_values
+        if bronze_partition_key not in {"ingest_dt"}:
+            bronze_partitions = None
+
         metrics = validate_table(
             table,
             bronze_path,
@@ -215,6 +223,7 @@ def main() -> int:
             partition_key=silver_partition_key,
             partitions=partition_values,
             bronze_partition_key=bronze_partition_key,
+            bronze_partitions=bronze_partitions,
         )
         table_metrics.append(metrics)
     metrics_by_table = {m.table: m for m in table_metrics}

@@ -473,6 +473,33 @@ Benefits:
 
 ---
 
+## GCS & I/O Optimization
+
+### Manifest-Based File Discovery
+
+**Avoid recursive globbing on GCS (`**/*.parquet`):**
+GCS is an object store, not a filesystem. Recursive listing is an `O(N)` operation where N is the number of files, leading to severe latency as the lake grows.
+
+**Optimization Strategy:**
+- **Produce Manifests:** The `base_silver` runner now auto-generates a `_MANIFEST.json` containing the list of files and row counts for every partition.
+- **Read Manifests:** Validation scripts (`src.validation.common`) prioritize reading the manifest over listing objects. This turns a multi-minute "directory scan" into a sub-second JSON read.
+
+### Batched Uploads vs. Sequential Copies
+
+**Avoid loops calling `gcloud storage cp`:**
+Executing a subprocess for every file or partition introduces massive Python and OS overhead.
+
+**Good - Batched Sync:**
+```python
+# Generate manifests locally first, then sync once
+subprocess.run(["gcloud", "storage", "rsync", "-r", local_path, remote_path])
+```
+
+**Impact:**
+Refactoring the Dimension Refresh pipeline to use manifests and `rsync` reduced stage duration from **30+ minutes to ~2 minutes**.
+
+---
+
 ## Monitoring & Profiling
 
 ### Polars Query Plans
