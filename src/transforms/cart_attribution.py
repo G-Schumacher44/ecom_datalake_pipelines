@@ -88,6 +88,7 @@ def compute_cart_attribution_summary(
         abandoned_value=pl.when(pl.col("order_id").is_null() & has_value_expr)
         .then(cart_value_expr)
         .otherwise(None),
+        order_date=pl.col("order_ts"),
     )
 
     return enriched.select(
