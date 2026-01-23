@@ -39,6 +39,7 @@ def compute_cart_attribution_summary(
     cart_items: pl.LazyFrame,
     orders: pl.LazyFrame,
     tolerance_hours: int = 48,
+    abandoned_min_value: float = 0.0,
 ) -> pl.LazyFrame:
     """Summarize cart conversion and abandonment at cart grain."""
     carts_lazy = carts.lazy() if isinstance(carts, pl.DataFrame) else carts
@@ -70,18 +71,24 @@ def compute_cart_attribution_summary(
     )
 
     cart_value_expr = pl.coalesce([pl.col("cart_total"), pl.col("cart_value_items")])
+    has_value_expr = cart_value_expr.is_not_null() & (
+        cart_value_expr > abandoned_min_value
+    )
 
     enriched = attributed.join(cart_items_agg, on="cart_id", how="left").with_columns(
         cart_value=cart_value_expr,
         cart_status=pl.when(pl.col("order_id").is_not_null())
         .then(pl.lit("converted"))
-        .otherwise(pl.lit("abandoned")),
+        .when(has_value_expr)
+        .then(pl.lit("abandoned"))
+        .otherwise(pl.lit("empty")),
         time_to_purchase_hours=pl.when(pl.col("order_ts").is_not_null())
         .then((pl.col("order_ts") - pl.col("cart_ts")).dt.total_hours())
         .otherwise(None),
-        abandoned_value=pl.when(pl.col("order_id").is_null())
+        abandoned_value=pl.when(pl.col("order_id").is_null() & has_value_expr)
         .then(cart_value_expr)
-        .otherwise(pl.lit(0.0)),
+        .otherwise(None),
+        order_date=pl.col("order_ts"),
     )
 
     return enriched.select(

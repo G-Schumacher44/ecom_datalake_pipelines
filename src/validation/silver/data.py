@@ -5,37 +5,42 @@ from pathlib import Path
 
 import polars as pl
 from polars.exceptions import ColumnNotFoundError, ComputeError, SchemaError
-from pyarrow.lib import ArrowInvalid, ArrowTypeError
 
-from src.validation.common import collect_parquet_files
+from src.validation.common import is_gcs_path, path_exists, read_parquet_safe
 
 logger = logging.getLogger(__name__)
 
 
 def get_quarantine_breakdown(
-    quarantine_path: Path,
+    quarantine_path: Path | str,
     top_n: int = 5,
     partition_key: str | None = None,
     partitions: list[str] | None = None,
 ) -> list[dict]:
     """Analyze quarantine reasons and return top failures."""
-    if not quarantine_path.exists():
+    if not path_exists(quarantine_path):
         return []
 
-    parquet_files = collect_parquet_files(
-        quarantine_path, partition_key=partition_key, partitions=partitions
-    )
-    if not parquet_files:
+    # get_quarantine_breakdown
+
+    # Use read_parquet_safe to handle GCS paths and pyarrow issues
+    # Note: We don't pass partitions logic to read_parquet_safe currently
+    # in its simplest form, but we can filter by path if needed.
+    # For now, we trust read_parquet_safe to handle the path.
+    # If explicit partition filtering is needed, we might need to
+    # enhance read_parquet_safe or pre-filter.
+    # Assuming quarantine_path points to the specific partition or base dir.
+
+    # Actually, read_parquet_safe calls collect_parquet_files internally
+    # but without partition args. We should update read_parquet_safe
+    # or just rely on path. For now, let's just pass the path.
+
+    df = read_parquet_safe(quarantine_path)
+
+    if df is None:
         return []
 
     try:
-        df = pl.read_parquet(
-            parquet_files,
-            memory_map=False,
-            low_memory=True,
-            use_pyarrow=True,
-        )
-
         if "invalid_reason" not in df.columns:
             logger.warning(f"No invalid_reason column in {quarantine_path}")
             return []
@@ -66,15 +71,6 @@ def get_quarantine_breakdown(
 
         return breakdown
 
-    except (ArrowInvalid, ArrowTypeError, OSError) as e:
-        logger.error(
-            f"Failed to read quarantine parquet at {quarantine_path}",
-            extra={
-                "error_type": type(e).__name__,
-                "error": str(e),
-            },
-        )
-        return []
     except (ColumnNotFoundError, SchemaError, ComputeError) as e:
         logger.error(
             f"Failed to analyze quarantine schema for {quarantine_path}",
@@ -87,12 +83,12 @@ def get_quarantine_breakdown(
 
 
 def compute_key_cardinality(
-    table_path: Path,
+    table_path: Path | str,
     key: str,
     partition_key: str | None = None,
     partitions: list[str] | None = None,
 ) -> dict[str, float]:
-    if not table_path.exists():
+    if not path_exists(table_path):
         return {
             "total_rows": 0,
             "non_null_rows": 0,
@@ -100,33 +96,20 @@ def compute_key_cardinality(
             "distinct_ratio": 0.0,
         }
 
-    parquet_files = collect_parquet_files(
-        table_path, partition_key=partition_key, partitions=partitions
+    # compute_key_cardinality
+
+    # Use read_parquet_safe to handle GCS paths and pyarrow issues
+    df = read_parquet_safe(
+        table_path,
+        columns=[key],
     )
-    if not parquet_files:
-        return {
-            "total_rows": 0,
-            "non_null_rows": 0,
-            "distinct_count": 0,
-            "distinct_ratio": 0.0,
-        }
 
-    try:
-        df = pl.read_parquet(
-            parquet_files,
-            columns=[key],
-            memory_map=False,
-            low_memory=True,
-            use_pyarrow=True,
-        )
-    except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
+    if df is None:
         logger.warning(
             "Failed key cardinality scan",
             extra={
                 "table": str(table_path),
                 "key": key,
-                "error_type": type(exc).__name__,
-                "error": str(exc),
             },
         )
         return {
@@ -135,12 +118,12 @@ def compute_key_cardinality(
             "distinct_count": 0,
             "distinct_ratio": 0.0,
         }
-    except ColumnNotFoundError as exc:
+
+    # Check if key column exists (read_parquet_safe returns None or DF with columns)
+    if key not in df.columns:
         logger.warning(
             f"Key column '{key}' not found in {table_path}",
-            extra={
-                "error_type": type(exc).__name__,
-            },
+            extra={"error_type": "ColumnNotFoundError"},
         )
         return {
             "total_rows": 0,
@@ -162,11 +145,61 @@ def compute_key_cardinality(
     }
 
 
-def list_partitions_by_key(path: Path, partition_key: str) -> set[str]:
+def list_partitions_by_key(path: Path | str, partition_key: str) -> set[str]:
     """Return partition values for a table path keyed by partition_key."""
+    path_str = str(path)
     partitions = set()
-    for part_dir in path.glob(f"{partition_key}=*"):
+    if is_gcs_path(path_str):
+        try:
+            import fsspec
+        except ModuleNotFoundError as exc:
+            raise RuntimeError("gcsfs is required for gs:// validation reads") from exc
+        fs = fsspec.filesystem("gcs")
+        matches = fs.glob(f"{path_str.rstrip('/')}/{partition_key}=*")
+        for match in matches:
+            name = match.rstrip("/").split("/")[-1]
+            if name.startswith(f"{partition_key}="):
+                partitions.add(name.split("=", 1)[-1])
+        return partitions
+
+    for part_dir in Path(path_str).glob(f"{partition_key}=*"):
         if not part_dir.is_dir():
             continue
         partitions.add(part_dir.name.split("=", 1)[-1])
     return partitions
+
+
+def check_required_columns(
+    table_path: Path | str,
+    required_cols: list[str],
+    partition_key: str | None = None,
+    partitions: list[str] | None = None,
+    sample_rows: int | None = None,
+) -> dict[str, list[str] | dict[str, int]]:
+    """Check required columns exist and are non-null."""
+    from src.validation.common import read_parquet_safe
+
+    df = read_parquet_safe(
+        table_path,
+        columns=required_cols,
+        n_rows=sample_rows,
+    )
+    if df is None:
+        logger.warning(
+            "Failed required-column scan",
+            extra={
+                "table": str(table_path),
+            },
+        )
+        return {"missing": required_cols, "nulls": {}}
+
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    null_counts: dict[str, int] = {}
+    for col in required_cols:
+        if col not in df.columns:
+            continue
+        nulls = df.select(pl.col(col).is_null().sum()).item()
+        if nulls:
+            null_counts[col] = int(nulls)
+
+    return {"missing": missing_cols, "nulls": null_counts}

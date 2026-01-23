@@ -24,7 +24,9 @@ def test_compute_cart_attribution_flags_recovered() -> None:
         }
     )
 
-    result = compute_cart_attribution(carts, orders, tolerance_hours=48).collect()
+    result = compute_cart_attribution(
+        carts.lazy(), orders.lazy(), tolerance_hours=48
+    ).collect()
 
     assert result.shape[0] == 1
     assert result[0, "is_recovered"] is True
@@ -60,7 +62,7 @@ def test_compute_cart_attribution_summary_cart_status() -> None:
     )
 
     result = compute_cart_attribution_summary(
-        carts, cart_items, orders, tolerance_hours=48
+        carts.lazy(), cart_items.lazy(), orders.lazy()
     ).collect()
 
     status_map = dict(zip(result["cart_id"], result["cart_status"], strict=False))

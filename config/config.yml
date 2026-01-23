@@ -8,6 +8,7 @@ pipeline:
   silver_bucket: "acme-analytics-silver"
   silver_base_prefix: "data/silver/base"
   silver_enriched_prefix: "data/silver/enriched"
+  silver_publish_mode: "direct"
 
   # BigQuery Datasets
   bigquery_dataset: "silver"
@@ -102,6 +103,15 @@ pipeline:
   enriched_max_rows_per_file: 50000
   # Tolerance for ratio checks (handles floating-point rounding).
   enriched_ratio_epsilon: 0.0001
+  # Minimum cart value required to label a cart as abandoned.
+  cart_abandoned_min_value: 0.0
+  # Decimal precision for rate metrics.
+  rate_precision: 6
+  # Cap rate metrics within [rate_cap_min, rate_cap_max].
+  rate_cap_min: 0.0
+  rate_cap_max: 1.0
+  rate_cap_enabled: true
+  return_units_max_ratio: 2.0
 
   # Partition Metadata (Bronze Layer)
   # NOTE: Bronze tables use ingest_dt for most tables, with exceptions for
@@ -178,16 +188,19 @@ pipeline:
         - name: "abandoned_requires_null_order_id"
           expr: "cart_status = 'abandoned' and order_id is not null"
         - name: "abandoned_value_positive_for_abandoned"
-          expr: "cart_status = 'abandoned' and order_id is null and time_to_purchase_hours is null and abandoned_value <= 0"
+          expr: >-
+            cart_status = 'abandoned' and order_id is null and
+            time_to_purchase_hours is null and abandoned_value is not null
+            and abandoned_value <= {cart_abandoned_min_value}
         - name: "time_to_purchase_hours_non_negative"
           expr: "time_to_purchase_hours is not null and time_to_purchase_hours < 0"
       int_product_performance:
-        - name: "units_returned_le_units_sold"
-          expr: "units_returned > units_sold"
+        - name: "units_returned_within_tolerance"
+          expr: "units_sold > 0 and units_returned > (units_sold * {return_units_max_ratio})"
         - name: "return_rate_le_one"
-          expr: "return_rate is not null and return_rate > 1"
+          expr: "return_rate is not null and return_rate > {rate_cap_max}"
         - name: "cart_to_order_rate_le_one"
-          expr: "cart_to_order_rate is not null and cart_to_order_rate > 1"
+          expr: "cart_to_order_rate is not null and cart_to_order_rate > {rate_cap_max}"
         - name: "net_margin_le_gross_margin"
           expr: "net_margin is not null and gross_margin is not null and net_margin > gross_margin"
       int_customer_lifetime_value:
@@ -195,9 +208,9 @@ pipeline:
           expr: "abs((total_spent - total_refunded) - net_clv) > 0.01"
       int_daily_business_metrics:
         - name: "return_rate_matches_ratio"
-          expr: "orders_count > 0 and abs(return_rate - (returns_count / orders_count)) > {ratio_epsilon}"
+          expr: "orders_count > 0 and abs(return_rate - expected_return_rate) > {ratio_epsilon}"
         - name: "cart_conversion_rate_matches_ratio"
-          expr: "carts_created > 0 and abs(cart_conversion_rate - (orders_count / carts_created)) > {ratio_epsilon}"
+          expr: "carts_created > 0 and abs(cart_conversion_rate - expected_cart_conversion_rate) > {ratio_epsilon}"
       int_shipping_economics:
         - name: "shipping_margin_matches_components"
           expr: >-

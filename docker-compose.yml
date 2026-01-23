@@ -4,20 +4,24 @@ x-airflow-common: &airflow-common
     context: .
     dockerfile: Dockerfile
   image: ecom-datalake-pipeline:latest
+  env_file:
+    - docker.env
   environment:
     # Airflow Core Config
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/airflow
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
     AIRFLOW__WEBSERVER__SECRET_KEY: "${AIRFLOW__WEBSERVER__SECRET_KEY:-}"
     AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY:-}"
     PYTHONPATH: "/opt/airflow"
 
     # Pipeline Environment (local, dev, prod)
-    PIPELINE_ENV: "${PIPELINE_ENV:-local}"
-    OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-}"
+    PIPELINE_ENV: "${PIPELINE_ENV:-dev}"
+    OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-dev}"
     CLOUDSDK_CONFIG: "/home/airflow/.config/gcloud"
+    GOOGLE_APPLICATION_CREDENTIALS: "/home/airflow/.config/gcloud/application_default_credentials.json"
     USE_SA_AUTH: "${USE_SA_AUTH:-false}"
 
     # Redirect writable paths to /tmp inside container to avoid macOS Docker volume locking (Errno 35)
@@ -34,15 +38,7 @@ x-airflow-common: &airflow-common
     GCS_BUCKET: "${GCS_BUCKET:-}"
     BQ_LOCATION: "${BQ_LOCATION:-US}"
     BQ_LOAD_ENABLED: "${BQ_LOAD_ENABLED:-}"
-    METRICS_BUCKET: "${METRICS_BUCKET:-}"
-    LOGS_BUCKET: "${LOGS_BUCKET:-}"
-    REPORTS_BUCKET: "${REPORTS_BUCKET:-}"
-    GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
-
-    # Path Overrides (optional - uses config.yml defaults if not set)
-    BRONZE_BASE_PATH: "${BRONZE_BASE_PATH:-samples/bronze}"
-    SILVER_BASE_PATH: "${SILVER_BASE_PATH:-data/silver/base}"
-    SILVER_ENRICHED_PATH: "${SILVER_ENRICHED_PATH:-data/silver/enriched}"
+    # Use docker.env for GCS buckets and paths to avoid host env overrides.
 
     # Feature Flags
     GOLD_PIPELINE_ENABLED: "${GOLD_PIPELINE_ENABLED:-false}"
@@ -66,14 +62,14 @@ x-airflow-common: &airflow-common
     - airflow-data:/opt/airflow/data
     - ./docs:/opt/airflow/docs
     # ADC (default): mount gcloud application-default credentials
-    - ${CLOUDSDK_CONFIG_PATH:-~/.config/gcloud}:/home/airflow/.config/gcloud:rw
+    # - ${CLOUDSDK_CONFIG_PATH:-~/.config/gcloud}:/home/airflow/.config/gcloud:rw
     # Optional service account key (set USE_SA_AUTH=true + GOOGLE_APPLICATION_CREDENTIALS)
     # - ${GCP_SA_KEY_PATH}:/opt/airflow/.gcp/sa.json:ro
 
-    # Mount source code for development (optional - can remove in prod)
-    # WARNING: Uncommenting dbt_duckdb causes Errno 35 on macOS Docker Desktop
-    # - ./src:/opt/airflow/src
-    # - ./config:/opt/airflow/config
+    # Mount source code for development (keep baked-in copies for prod)
+    # WARNING: Uncommenting dbt_duckdb can cause Errno 35 on macOS Docker Desktop
+    - ./src:/opt/airflow/src
+    - ./config:/opt/airflow/config
     # - ./dbt_duckdb:/opt/airflow/dbt_duckdb
     # - ./dbt_bigquery:/opt/airflow/dbt_bigquery
 
@@ -85,8 +81,8 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
+      POSTGRES_USER: "${POSTGRES_USER:-airflow}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-airflow}"
       POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data

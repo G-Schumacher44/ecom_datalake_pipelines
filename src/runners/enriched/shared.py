@@ -12,6 +12,7 @@ import polars as pl
 import pyarrow.parquet as pq
 
 from src.settings import PipelineConfig, load_settings
+from src.specs import load_spec_safe
 from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,9 @@ def normalize_schema(
     if schema is None:
         return None
     if table == "product_catalog" and "category" not in schema:
-        return {**schema, "category": pl.Utf8}
+        schema = {**schema, "category": pl.String()}
+    if table in get_dims_partitions() and "as_of_dt" not in schema:
+        return {**schema, "as_of_dt": pl.Date()}
     return schema
 
 
@@ -86,16 +89,34 @@ def enriched_runner(
 
 def get_table_partitions() -> dict[str, str | None]:
     """Get bronze table partitions (deprecated for enriched runners)."""
+    spec = load_spec_safe()
+    if spec:
+        return {table.name: table.partition_key for table in spec.bronze.tables}
     return load_settings().pipeline.table_partitions
 
 
 def get_silver_table_partitions() -> dict[str, str | None]:
     """Get silver table partitions for enriched runners."""
+    spec = load_spec_safe()
+    if spec:
+        return {table.name: table.partition_key for table in spec.silver_base.tables}
     return load_settings().pipeline.silver_table_partitions
 
 
 def get_enriched_partitions() -> dict[str, str]:
+    spec = load_spec_safe()
+    if spec:
+        return {
+            table.name: table.partition_key for table in spec.silver_enriched.tables
+        }
     return load_settings().pipeline.enriched_partitions
+
+
+def get_dims_partitions() -> dict[str, str | None]:
+    spec = load_spec_safe()
+    if spec:
+        return {table.name: table.partition_key for table in spec.dims.tables}
+    return {}
 
 
 def is_gcs_path(path: str) -> bool:
@@ -145,13 +166,30 @@ def read_partitioned(
     ingest_dt: str,
     lookback_days: int,
 ) -> pl.LazyFrame:
-    partition_key = get_silver_table_partitions().get(table)
+    dims_partitions = get_dims_partitions()
+    dims_base = os.getenv("SILVER_DIMS_PATH")
+    if table in dims_partitions:
+        if not dims_base:
+            spec = load_spec_safe()
+            dims_base = spec.dims.base_path if spec and spec.dims.base_path else ""
+        if dims_base:
+            dims_base = os.path.expandvars(dims_base)
+            if is_gcs_path(dims_base):
+                dims_base = os.getenv(
+                    "SILVER_DIMS_LOCAL_PATH", "/opt/airflow/data/silver/dims"
+                )
+            elif not os.path.isabs(dims_base):
+                dims_base = os.path.join("/opt/airflow", dims_base)
+            base_path = dims_base
+        partition_key = dims_partitions.get(table)
+    else:
+        partition_key = get_silver_table_partitions().get(table)
     if partition_key is None:
         schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
         return pl.scan_parquet(
             f"{base_path}/{table}/**/*.parquet",
             hive_partitioning=True,
-            schema=schema,  # type: ignore[arg-type]
+            schema=schema,
         )
 
     date_partitions = {
@@ -167,7 +205,7 @@ def read_partitioned(
         return pl.scan_parquet(
             f"{base_path}/{table}/{partition_key}=*/**/*.parquet",
             hive_partitioning=True,
-            schema=schema,  # type: ignore[arg-type]
+            schema=schema,
         )
 
     available = set(list_partitions(base_path, table, partition_key))
@@ -178,9 +216,7 @@ def read_partitioned(
         demo_mode = os.getenv("DEMO_MODE", "").lower() in {"1", "true", "yes", "on"}
         if demo_mode and table == "product_catalog" and available:
             latest = sorted(available)[-1]
-            paths = [
-                f"{base_path}/{table}/{partition_key}={latest}/**/*.parquet"
-            ]
+            paths = [f"{base_path}/{table}/{partition_key}={latest}/**/*.parquet"]
             schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
             logger.warning(
                 "Demo mode: falling back to latest %s partition %s for %s.",
@@ -191,7 +227,7 @@ def read_partitioned(
             return pl.scan_parquet(
                 paths,
                 hive_partitioning=True,
-                schema=schema,  # type: ignore[arg-type]
+                schema=schema,
             )
         # If no partitions match the requested date range, return an empty
         # DataFrame with the correct schema. This prevents pipeline failure
@@ -202,7 +238,7 @@ def read_partitioned(
         )
         schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
         if schema:
-            return pl.DataFrame(schema=schema).lazy()  # type: ignore[arg-type]
+            return pl.DataFrame(schema=schema).lazy()
         # Fallback if schema is missing (should not happen given imports)
         raise FileNotFoundError(
             f"No {partition_key} partitions found for {table} at {base_path} "
@@ -214,7 +250,7 @@ def read_partitioned(
     return pl.scan_parquet(
         paths,
         hive_partitioning=True,
-        schema=schema,  # type: ignore[arg-type]
+        schema=schema,
     )
 
 
@@ -236,7 +272,7 @@ def write_sharded_parquet(
 ) -> None:
     def _write_parquet_compat(frame: pl.DataFrame, path: str) -> None:
         try:
-            frame.write_parquet(path, use_dictionary=False)
+            frame.write_parquet(path)
         except TypeError:
             pq.write_table(frame.to_arrow(), path, use_dictionary=False)
 

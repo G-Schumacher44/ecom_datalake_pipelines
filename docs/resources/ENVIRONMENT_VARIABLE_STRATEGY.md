@@ -125,6 +125,7 @@ tolerance = settings.pipeline.attribution_tolerance_hours
 # Gate optional stages without changing code
 GOLD_PIPELINE_ENABLED=true
 BQ_LOAD_ENABLED=true
+SILVER_PUBLISH_MODE=direct|staging
 ```
 
 ### Path Overrides (Per-Dev / Dev)
@@ -133,6 +134,8 @@ BRONZE_BASE_PATH=samples/bronze
 SILVER_BASE_PATH=data/silver/base
 SILVER_QUARANTINE_PATH=data/silver/base/quarantine
 SILVER_ENRICHED_PATH=data/silver/enriched
+SILVER_DIMS_PATH=data/silver/dims
+SILVER_DIMS_LOCAL_PATH=/opt/airflow/data/silver/dims
 SILVER_GCS_TARGET=gs://your-silver-bucket/silver/base
 SILVER_ENRICHED_GCS_TARGET=gs://your-silver-bucket/silver/enriched
 ```
@@ -143,6 +146,7 @@ SILVER_ENRICHED_GCS_TARGET=gs://your-silver-bucket/silver/enriched
 ```bash
 PIPELINE_ENV=local|dev|prod
 ECOM_CONFIG_PATH=/opt/airflow/config/config.yml
+ECOM_SPEC_PATH=/opt/airflow/config/specs
 BASE_SILVER_LOOKBACK_DAYS=0
 ```
 
@@ -152,6 +156,8 @@ BRONZE_BASE_PATH=samples/bronze
 SILVER_BASE_PATH=data/silver/base
 SILVER_QUARANTINE_PATH=data/silver/base/quarantine
 SILVER_ENRICHED_PATH=data/silver/enriched
+SILVER_DIMS_PATH=data/silver/dims
+SILVER_DIMS_LOCAL_PATH=/opt/airflow/data/silver/dims
 SILVER_GCS_TARGET=gs://bucket/silver/base
 SILVER_ENRICHED_GCS_TARGET=gs://bucket/silver/enriched
 ```

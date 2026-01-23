@@ -5,7 +5,7 @@
 .PHONY: help build up down restart logs shell log-task test lint format type-check clean clean-data
 .PHONY: dbt-deps dbt-build dbt-test local-silver push-image
 .PHONY: strict-mode easy-mode run-sample run-sample-strict run-sample-bq backfill-easy backfill-strict run-dims backfill-dims
-.PHONY: run-dev-gcs dev-mode run-dev-docker
+.PHONY: run-dev-gcs dev-mode run-dev-docker prod-sim-mode run-prod-sim-docker
 
 RUN_ID_OPT = $(if $(RUN_ID),--run-id $(RUN_ID),)
 
@@ -51,9 +51,11 @@ help:
 	@echo "      Required: START=YYYY-MM-DD END=YYYY-MM-DD"
 	@echo ""
 	@echo "  make run-dev-gcs       Run Pipeline with GCS (Native, No Docker)"
+	@echo "  make run-sim-prod-gcs  Simulate prod run against GCS (Native, No Docker)"
 	@echo "      Required: DATE=YYYY-MM-DD"
 	@echo ""
-	@echo "  make run-dev-docker    Run Pipeline with GCS (Docker + Airflow)"
+	@echo "  make run-dev-docker    Run Pipeline with GCS (Docker + Airflow, dev)"
+	@echo "  make run-prod-sim-docker Run Pipeline with GCS (Docker + Airflow, prod-sim)"
 	@echo "      Required: DATE=YYYY-MM-DD"
 	@echo "      Uses: gs://acme-analytics-raw (Bronze)"
 	@echo "            gs://acme-analytics-silver (Silver)"
@@ -252,6 +254,21 @@ endif
 	@echo "=========================================="
 	@./scripts/run_dev_pipeline.sh $(DATE)
 
+# Simulated prod run against GCS (native, no Docker)
+run-sim-prod-gcs:
+ifndef DATE
+	@echo "ERROR: DATE not set. Usage: make run-sim-prod-gcs DATE=2025-10-04"
+	@exit 1
+endif
+	@echo "=========================================="
+	@echo "Running Simulated Prod Pipeline (GCS)"
+	@echo "Date: $(DATE)"
+	@echo "Bronze: gs://acme-analytics-raw/ecom/raw"
+	@echo "Silver: gs://acme-analytics-silver/data/silver/base"
+	@echo "Enriched: gs://acme-analytics-silver/data/silver/enriched"
+	@echo "=========================================="
+	@./scripts/run_sim_prod_gcs.sh $(DATE)
+
 # Start Airflow in dev mode (GCS buckets, no BQ load)
 dev-mode:
 	@echo "Starting Airflow in DEV mode..."
@@ -261,14 +278,15 @@ dev-mode:
 	@echo "  - BigQuery: DISABLED"
 	@echo "  - Gold: DISABLED"
 	PIPELINE_ENV=dev \
+	OBSERVABILITY_ENV=dev \
 	BQ_LOAD_ENABLED=false \
 	GOLD_PIPELINE_ENABLED=false \
-	docker-compose up -d --force-recreate airflow-scheduler airflow-webserver
+	docker compose --env-file docker.env up -d --force-recreate airflow-scheduler airflow-webserver
 	@echo ""
 	@echo "Airflow UI: http://localhost:8080"
 	@echo "Username: airflow | Password: airflow"
 
-# Run pipeline in Docker with GCS buckets
+# Run pipeline in Docker with GCS buckets (dev defaults)
 run-dev-docker: dev-mode
 ifndef DATE
 	@echo "ERROR: DATE not set. Usage: make run-dev-docker DATE=2025-10-04"
@@ -276,6 +294,39 @@ ifndef DATE
 endif
 	@echo "=========================================="
 	@echo "Triggering DAG in Airflow (Docker)"
+	@echo "Date: $(DATE)"
+	@echo "=========================================="
+	@sleep 5  # Give Airflow time to start
+	docker-compose exec airflow-scheduler \
+		airflow dags trigger ecom_silver_to_gold_pipeline --exec-date $(DATE)
+	@echo ""
+	@echo "DAG triggered! Monitor at http://localhost:8080"
+
+# Start Airflow in prod-sim mode (GCS buckets, no BQ load)
+prod-sim-mode:
+	@echo "Starting Airflow in PROD-SIM mode..."
+	@echo "  - Environment: prod"
+	@echo "  - Bronze: gs://acme-analytics-raw"
+	@echo "  - Silver: gs://acme-analytics-silver"
+	@echo "  - BigQuery: DISABLED"
+	@echo "  - Gold: DISABLED"
+	PIPELINE_ENV=prod \
+	OBSERVABILITY_ENV=prod \
+	BQ_LOAD_ENABLED=false \
+	GOLD_PIPELINE_ENABLED=false \
+	docker compose --env-file docker.env up -d --force-recreate airflow-scheduler airflow-webserver
+	@echo ""
+	@echo "Airflow UI: http://localhost:8080"
+	@echo "Username: airflow | Password: airflow"
+
+# Run pipeline in Docker with GCS buckets (prod-sim defaults)
+run-prod-sim-docker: prod-sim-mode
+ifndef DATE
+	@echo "ERROR: DATE not set. Usage: make run-prod-sim-docker DATE=2025-10-04"
+	@exit 1
+endif
+	@echo "=========================================="
+	@echo "Triggering DAG in Airflow (Docker, PROD-SIM)"
 	@echo "Date: $(DATE)"
 	@echo "=========================================="
 	@sleep 5  # Give Airflow time to start
@@ -366,11 +417,7 @@ local-dims:
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
-		python -m src.runners.base_silver \
-		--select stg_ecommerce__customers \
-		stg_ecommerce__customers_quarantine \
-		stg_ecommerce__product_catalog \
-		stg_ecommerce__product_catalog_quarantine
+		python scripts/run_dims_from_spec.py
 	python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
@@ -381,11 +428,7 @@ local-dims-strict:
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
-		python -m src.runners.base_silver \
-		--select stg_ecommerce__customers \
-		stg_ecommerce__customers_quarantine \
-		stg_ecommerce__product_catalog \
-		stg_ecommerce__product_catalog_quarantine
+		python scripts/run_dims_from_spec.py
 	python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \

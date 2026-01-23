@@ -160,6 +160,7 @@ Key overrides:
 - `PIPELINE_ENV` → Overrides `pipeline.environment` (local, dev, prod)
 - `GOOGLE_CLOUD_PROJECT` → Overrides `pipeline.project_id`
 - `GCS_BUCKET` → Bronze data bucket for GCS operations
+- `ECOM_SPEC_PATH` → Overrides the spec directory or YAML file (default: `config/specs`)
 
 #### Observability
 
@@ -175,6 +176,8 @@ Key overrides:
 - `SILVER_BASE_PATH` → Overrides dbt var (for dbt models)
 - `SILVER_QUARANTINE_PATH` → Overrides silver quarantine output path
 - `SILVER_ENRICHED_PATH` → Overrides silver enriched output path
+- `SILVER_DIMS_PATH` → Overrides dims snapshot base path
+- `SILVER_DIMS_LOCAL_PATH` → Local dims snapshot path (used when `SILVER_DIMS_PATH` is gs://)
 - `SILVER_GCS_TARGET` → Overrides silver base GCS sync target
 - `SILVER_ENRICHED_GCS_TARGET` → Overrides silver enriched GCS sync target
 
@@ -198,6 +201,12 @@ Key overrides:
 - `BQ_LOAD_ENABLED` → Enable Enriched Silver BigQuery loads (default: `false`)
 - `BRONZE_QA_REQUIRED` → Require Bronze QA phase (default: `true`)
 - `BRONZE_QA_FAIL` → Fail pipeline on Bronze issues (default: `false`)
+- `SILVER_PUBLISH_MODE` → Export mode for Silver (direct or staging) (default: `direct`)
+
+When `SILVER_PUBLISH_MODE=staging`, exports go to:
+- `gs://.../silver/base/_staging/<run_id>/...`
+- `_MANIFEST.json` written under the staging prefix
+- `_latest.json` written at the silver base root to point to the latest staging run
 - `STRICT_FK` → Enforce FK validation in Silver (default: `false`)
 
 ---
@@ -219,6 +228,26 @@ Key overrides:
 **Secret examples (env-only):**
 - `GOOGLE_APPLICATION_CREDENTIALS` (in-container path)
 - `GCP_SA_KEY_PATH` (host path for docker-compose mount)
+
+---
+
+## Recommended Local vs Docker Split
+
+For day-to-day development, keep your local shell in **local** mode and run
+Docker/Airflow in **dev** mode so GCS paths and staging behavior can be tested
+without changing your laptop defaults.
+
+**Local shell (direnv defaults):**
+- `PIPELINE_ENV=local`
+- local filesystem paths in `.envrc` (e.g. `data/bronze`, `data/silver/*`)
+- `SILVER_PUBLISH_MODE=direct`
+
+**Docker/Airflow (docker-compose defaults):**
+- `PIPELINE_ENV=dev`
+- GCS paths/buckets for Bronze/Silver/Enriched/Dims
+- `SILVER_PUBLISH_MODE=staging`
+
+This keeps local iterations fast while Docker validates staging + manifest flow.
 
 ---
 

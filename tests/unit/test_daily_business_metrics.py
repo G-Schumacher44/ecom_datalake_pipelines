@@ -33,9 +33,7 @@ def test_compute_daily_business_metrics_basic_kpis() -> None:
     )
 
     result = compute_daily_business_metrics(
-        orders=orders,
-        carts=carts,
-        returns=returns,
+        orders=orders.lazy(), carts=carts.lazy(), returns=returns.lazy()
     ).collect()
 
     day1 = result.filter(pl.col("date") == date(2020, 1, 1)).row(0, named=True)

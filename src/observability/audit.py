@@ -37,7 +37,7 @@ def write_audit_file(path: str | Path, record: AuditRecord) -> None:
     path_str = str(path)
     if path_str.startswith("gs://"):
         try:
-            import fsspec  # type: ignore
+            import fsspec
         except ImportError as exc:
             raise RuntimeError("fsspec is required for GCS audit writes") from exc
         with fsspec.open(path_str, "w") as handle:

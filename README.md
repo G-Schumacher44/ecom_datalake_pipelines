@@ -30,6 +30,7 @@ ___
 - **Gold marts (dbt-bigquery)**: Aggregated analytics tables optimized for BI and reporting in BigQuery.
 - **Orchestration**: Airflow DAGs coordinate Bronze → Silver → Gold flows with partition-level backfill and incremental processing.
 - **Observability**: Audit trails, data quality metrics, and SLA monitoring baked into every transformation.
+- **Spec-driven orchestration**: Layered YAML specs drive table lists, partitions, and gates (see [Spec Overview](docs/resources/SPEC_OVERVIEW.md)).
 
 <details>
 <summary> ⏯️ Quick Start</summary>
@@ -78,10 +79,34 @@ ___
 
 5. **Spin up Airflow**
    ```bash
-   make airflow-init
-   make airflow-up
+   make up
    # Navigate to http://localhost:8080
+   # To stop: make down
    ```
+
+</details>
+
+<details>
+<summary> 📦 Sample Data Included</summary>
+
+The repository comes pre-loaded with **Bronze Parquet samples** in `samples/bronze/` to enable immediate testing without cloud dependencies.
+
+- **Tables**: `orders`, `order_items`, `customers`, `products`, `shopping_carts`, `cart_items`
+- **Date Range**: Includes slices from **Oct 2025** (simulated)
+- **Format**: Hive-partitioned Parquet with `_MANIFEST.json` files
+- **Use Case**: Run full Bronze → Silver → Enriched transformations locally using DuckDB and Polars.
+
+</details>
+
+<details>
+<summary> 🚀 Zero-Config Demo</summary>
+
+Want to see it in action instantly? Run the full local pipeline (Bronze -> Silver -> Enriched) with a single command line:
+
+```bash
+# Process sample data from Bronze to Enriched Silver (no Docker required)
+make local-silver && make local-dims && make local-enriched DATE=2025-10-15
+```
 
 </details>
 
@@ -90,6 +115,7 @@ ___
 ## 📐 What's Included
 
 - **Medallion architecture**: Bronze (raw) → Silver (clean, typed) → Gold (aggregated marts).
+- **Spec-driven pipeline control**: Table lists, partitions, and validation gates live in `config/specs/*.yml`.
 - **dbt-duckdb for Base Silver**: Leverage DuckDB's speed for local development and testing.
 - **Polars for Enriched Silver**: Pure Python transforms for business logic, cohort analysis, and feature engineering.
 - **dbt-bigquery for Gold marts**: SQL-based aggregations optimized for BI and reporting in BigQuery.
@@ -97,6 +123,7 @@ ___
 - **Quality gates**: Primary key uniqueness, foreign key referential integrity, and non-negative numeric constraints.
 - **Airflow orchestration**: DAGs for backfill, incremental processing, and partition-level recovery.
 - **Observability**: Audit JSON emitted per table/partition, ready for SLA dashboards and alerting.
+- **Dimension snapshot validation**: Lightweight quality gate for dimension snapshots (customers, products) ensuring schema and primary key integrity without expensive historical scans.
 - **Self-documenting profiling**: Bronze profiling script auto-generates schema maps, data dictionaries, and quality reports from live data samples.
 
 ### 🧭 Orientation & Getting Started
@@ -207,7 +234,6 @@ ecom-datalake-pipelines/
 │   └── config/                 # Airflow configuration
 ├── config/
 │   ├── config.yml              # Pipeline settings (buckets, prefixes, targets)
-│   └── .env.example            # Environment variable template
 ├── dbt_duckdb/                 # Base Silver dbt project (DuckDB)
 │   ├── models/
 │   │   └── base_silver/        # Type-safe, integrity-checked Silver tables
@@ -397,18 +423,15 @@ dbt test --target dev
 <br>
 
 ```bash
-# Initialize Airflow (first time only)
-make airflow-init
-
-# Start Airflow services
-make airflow-up
+# Initialize and start Airflow services
+make up
 
 # Access Airflow UI
 open http://localhost:8080
 # Default credentials: airflow / airflow
 
 # Stop Airflow
-make airflow-down
+make down
 ```
 
 </details>
@@ -425,7 +448,7 @@ make test
 pytest tests/test_validation.py -v
 
 # Run with coverage
-pytest --cov=src/ecom_pipelines tests/
+pytest --cov=src tests/
 ```
 
 </details>

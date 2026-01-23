@@ -121,6 +121,10 @@ class PipelineConfig(BaseModel):
     silver_bucket: str = Field(..., description="Silver GCS bucket name")
     silver_base_prefix: str = "silver/base"
     silver_enriched_prefix: str = "silver/enriched"
+    silver_publish_mode: str = Field(
+        default="direct",
+        description="Silver publish mode: direct or staging",
+    )
 
     # BigQuery Datasets
     bigquery_dataset: str = "silver"
@@ -224,6 +228,32 @@ class PipelineConfig(BaseModel):
         default=0.0001,
         description="Tolerance for enriched ratio checks (floating-point drift).",
     )
+    cart_abandoned_min_value: float = Field(
+        default=0.0,
+        description="Minimum cart value required to label a cart as abandoned.",
+    )
+    rate_precision: int = Field(
+        default=6,
+        description="Decimal precision for derived rate metrics.",
+    )
+    rate_cap_min: float = Field(
+        default=0.0,
+        description="Minimum cap for rate metrics when rate_cap_enabled is true.",
+    )
+    rate_cap_max: float = Field(
+        default=1.0,
+        description="Maximum cap for rate metrics when rate_cap_enabled is true.",
+    )
+    rate_cap_enabled: bool = Field(
+        default=True,
+        description="Whether to cap rate metrics within [rate_cap_min, rate_cap_max].",
+    )
+    return_units_max_ratio: float = Field(
+        default=2.0,
+        description=(
+            "Maximum allowed ratio of units_returned to units_sold before flagging."
+        ),
+    )
     table_partitions: dict[str, str | None] = Field(default_factory=dict)
     silver_table_partitions: dict[str, str | None] = Field(default_factory=dict)
     enriched_partitions: dict[str, str] = Field(default_factory=dict)
@@ -235,6 +265,14 @@ class PipelineConfig(BaseModel):
         allowed = {"local", "dev", "prod"}
         if v not in allowed:
             raise ValueError(f"environment must be one of {allowed}, got '{v}'")
+        return v
+
+    @field_validator("silver_publish_mode")
+    @classmethod
+    def silver_publish_mode_is_valid(cls, v: str) -> str:
+        allowed = {"direct", "staging"}
+        if v not in allowed:
+            raise ValueError(f"silver_publish_mode must be one of {allowed}, got '{v}'")
         return v
 
     @field_validator("default_ingest_dt")
@@ -260,6 +298,30 @@ class PipelineConfig(BaseModel):
     def percentage_in_range(cls, v: float) -> float:
         if not 0.0 <= v <= 100.0:
             raise ValueError(f"Percentage must be between 0 and 100, got {v}")
+        return v
+
+    @field_validator("rate_precision")
+    @classmethod
+    def rate_precision_is_non_negative(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("rate_precision must be non-negative")
+        return v
+
+    @model_validator(mode="after")
+    def validate_rate_caps(self) -> "PipelineConfig":
+        """Ensure rate_cap_max >= rate_cap_min."""
+        if self.rate_cap_enabled and self.rate_cap_max < self.rate_cap_min:
+            raise ValueError(
+                f"rate_cap_max ({self.rate_cap_max}) must be >= "
+                f"rate_cap_min ({self.rate_cap_min})"
+            )
+        return self
+
+    @field_validator("return_units_max_ratio")
+    @classmethod
+    def return_units_max_ratio_gte_one(cls, v: float) -> float:
+        if v < 1.0:
+            raise ValueError("return_units_max_ratio must be >= 1.0")
         return v
 
     @field_validator("retry_config")

@@ -45,7 +45,8 @@ def compute_customer_lifetime_value(
     )
 
     result = (
-        customers.select(["customer_id", "clv_bucket"])
+        customers.unique(subset=["customer_id"], keep="last")
+        .select(["customer_id", "clv_bucket"])
         .join(orders_agg, on="customer_id", how="left")
         .join(returns_agg, on="customer_id", how="left")
         .with_columns(

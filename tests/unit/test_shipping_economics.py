@@ -17,7 +17,7 @@ def test_compute_shipping_economics_margins() -> None:
         }
     )
 
-    result = compute_shipping_economics(orders).collect()
+    result = compute_shipping_economics(orders.lazy()).collect()
     row1 = result.filter(pl.col("order_id") == "ORD-1").row(0, named=True)
     row2 = result.filter(pl.col("order_id") == "ORD-2").row(0, named=True)
 

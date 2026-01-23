@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 import polars as pl
 
@@ -297,7 +297,8 @@ def render_markdown(
     # Check for high null percentages
     for profile in profiles_list:
         for stat in profile.column_stats:
-            if stat["null_pct"] > 50:
+            null_pct = cast(float, stat["null_pct"])
+            if null_pct > 50:
                 quality_flags.append(
                     (
                         profile.table,
@@ -305,7 +306,7 @@ def render_markdown(
                         f"high_nulls|{profile.table}|{stat['column']}",
                         (
                             f"⚠️ **{profile.table}.{stat['column']}**: "
-                            f"{stat['null_pct']}% nulls (>50%)"
+                            f"{null_pct}% nulls (>50%)"
                         ),
                     )
                 )
@@ -324,7 +325,7 @@ def render_markdown(
 
     for profile in profiles_list:
         for stat in profile.column_stats:
-            col_name = stat["column"].lower()
+            col_name = str(stat["column"]).lower()
             # Skip metadata columns
             if stat["column"] in metadata_columns:
                 continue
@@ -346,7 +347,9 @@ def render_markdown(
                 ]
             )
 
-            if is_primary_id and stat["distinct"] < 10 and stat["null_pct"] < 100:
+            distinct_val = cast(int, stat["distinct"])
+            null_pct_val = cast(float, stat["null_pct"])
+            if is_primary_id and distinct_val < 10 and null_pct_val < 100:
                 quality_flags.append(
                     (
                         profile.table,
@@ -354,7 +357,7 @@ def render_markdown(
                         f"low_cardinality_id|{profile.table}|{stat['column']}",
                         (
                             f"⚠️ **{profile.table}.{stat['column']}**: Only "
-                            f"{stat['distinct']} distinct values "
+                            f"{distinct_val} distinct values "
                             "(expected high cardinality for primary entity ID)"
                         ),
                     )
@@ -365,8 +368,8 @@ def render_markdown(
         stat_dict = {s["column"]: s for s in profile.column_stats}
         # Check product_id vs product_name mismatches
         if "product_id" in stat_dict and "product_name" in stat_dict:
-            prod_id_distinct = stat_dict["product_id"]["distinct"]
-            prod_name_distinct = stat_dict["product_name"]["distinct"]
+            prod_id_distinct = cast(int, stat_dict["product_id"]["distinct"])
+            prod_name_distinct = cast(int, stat_dict["product_name"]["distinct"])
             if prod_name_distinct > prod_id_distinct * 1.5:
                 quality_flags.append(
                     (
@@ -418,25 +421,24 @@ def render_markdown(
                     "partitions": set(),
                 }
             entry = aggregated[issue_key]
-            entry["count"] = int(entry["count"]) + 1
+            entry["count"] = cast(int, entry["count"]) + 1
             partitions = entry["partitions"]
             if isinstance(partitions, set):
                 partitions.add(f"{table}:{partition}")
 
         sorted_flags = sorted(
             aggregated.items(),
-            key=lambda item: int(item[1]["count"]),
+            key=lambda item: cast(int, item[1]["count"]),
             reverse=True,
         )
         for _issue_key, meta in sorted_flags[:10]:
-            partitions = sorted(list(meta["partitions"]))[:5]
-            partition_sample = ", ".join(partitions)
-            lines.append(
-                (
-                    f"- {meta['message']} (count={meta['count']}, "
-                    f"samples={partition_sample})"
-                )
-            )
+            # meta is dict[str, object]
+            partitions_set = cast(Set[str], meta["partitions"])
+            partitions_sample = sorted(list(partitions_set))[:5]
+            partition_sample_str = ", ".join(partitions_sample)
+            msg = cast(str, meta["message"])
+            cnt = cast(int, meta["count"])
+            lines.append((f"- {msg} (count={cnt}, " f"samples={partition_sample_str})"))
     else:
         lines.append("- ✅ No major data quality issues detected")
 
@@ -620,17 +622,17 @@ def render_markdown(
                 stats_parts.append(f"Range: `{stat['min']}` to `{stat['max']}`")
 
             # Percentiles for numeric
-            if stat["percentiles"]:
-                p = stat["percentiles"]
+            percentiles = cast(Optional[Dict[str, Any]], stat["percentiles"])
+            if percentiles:
+                p = percentiles
                 stats_parts.append(
                     f"p25={p['p25']}, p50={p['p50']}, p75={p['p75']}, p95={p['p95']}"
                 )
 
             # Top values for strings
-            if stat["top_values"]:
-                top_str = ", ".join(
-                    [f"`{val}` ({cnt})" for val, cnt in stat["top_values"][:3]]
-                )
+            top_values = cast(Optional[List[Tuple[Any, int]]], stat["top_values"])
+            if top_values:
+                top_str = ", ".join([f"`{val}` ({cnt})" for val, cnt in top_values[:3]])
                 stats_parts.append(f"Top: {top_str}")
 
             stats_cell = "<br>".join(stats_parts) if stats_parts else "—"
@@ -826,21 +828,21 @@ def main() -> None:
         contract_path = Path(args.update_contract)
         contract = contract_path.read_text()
 
-        lines: list[str] = []
-        lines.append("## Observed Bronze Types vs Base Silver Targets")
-        lines.append(
+        contract_lines: list[str] = []
+        contract_lines.append("## Observed Bronze Types vs Base Silver Targets")
+        contract_lines.append(
             "Bronze source fields are string-heavy (timestamps and dates are "
             "strings). Base Silver must"
         )
-        lines.append(
+        contract_lines.append(
             "explicitly cast to target types below. Use the profile report for "
             "observed types and"
         )
-        lines.append("validate that casts are applied in dbt-duckdb models.")
-        lines.append("")
+        contract_lines.append("validate that casts are applied in dbt-duckdb models.")
+        contract_lines.append("")
 
         for table in sorted(schema_by_table.keys()):
-            lines.append(f"### {table}")
+            contract_lines.append(f"### {table}")
             for col, bronze_type in schema_by_table[table].items():
                 target = bronze_to_base.get(bronze_type, bronze_type.lower())
                 if col in timestamp_fields:
@@ -849,13 +851,13 @@ def main() -> None:
                     target = "date"
                 elif col in bool_fields:
                     target = "bool"
-                lines.append(
+                contract_lines.append(
                     f"- {col}: Bronze `{bronze_type.lower()}` -> Base Silver "
                     f"`{target}`"
                 )
-            lines.append("")
+            contract_lines.append("")
 
-        new_block = "\n".join(lines).rstrip()
+        new_block = "\n".join(contract_lines).rstrip()
         start_marker = "## Observed Bronze Types vs Base Silver Targets"
         end_marker = "## Base Silver Tables (Required Fields)"
         if start_marker in contract and end_marker in contract:
@@ -932,7 +934,7 @@ def main() -> None:
             "is_reactivated": "Whether the customer was reactivated.",
         }
 
-        lines: list[str] = [
+        dict_lines: list[str] = [
             "# Data Dictionary",
             "",
             "Derived from the Bronze profile report and Data Contract.",
@@ -962,12 +964,12 @@ def main() -> None:
                     required_fields[current].add(field)
 
         for table in sorted(schema_by_table.keys()):
-            lines.append(f"## {table}")
-            lines.append("")
-            lines.append(
+            dict_lines.append(f"## {table}")
+            dict_lines.append("")
+            dict_lines.append(
                 "| Column | Bronze Type | Base Silver Type | Required | Description |"
             )
-            lines.append("| --- | --- | --- | --- | --- |")
+            dict_lines.append("| --- | --- | --- | --- | --- |")
             for col, bronze_type in schema_by_table[table].items():
                 base_type = bronze_to_base.get(bronze_type, bronze_type.lower())
                 if col in timestamp_fields:
@@ -980,13 +982,13 @@ def main() -> None:
                     "Yes" if col in required_fields.get(table, set()) else "No"
                 )
                 desc = common_desc.get(col, "")
-                lines.append(
+                dict_lines.append(
                     f"| {col} | {bronze_type.lower()} | {base_type} | "
                     f"{required_flag} | {desc} |"
                 )
-            lines.append("")
+            dict_lines.append("")
 
-        data_dictionary, _ = apply_markdown_meta("\n".join(lines), timestamp)
+        data_dictionary, _ = apply_markdown_meta("\n".join(dict_lines), timestamp)
         dict_path.parent.mkdir(parents=True, exist_ok=True)
         dict_path.write_text(data_dictionary)
         print(f"Wrote {args.data_dictionary}")
