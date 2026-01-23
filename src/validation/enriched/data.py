@@ -10,10 +10,10 @@ from src.observability import get_logger
 from src.validation.common import (
     collect_parquet_files,
     count_parquet_rows,
+    get_gcs_filesystem,
     join_path,
     list_partitions,
     path_exists,
-    get_gcs_filesystem,
 )
 
 logger = get_logger(__name__)

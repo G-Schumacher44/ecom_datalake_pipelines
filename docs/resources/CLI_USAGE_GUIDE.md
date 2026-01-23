@@ -13,6 +13,8 @@ This project includes a suite of CLI scripts designed to automate Bronze layer p
 | `report_bronze_sizes.sh` | Generate bucket size report | Markdown report with table-level storage metrics |
 | `bootstrap_airflow.sh` | Initialize Airflow environment | Airflow directories and Docker containers |
 | `dims_snapshot.py` | Validate Dimension snapshots | Quality report for dimension tables |
+| `run_dev_pipeline.sh` | Run dev pipeline (GCS native) | Full pipeline execution without Docker |
+| `run_sim_prod_gcs.sh` | Run sim-prod pipeline (GCS native) | Production simulation against GCS |
 
 ---
 
@@ -418,6 +420,28 @@ docker compose down
 rm -rf airflow/logs/* airflow/plugins/*
 docker compose down -v
 ./scripts/bootstrap_airflow.sh
+```
+
+## 🚀 Pipeline Execution: `run_dev_pipeline.sh`
+
+Run the full pipeline (Bronze -> Silver -> Enriched) in development mode against GCS buckets, without using Docker/Airflow. Ideal for fast feedback loops.
+
+### Usage
+
+```bash
+# Run for a specific date
+./scripts/run_dev_pipeline.sh 2025-10-04
+```
+
+## 🏭 Production Simulation: `run_sim_prod_gcs.sh`
+
+Simulate a production run against GCS buckets, including "Prod" specific gates and configurations.
+
+### Usage
+
+```bash
+# Run simulation for a specific date
+./scripts/run_sim_prod_gcs.sh 2025-10-04
 ```
 
 ---

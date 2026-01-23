@@ -108,13 +108,13 @@ After dbt processes Bronze → Silver, this validator checks **Fact Tables Only*
 
 ```bash
 # Run after dbt completes
-python src/validation/silver_quality.py
+python -m src.validation.silver
 ```
 
 #### With Custom Paths
 
 ```bash
-python src/validation/silver_quality.py \
+python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --quarantine-path data/silver/base/quarantine \
@@ -124,7 +124,7 @@ python src/validation/silver_quality.py \
 #### In Hard Fail Mode (Stops Pipeline on SLA Breach)
 
 ```bash
-python src/validation/silver_quality.py \
+python -m src.validation.silver \
   --enforce-quality
 ```
 
@@ -474,8 +474,8 @@ python src/validation/silver_quality.py --enforce-quality
 - [x] SLA threshold validation
 
 ### Next Steps ⏭️
-- [ ] Bronze metadata validation
-- [ ] Enhanced Pydantic validation (all 8 tables)
+- [x] Bronze metadata validation
+- [x] Enhanced Pydantic validation (all 8 tables)
 - [ ] Historical baseline comparison
 - [ ] Anomaly detection
 - [ ] Alerting integration (Slack/PagerDuty)
@@ -485,7 +485,7 @@ python src/validation/silver_quality.py --enforce-quality
 ## Files Reference
 
 ### Validation Scripts
-- `src/validation/silver_quality.py` - Silver quality validator
+- `src/validation/silver/__main__.py` - Silver quality validator
 - `scripts/validate_bronze_samples.py` - Bronze Pydantic validation
 - `scripts/describe_parquet_samples.py` - Bronze schema profiling
 

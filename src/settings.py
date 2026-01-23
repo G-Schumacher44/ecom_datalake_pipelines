@@ -272,9 +272,7 @@ class PipelineConfig(BaseModel):
     def silver_publish_mode_is_valid(cls, v: str) -> str:
         allowed = {"direct", "staging"}
         if v not in allowed:
-            raise ValueError(
-                f"silver_publish_mode must be one of {allowed}, got '{v}'"
-            )
+            raise ValueError(f"silver_publish_mode must be one of {allowed}, got '{v}'")
         return v
 
     @field_validator("default_ingest_dt")
@@ -309,13 +307,15 @@ class PipelineConfig(BaseModel):
             raise ValueError("rate_precision must be non-negative")
         return v
 
-    @field_validator("rate_cap_max")
-    @classmethod
-    def rate_cap_max_gte_min(cls, v: float, info) -> float:
-        min_value = info.data.get("rate_cap_min", 0.0)
-        if v < min_value:
-            raise ValueError("rate_cap_max must be >= rate_cap_min")
-        return v
+    @model_validator(mode="after")
+    def validate_rate_caps(self) -> "PipelineConfig":
+        """Ensure rate_cap_max >= rate_cap_min."""
+        if self.rate_cap_enabled and self.rate_cap_max < self.rate_cap_min:
+            raise ValueError(
+                f"rate_cap_max ({self.rate_cap_max}) must be >= "
+                f"rate_cap_min ({self.rate_cap_min})"
+            )
+        return self
 
     @field_validator("return_units_max_ratio")
     @classmethod

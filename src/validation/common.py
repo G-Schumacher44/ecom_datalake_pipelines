@@ -6,7 +6,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Union
+from typing import Union
 
 import polars as pl
 import pyarrow.parquet as pq
@@ -78,28 +78,36 @@ def collect_parquet_files(
     """Collect valid Parquet files under a path, using manifest if available."""
     path_str = str(path)
     candidates: list[Union[Path, str]] = []
-    
+
     if is_gcs_path(path_str):
         fs = get_gcs_filesystem()
-        
+
+        def _ensure_gs(p):
+            p_str = str(p)
+            return f"gs://{p_str}" if not p_str.startswith("gs://") else p_str
+
         # 1. Try to read from _MANIFEST.json first (Fastest)
         manifest_path = f"{path_str.rstrip('/')}/_MANIFEST.json"
         try:
             if fs.exists(manifest_path):
                 with fs.open(manifest_path, "r") as f:
                     manifest = json.load(f)
-                    
+
                 files = manifest.get("files", [])
-                base_dir = path_str.rstrip('/')
-                
+                base_dir = path_str.rstrip("/")
+
                 # Filter files based on requested partitions
                 for file_entry in files:
-                    file_rel_path = file_entry.get("path") if isinstance(file_entry, dict) else file_entry
+                    file_rel_path = (
+                        file_entry.get("path")
+                        if isinstance(file_entry, dict)
+                        else file_entry
+                    )
                     if not file_rel_path:
                         continue
-                        
+
                     full_path = f"{base_dir}/{file_rel_path}"
-                    
+
                     if partition_key and partitions:
                         match = False
                         for val in partitions:
@@ -108,36 +116,38 @@ def collect_parquet_files(
                                 break
                         if not match:
                             continue
-                    
-                    # Ensure GCS URIs have the prefix for polars
-                    if not full_path.startswith("gs://"):
-                         full_path = f"gs://{full_path.lstrip('/')}"
-                            
-                    candidates.append(str(full_path))
-                
+
+                    candidates.append(_ensure_gs(full_path))
+
                 if candidates:
-                    logger.info(f"Collected {len(candidates)} files from manifest. Sample: {candidates[0]} (type: {type(candidates[0])})")
+                    logger.info(
+                        f"Collected {len(candidates)} files from manifest. Sample: {candidates[0]} (type: {type(candidates[0])})"
+                    )
                     return sorted(candidates)
         except Exception as exc:
-            logger.warning(f"Failed to use manifest for file collection at {manifest_path}, falling back to glob: {exc}")
+            logger.warning(
+                f"Failed to use manifest for file collection at {manifest_path}, falling back to glob: {exc}"
+            )
 
         # 2. Fallback to glob (Slow)
-        def _ensure_gs(p):
-            p_str = str(p)
-            return f"gs://{p_str}" if not p_str.startswith("gs://") else p_str
-
         if partition_key and partitions:
             for value in partitions:
                 partition_path = f"{path_str.rstrip('/')}/{partition_key}={value}"
                 if not fs.exists(partition_path):
                     continue
-                candidates.extend([_ensure_gs(p) for p in fs.glob(f"{partition_path}/**/*.parquet")])
+                candidates.extend(
+                    [_ensure_gs(p) for p in fs.glob(f"{partition_path}/**/*.parquet")]
+                )
         else:
-            candidates = [_ensure_gs(p) for p in fs.glob(f"{path_str.rstrip('/')}/**/*.parquet")]
-        
+            candidates = [
+                _ensure_gs(p) for p in fs.glob(f"{path_str.rstrip('/')}/**/*.parquet")
+            ]
+
         if candidates:
-             logger.info(f"Collected {len(candidates)} files via glob. Sample: {candidates[0]} (type: {type(candidates[0])})")
-             
+            logger.info(
+                f"Collected {len(candidates)} files via glob. Sample: {candidates[0]} (type: {type(candidates[0])})"
+            )
+
         return sorted(candidates)
 
     path_obj = Path(path_str)
@@ -201,11 +211,17 @@ def count_parquet_rows(
     if partition_key:
         if partitions:
             # Targeted partitions
-            target_dirs = [f"{path_str.rstrip('/')}/{partition_key}={v}" for val in partitions for v in (val.split(',') if ',' in val else [val])]
+            target_dirs = [
+                f"{path_str.rstrip('/')}/{partition_key}={v}"
+                for val in partitions
+                for v in (val.split(",") if "," in val else [val])
+            ]
         else:
             # Full scan: list all partition directories
             partition_values = list_partitions(path, partition_key)
-            target_dirs = [f"{path_str.rstrip('/')}/{partition_key}={v}" for v in partition_values]
+            target_dirs = [
+                f"{path_str.rstrip('/')}/{partition_key}={v}" for v in partition_values
+            ]
     else:
         # Unpartitioned table
         target_dirs = [path_str]
@@ -216,7 +232,7 @@ def count_parquet_rows(
     for d in target_dirs:
         manifest_found = False
         m_path = f"{d.rstrip('/')}/{manifest_name}"
-        
+
         # Try manifest first (Fast)
         try:
             if is_gcs:
@@ -258,6 +274,7 @@ def read_parquet_safe(
     n_rows: int | None = None,
 ) -> pl.DataFrame | None:
     """Read a parquet file or directory safely, returning None on failure."""
+
     def _is_decimal_dtype(dtype: pl.DataType) -> bool:
         try:
             from polars.datatypes import is_decimal
@@ -279,9 +296,16 @@ def read_parquet_safe(
             n_rows=n_rows,
             memory_map=False,
             low_memory=True,
-            use_pyarrow=False, 
+            use_pyarrow=False,
         )
-    except (ArrowInvalid, ArrowTypeError, OSError, ValueError, TypeError, pl.exceptions.ComputeError) as exc:
+    except (
+        ArrowInvalid,
+        ArrowTypeError,
+        OSError,
+        ValueError,
+        TypeError,
+        pl.exceptions.ComputeError,
+    ) as exc:
         logger.warning(
             "Failed to read parquet; falling back to per-file read",
             path=str(path),

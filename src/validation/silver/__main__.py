@@ -17,17 +17,16 @@ from src.runners.enriched.shared import (
 )
 from src.settings import load_settings
 from src.specs import load_spec_safe
+from src.validation.base_silver_schemas import (
+    REQUIRED_BASE_SILVER_COLUMNS,
+)
 from src.validation.common import (
     get_overall_status,
     handle_exit,
     is_gcs_path,
+    join_path,
     resolve_layer_paths,
     resolve_reports_enabled,
-    join_path,
-)
-from src.validation.base_silver_schemas import (
-    BASE_SILVER_SCHEMAS,
-    REQUIRED_BASE_SILVER_COLUMNS,
 )
 from src.validation.silver.data import (
     check_required_columns,
@@ -207,7 +206,7 @@ def main() -> int:
         bronze_partition_key = get_table_partitions().get(table, "ingest_dt")
 
         # Only apply date partition filter to Bronze if it uses standard ingestion dates.
-        # For dimensions (signup_date, category), we want to compare the snapshot 
+        # For dimensions (signup_date, category), we want to compare the snapshot
         # against the total bronze volume.
         bronze_partitions = partition_values
         if bronze_partition_key not in {"ingest_dt"}:
@@ -464,6 +463,7 @@ def main() -> int:
 
     # Determine report path (use observability config for GCS in dev/prod)
     from src.observability.config import get_config
+
     if resolve_reports_enabled(args.spec_path):
         obs_config = get_config()
         if not obs_config.use_cloud_reports():

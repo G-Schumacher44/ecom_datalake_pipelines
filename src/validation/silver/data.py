@@ -5,10 +5,8 @@ from pathlib import Path
 
 import polars as pl
 from polars.exceptions import ColumnNotFoundError, ComputeError, SchemaError
-from pyarrow.lib import ArrowInvalid, ArrowTypeError
 
 from src.validation.common import (
-    collect_parquet_files,
     is_gcs_path,
     path_exists,
     read_parquet_safe,
@@ -28,19 +26,19 @@ def get_quarantine_breakdown(
         return []
 
     # get_quarantine_breakdown
-    
+
     # Use read_parquet_safe to handle GCS paths and pyarrow issues
     # Note: We don't pass partitions logic to read_parquet_safe currently in its simplest form,
     # but we can filter by path if needed. For now, we trust read_parquet_safe to handle the path.
     # If explicit partition filtering is needed, we might need to enhance read_parquet_safe or pre-filter.
     # Assuming quarantine_path points to the specific partition or base dir.
-    
+
     # Actually, read_parquet_safe calls collect_parquet_files internally but without partition args.
-    # We should update read_parquet_safe or just rely on path. 
+    # We should update read_parquet_safe or just rely on path.
     # For now, let's just pass the path.
-    
+
     df = read_parquet_safe(quarantine_path)
-    
+
     if df is None:
         return []
 
@@ -101,13 +99,13 @@ def compute_key_cardinality(
         }
 
     # compute_key_cardinality
-    
+
     # Use read_parquet_safe to handle GCS paths and pyarrow issues
     df = read_parquet_safe(
         table_path,
         columns=[key],
     )
-    
+
     if df is None:
         logger.warning(
             "Failed key cardinality scan",
@@ -122,14 +120,14 @@ def compute_key_cardinality(
             "distinct_count": 0,
             "distinct_ratio": 0.0,
         }
-        
+
     # Check if key column exists (read_parquet_safe returns None or DF with columns)
     if key not in df.columns:
-         logger.warning(
+        logger.warning(
             f"Key column '{key}' not found in {table_path}",
             extra={"error_type": "ColumnNotFoundError"},
         )
-         return {
+        return {
             "total_rows": 0,
             "non_null_rows": 0,
             "distinct_count": 0,
