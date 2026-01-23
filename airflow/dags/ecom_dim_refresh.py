@@ -20,7 +20,7 @@ from common import (
     resolve_dims_base_path,
 )
 
-from airflow import DAG
+from airflow import DAG  # type: ignore
 from src.runners.dims_snapshot import snapshot_dims
 
 # --- Task Callables ---
