@@ -49,7 +49,7 @@ def is_parquet_file(path: Path) -> bool:
 
 def get_gcs_filesystem():
     try:
-        import fsspec  # type: ignore
+        import fsspec
     except ModuleNotFoundError as exc:
         raise RuntimeError("gcsfs is required for gs:// validation reads") from exc
     return fsspec.filesystem("gcs")
@@ -121,12 +121,14 @@ def collect_parquet_files(
 
                 if candidates:
                     logger.info(
-                        f"Collected {len(candidates)} files from manifest. Sample: {candidates[0]} (type: {type(candidates[0])})"
+                        f"Collected {len(candidates)} files from manifest. "
+                        f"Sample: {candidates[0]} (type: {type(candidates[0])})"
                     )
                     return sorted(candidates)
         except Exception as exc:
             logger.warning(
-                f"Failed to use manifest for file collection at {manifest_path}, falling back to glob: {exc}"
+                f"Failed to use manifest for file collection at {manifest_path}, "
+                f"falling back to glob: {exc}"
             )
 
         # 2. Fallback to glob (Slow)
@@ -145,7 +147,8 @@ def collect_parquet_files(
 
         if candidates:
             logger.info(
-                f"Collected {len(candidates)} files via glob. Sample: {candidates[0]} (type: {type(candidates[0])})"
+                f"Collected {len(candidates)} files via glob. "
+                f"Sample: {candidates[0]} (type: {type(candidates[0])})"
             )
 
         return sorted(candidates)
@@ -153,17 +156,17 @@ def collect_parquet_files(
     path_obj = Path(path_str)
     if partition_key and partitions:
         for value in partitions:
-            partition_path = path_obj / f"{partition_key}={value}"
-            if not partition_path.exists():
+            local_partition_path = path_obj / f"{partition_key}={value}"
+            if not local_partition_path.exists():
                 continue
-            candidates.extend(partition_path.glob("**/*.parquet"))
+            candidates.extend(local_partition_path.glob("**/*.parquet"))
     else:
         candidates = list(path_obj.glob("**/*.parquet"))
     if not candidates:
         return []
 
-    valid_files = []
-    invalid_files = []
+    valid_files: list[Path | str] = []
+    invalid_files: list[Path | str] = []
     seen: set[Path] = set()
     for file_path in candidates:
         if not isinstance(file_path, Path):
@@ -235,13 +238,13 @@ def count_parquet_rows(
 
         # Try manifest first (Fast)
         try:
-            if is_gcs:
+            if is_gcs and fs:
                 if fs.exists(m_path):
                     with fs.open(m_path, "r") as f:
                         data = json.load(f)
                         total_rows += int(data.get("total_rows", 0))
                         manifest_found = True
-            else:
+            elif not is_gcs:
                 m_file = Path(m_path)
                 if m_file.exists():
                     data = json.loads(m_file.read_text())
@@ -255,11 +258,11 @@ def count_parquet_rows(
             files = collect_parquet_files(d)
             for file_path in files:
                 try:
-                    if is_gcs:
+                    if is_gcs and fs:
                         with fs.open(file_path, "rb") as handle:
                             parquet_file = pq.ParquetFile(handle)
                             total_rows += parquet_file.metadata.num_rows
-                    else:
+                    elif not is_gcs:
                         parquet_file = pq.ParquetFile(file_path)
                         total_rows += parquet_file.metadata.num_rows
                 except Exception as exc:
@@ -276,20 +279,14 @@ def read_parquet_safe(
     """Read a parquet file or directory safely, returning None on failure."""
 
     def _is_decimal_dtype(dtype: pl.DataType) -> bool:
-        try:
-            from polars.datatypes import is_decimal
-        except Exception:
-            is_decimal = None
-        if is_decimal:
-            return is_decimal(dtype)
         return str(dtype).startswith("Decimal")
 
-    parquet_files = collect_parquet_files(path)
+    parquet_files = [str(p) for p in collect_parquet_files(path)]
     if not parquet_files:
         return None
-    demo_mode = os.getenv("DEMO_MODE", "").lower() in {"1", "true", "yes", "on"}
     try:
-        # Prefer Polars native reader (use_pyarrow=False) to avoid GCSFile type issues with PyArrow
+        # Prefer Polars native reader (use_pyarrow=False)
+        # to avoid GCSFile type issues with PyArrow
         return pl.read_parquet(
             parquet_files,
             columns=columns,

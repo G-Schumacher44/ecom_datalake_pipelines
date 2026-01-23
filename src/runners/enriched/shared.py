@@ -24,9 +24,9 @@ def normalize_schema(
     if schema is None:
         return None
     if table == "product_catalog" and "category" not in schema:
-        schema = {**schema, "category": pl.Utf8}
+        schema = {**schema, "category": pl.String()}
     if table in get_dims_partitions() and "as_of_dt" not in schema:
-        return {**schema, "as_of_dt": pl.Date}
+        return {**schema, "as_of_dt": pl.Date()}
     return schema
 
 
@@ -189,7 +189,7 @@ def read_partitioned(
         return pl.scan_parquet(
             f"{base_path}/{table}/**/*.parquet",
             hive_partitioning=True,
-            schema=schema,  # type: ignore[arg-type]
+            schema=schema,
         )
 
     date_partitions = {
@@ -205,7 +205,7 @@ def read_partitioned(
         return pl.scan_parquet(
             f"{base_path}/{table}/{partition_key}=*/**/*.parquet",
             hive_partitioning=True,
-            schema=schema,  # type: ignore[arg-type]
+            schema=schema,
         )
 
     available = set(list_partitions(base_path, table, partition_key))
@@ -227,7 +227,7 @@ def read_partitioned(
             return pl.scan_parquet(
                 paths,
                 hive_partitioning=True,
-                schema=schema,  # type: ignore[arg-type]
+                schema=schema,
             )
         # If no partitions match the requested date range, return an empty
         # DataFrame with the correct schema. This prevents pipeline failure
@@ -238,7 +238,7 @@ def read_partitioned(
         )
         schema = normalize_schema(table, BASE_SILVER_SCHEMAS.get(table))
         if schema:
-            return pl.DataFrame(schema=schema).lazy()  # type: ignore[arg-type]
+            return pl.DataFrame(schema=schema).lazy()
         # Fallback if schema is missing (should not happen given imports)
         raise FileNotFoundError(
             f"No {partition_key} partitions found for {table} at {base_path} "
@@ -250,7 +250,7 @@ def read_partitioned(
     return pl.scan_parquet(
         paths,
         hive_partitioning=True,
-        schema=schema,  # type: ignore[arg-type]
+        schema=schema,
     )
 
 
@@ -272,7 +272,7 @@ def write_sharded_parquet(
 ) -> None:
     def _write_parquet_compat(frame: pl.DataFrame, path: str) -> None:
         try:
-            frame.write_parquet(path, use_dictionary=False)
+            frame.write_parquet(path)
         except TypeError:
             pq.write_table(frame.to_arrow(), path, use_dictionary=False)
 

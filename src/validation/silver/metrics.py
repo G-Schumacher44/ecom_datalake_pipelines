@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import polars as pl
@@ -8,10 +9,10 @@ from polars.exceptions import ColumnNotFoundError, ComputeError, SchemaError
 from pyarrow.lib import ArrowInvalid, ArrowTypeError
 
 from src.validation.common import (
-    collect_parquet_files,
     count_parquet_rows,
     join_path,
     path_exists,
+    read_parquet_safe,
 )
 from src.validation.silver.data import (
     get_quarantine_breakdown,
@@ -46,15 +47,17 @@ def validate_table(
     # Resolve bronze partitions:
     # 1. If explicit argument provided (including None), use it.
     # 2. If not provided (Sentinel), fallback to shared 'partitions'.
+    bronze_parts_final: list[str] | None
     if bronze_partitions is _NOT_SET:
         bronze_parts_final = partitions
     else:
+        # It's either list[str] or None at this point if not Sentinel
         bronze_parts_final = bronze_partitions  # type: ignore
 
     bronze_rows = count_parquet_rows(
         join_path(bronze_path, table),
         partition_key=bronze_pk,
-        partitions=bronze_parts_final,  # type: ignore
+        partitions=bronze_parts_final,
     )
     silver_rows = count_parquet_rows(
         join_path(silver_path, table),
@@ -151,24 +154,18 @@ def compute_fk_mismatch_summary(silver_path: Path | str) -> list[dict[str, Any]]
             continue
 
         try:
-            child_files = collect_parquet_files(child_path)
-            parent_files = collect_parquet_files(parent_path)
-            if not child_files or not parent_files:
+            child_keys_df = read_parquet_safe(
+                child_path,
+            )
+            parent_keys_df = read_parquet_safe(
+                parent_path,
+            )
+            if child_keys_df is None or parent_keys_df is None:
                 continue
-            child_keys = pl.read_parquet(
-                child_files,
-                memory_map=False,
-                low_memory=True,
-                use_pyarrow=True,
-            ).select(pl.col(child_key).alias("key"))
+
+            child_keys = child_keys_df.select(pl.col(child_key).alias("key"))
             parent_keys = (
-                pl.read_parquet(
-                    parent_files,
-                    memory_map=False,
-                    low_memory=True,
-                    use_pyarrow=True,
-                )
-                .select(pl.col(parent_key).alias("key"))
+                parent_keys_df.select(pl.col(parent_key).alias("key"))
                 .filter(pl.col("key").is_not_null())
                 .unique()
             )

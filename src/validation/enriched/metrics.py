@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import polars as pl
 from polars.exceptions import ComputeError, SQLInterfaceError, SQLSyntaxError
 

@@ -205,9 +205,9 @@ def main() -> int:
         silver_partition_key = get_silver_table_partitions().get(table, "ingest_dt")
         bronze_partition_key = get_table_partitions().get(table, "ingest_dt")
 
-        # Only apply date partition filter to Bronze if it uses standard ingestion dates.
-        # For dimensions (signup_date, category), we want to compare the snapshot
-        # against the total bronze volume.
+        # Only apply date partition filter to Bronze if it uses standard
+        # ingestion dates. For dimensions (signup_date, category),
+        # we want to compare the snapshot against the total bronze volume.
         bronze_partitions = partition_values
         if bronze_partition_key not in {"ingest_dt"}:
             bronze_partitions = None
@@ -322,12 +322,12 @@ def main() -> int:
         # I moved compute_key_cardinality to data.py, so we can use it here.
 
     sample_rows_env = os.getenv("SILVER_LINEAGE_SAMPLE_ROWS", "0").strip()
-    sample_rows = int(sample_rows_env) if sample_rows_env.isdigit() else 0
-    sample_rows = None if sample_rows <= 0 else sample_rows
+    sample_rows_val = int(sample_rows_env) if sample_rows_env.isdigit() else 0
+    sample_rows: int | None = None if sample_rows_val <= 0 else sample_rows_val
     for table in tables:
-        metrics = metrics_by_table.get(table)
-        if allow_empty_map.get(table) and metrics:
-            processed = metrics.silver_rows + metrics.quarantine_rows
+        metrics_item = metrics_by_table.get(table)
+        if allow_empty_map.get(table) and metrics_item:
+            processed = metrics_item.silver_rows + metrics_item.quarantine_rows
             if processed == 0:
                 continue
         required_cols = REQUIRED_BASE_SILVER_COLUMNS.get(table, [])
@@ -341,17 +341,17 @@ def main() -> int:
             partitions=partition_values,
             sample_rows=sample_rows,
         )
-        missing = checks.get("missing", [])
+        missing_item = checks.get("missing", [])
         nulls = checks.get("nulls", {})
-        if missing:
+        if missing_item and isinstance(missing_item, list):
             contract_issues.append(
                 {
                     "check": "missing_required_columns",
                     "table": table,
-                    "message": f"Missing columns: {', '.join(missing)}",
+                    "message": f"Missing columns: {', '.join(missing_item)}",
                 }
             )
-        if nulls:
+        if nulls and isinstance(nulls, dict):
             detail = ", ".join(f"{col}={count}" for col, count in nulls.items())
             contract_issues.append(
                 {
@@ -489,7 +489,7 @@ def main() -> int:
                 "SILVER_PROFILE_REPORT", "docs/validation_reports/SILVER_PROFILE.md"
             )
         )
-        build_profile_report(tables, silver_path, profile_path)
+        build_profile_report(tables, Path(silver_path), profile_path)
 
     logger.info("=" * 70)
     logger.info(f"Silver Quality Validation Summary (run_id={run_id})")
