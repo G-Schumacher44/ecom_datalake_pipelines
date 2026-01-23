@@ -188,7 +188,10 @@ pipeline:
         - name: "abandoned_requires_null_order_id"
           expr: "cart_status = 'abandoned' and order_id is not null"
         - name: "abandoned_value_positive_for_abandoned"
-          expr: "cart_status = 'abandoned' and order_id is null and time_to_purchase_hours is null and abandoned_value is not null and abandoned_value <= {cart_abandoned_min_value}"
+          expr: >-
+            cart_status = 'abandoned' and order_id is null and
+            time_to_purchase_hours is null and abandoned_value is not null
+            and abandoned_value <= {cart_abandoned_min_value}
         - name: "time_to_purchase_hours_non_negative"
           expr: "time_to_purchase_hours is not null and time_to_purchase_hours < 0"
       int_product_performance:
