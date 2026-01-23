@@ -402,8 +402,9 @@ def main() -> None:
 
                         # Sync Quarantine Table (if exists)
                         q_source = Path(quarantine_path) / table
-                        # Assuming quarantine path follows standard structure relative to export base
-                        # If export_base is .../silver/base, quarantine is .../silver/base/quarantine
+                        # Assuming quarantine path follows standard structure
+                        # relative to export base. If export_base is .../silver/base,
+                        # quarantine is .../silver/base/quarantine
                         q_dest = f"{export_base.rstrip('/')}/quarantine/{table}"
                         if q_source.exists():
                             gcloud_rsync(str(q_source), q_dest, delete=True)

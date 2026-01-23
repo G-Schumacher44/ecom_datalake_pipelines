@@ -155,7 +155,8 @@ def main() -> int:
         "",
         f"**Run ID:** `{run_id}`",
         f"**Snapshot Date:** `{args.run_date}`",
-        f"**Overall Status:** {'✅' if overall_status == 'PASS' else '❌'} {overall_status}",
+        f"**Overall Status:** {'✅' if overall_status == 'PASS' else '❌'} "
+        f"{overall_status}",
         "",
         "## Summary",
         "",
@@ -165,10 +166,11 @@ def main() -> int:
 
     for r in results:
         status_emoji = "✅" if r["status"] == "PASS" else "❌"
-        # Escape pipe characters in message/path if necessary, though paths usually fine
+        # Escape pipe characters in message/path if necessary
         path_display = f"`{r['path']}`"
         report_lines.append(
-            f"| {r['table']} | {status_emoji} {r['status']} | {r['rows']:,} | {r['message']} | {path_display} |"
+            f"| {r['table']} | {status_emoji} {r['status']} | "
+            f"{r['rows']:,} | {r['message']} | {path_display} |"
         )
 
     report_lines.extend(
@@ -206,14 +208,14 @@ def main() -> int:
             report_filename = Path(args.output_report).name
             gcs_path = obs_config.get_run_report_path(run_id, report_filename)
 
-            # Ensure gs:// prefix for fsspec if missing (though obs_config usually provides it)
+            # Ensure gs:// prefix for fsspec if missing
             if not str(gcs_path).startswith("gs://"):
                 gcs_path = f"gs://{gcs_path}"
 
             try:
                 fs = fsspec.filesystem("gcs")
-                # fsspec gcs filesystem expects path without gs:// prefix usually,
-                # or handle it if it supports it. Safest is to strip if we used filesystem("gcs")
+                # fsspec gcs filesystem expects path without gs:// prefix
+                # Safest is to strip if we used filesystem("gcs")
                 write_path = str(gcs_path).replace("gs://", "")
 
                 with fs.open(write_path, "w") as f:

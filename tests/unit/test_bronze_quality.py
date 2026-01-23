@@ -31,12 +31,12 @@ def test_bronze_quality_passes_with_manifest(
             partition_date=None,
             lookback_days=0,
             run_id="test",
-                            output_report=str(tmp_path / "report.md"),
-                            tables=None,
-                            enforce_quality=True,
-                            spec_path=None,
-                        ),
-                    )
+            output_report=str(tmp_path / "report.md"),
+            tables=None,
+            enforce_quality=True,
+            spec_path=None,
+        ),
+    )
     assert bronze_quality.main() == 0
 
 
@@ -57,10 +57,10 @@ def test_bronze_quality_fails_without_manifest(
             partition_date=None,
             lookback_days=0,
             run_id="test",
-                            output_report=str(tmp_path / "report.md"),
-                            tables=None,
-                            enforce_quality=True,
-                            spec_path=None,
-                        ),
-                    )
+            output_report=str(tmp_path / "report.md"),
+            tables=None,
+            enforce_quality=True,
+            spec_path=None,
+        ),
+    )
     assert bronze_quality.main() == 1

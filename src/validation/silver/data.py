@@ -28,14 +28,16 @@ def get_quarantine_breakdown(
     # get_quarantine_breakdown
 
     # Use read_parquet_safe to handle GCS paths and pyarrow issues
-    # Note: We don't pass partitions logic to read_parquet_safe currently in its simplest form,
-    # but we can filter by path if needed. For now, we trust read_parquet_safe to handle the path.
-    # If explicit partition filtering is needed, we might need to enhance read_parquet_safe or pre-filter.
+    # Note: We don't pass partitions logic to read_parquet_safe currently
+    # in its simplest form, but we can filter by path if needed.
+    # For now, we trust read_parquet_safe to handle the path.
+    # If explicit partition filtering is needed, we might need to
+    # enhance read_parquet_safe or pre-filter.
     # Assuming quarantine_path points to the specific partition or base dir.
 
-    # Actually, read_parquet_safe calls collect_parquet_files internally but without partition args.
-    # We should update read_parquet_safe or just rely on path.
-    # For now, let's just pass the path.
+    # Actually, read_parquet_safe calls collect_parquet_files internally
+    # but without partition args. We should update read_parquet_safe
+    # or just rely on path. For now, let's just pass the path.
 
     df = read_parquet_safe(quarantine_path)
 
@@ -153,7 +155,7 @@ def list_partitions_by_key(path: Path | str, partition_key: str) -> set[str]:
     partitions = set()
     if is_gcs_path(path_str):
         try:
-            import fsspec  # type: ignore
+            import fsspec
         except ModuleNotFoundError as exc:
             raise RuntimeError("gcsfs is required for gs:// validation reads") from exc
         fs = fsspec.filesystem("gcs")

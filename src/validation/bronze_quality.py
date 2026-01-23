@@ -163,12 +163,12 @@ def list_partitions(
         key = get_bronze_partitions().get(table, "ingest_dt")
         fs = fsspec.filesystem("gcs")
         if partition_values:
-            prefixes = []
+            found_prefixes = []
             for value in partition_values:
-                partition_path = f"{root}/{table}/{key}={value}"
-                if fs.exists(partition_path):
-                    prefixes.append(partition_path)
-            return sorted(prefixes)
+                partition_path_str = f"{root}/{table}/{key}={value}"
+                if fs.exists(partition_path_str):
+                    found_prefixes.append(partition_path_str)
+            return sorted(found_prefixes)
 
         # Optimization: Just list the partition directories, not every file inside them.
         # This prevents hangs on large GCS buckets.
@@ -192,9 +192,9 @@ def list_partitions(
         paths = []
         key = get_bronze_partitions().get(table, "ingest_dt")
         for value in partition_values:
-            partition_path = Path(root, table, f"{key}={value}")
-            if partition_path.is_dir():
-                paths.append(str(partition_path))
+            local_partition_path = Path(root, table, f"{key}={value}")
+            if local_partition_path.is_dir():
+                paths.append(str(local_partition_path))
         return sorted(paths)
 
     return sorted(str(p) for p in Path(root, table).glob(partition_glob) if p.is_dir())
