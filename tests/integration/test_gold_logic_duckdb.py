@@ -70,7 +70,7 @@ def main():
     # NumericValueUnionToValue'
     # This error occurs during statistics propagation for certain Decimal types
     # in aggregations.
-    con.execute("SET optimizer_disabled_optimizers = 'statistics_propagation'")
+    con.execute("SET disabled_optimizers = 'statistics_propagation'")
 
     # Register BQ compatibility macros
     con.execute("CREATE MACRO safe_divide(a, b) AS a / NULLIF(b, 0)")
