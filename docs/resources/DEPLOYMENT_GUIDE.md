@@ -67,7 +67,7 @@ docker-compose up -d
 ```
 
 **What this does**:
-- ✅ Extracts 3 months of sample Bronze Parquet data (Oct 2025)
+- ✅ Extracts multi-period Bronze Parquet samples (2020-03, 2023-01, 2024-01, 2025-10)
 - ✅ Builds custom Airflow image with dbt + Polars + all dependencies
 - ✅ Initializes Airflow database and creates admin user
 - ✅ Starts Airflow scheduler, webserver, and PostgreSQL services
@@ -75,18 +75,46 @@ docker-compose up -d
 
 **Next steps**:
 
+**Env files**:
+- **Local samples**: `docker.env.local.example` → `docker.env.local`
+- **GCS/BigQuery**: `docker.env.gcs.example` → `docker.env`
+
 **Option A: Use Airflow UI** (Recommended - handles dependencies automatically):
 1. Open Airflow UI: http://localhost:8080
 2. Navigate to **DAGs** → `ecom_silver_to_gold_pipeline`
+
+---
+
+### Run Locally with the Published Image (Sample Data)
+
+If you want to use the **versioned Docker image** instead of building locally:
+
+```bash
+# 1) Unzip sample data
+unzip samples/bronze_samples.zip -d samples/
+
+# 2) Create a local env file
+cp docker.env.local.example docker.env.local
+
+# 3) Run the published image (replace TAG)
+DOCKER_ENV_FILE=docker.env.local \
+PIPELINE_TAG=YOUR_TAG \
+docker compose up -d --no-build
+```
+
+**Notes**:
+- The compose file defaults to `ecom-datalake-pipeline:latest`. Override with `PIPELINE_TAG`.
+- GitHub releases (tags like `v1.0.0`) automatically build/push to **GHCR** via GitHub Actions.
+  If you need **GCP Artifact Registry**, use `make push-image-versioned PROJECT_ID=...`.
 3. Click **Trigger DAG** (play button)
 4. Watch the pipeline execute: Dims → Base Silver → Enriched Silver
 
 **Option B: Manual CLI execution** (for testing individual steps):
 ```bash
 # Run in correct order:
-make local-dims DATE=2025-10-01      # 1. Create dimension snapshots
-make local-silver DATE=2025-10-01    # 2. Run Base Silver (needs dims for FK checks)
-make local-enriched DATE=2025-10-01  # 3. Run Enriched transforms
+make local-dims DATE=2024-01-03      # 1. Create dimension snapshots
+make local-silver DATE=2024-01-03    # 2. Run Base Silver (needs dims for FK checks)
+make local-enriched DATE=2024-01-03  # 3. Run Enriched transforms
 ```
 
 **Note**: Base Silver models perform FK validation against dimension snapshots, so dims must be created first
@@ -107,22 +135,25 @@ cat docs/validation_reports/ENRICHED_QUALITY.md
 
 The sample archive contains representative Bronze Parquet data for testing and development:
 
-- **8 tables**: orders, customers, products, carts, cart_items, order_items, returns, return_items
-- **Date range**: First day of sample months (e.g., Oct 1, 2025)
+- **8 tables**: orders, customers, product_catalog, shopping_carts, cart_items, order_items, returns, return_items
+- **Partitions**:
+  - `ingest_dt`: 2020-03-01, 2023-01-01, 2024-01-01..2024-01-03, 2025-10-01
+  - `signup_date`: 2020-03-01, 2023-01-01, 2025-10-01
+  - `category`: Books, Clothing, Electronics, Home, Toys
 - **Format**: Hive-partitioned Parquet with `_MANIFEST.json` metadata
-- **Size**: ~150MB compressed, ~400MB extracted
-- **Rows**: ~100K orders, ~50K customers, ~300K order items
+- **Size**: ~14MB compressed, ~18MB extracted
+- **Rows**: ~194k total rows across 8 tables (see `docs/data/BRONZE_PROFILE_REPORT.md`)
 - **Use case**: Full end-to-end pipeline testing without external dependencies
 
 **Sample data structure**:
 ```
 samples/bronze/
   orders/
-    ingest_dt=2025-10-01/
+    ingest_dt=2024-01-02/
       part-00000.parquet
       _MANIFEST.json
   customers/
-    signup_date=2025-10-01/
+    signup_date=2023-01-01/
       part-00000.parquet
       _MANIFEST.json
   product_catalog/

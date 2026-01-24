@@ -78,11 +78,16 @@ ___
 3. **Pull sample Bronze data**
    ```bash
    # Profile your Bronze samples
-   python scripts/describe_parquet_samples.py --date-range 2025-10-01..2025-10-01
+   python scripts/describe_parquet_samples.py --date-range 2024-01-03..2024-01-03
    ```
 
 4. **Run transformations locally**
    ```bash
+   # Convenience Make targets
+   make local-silver DATE=2024-01-03
+   make local-dims DATE=2024-01-03
+   make local-enriched DATE=2024-01-03
+
    # Base Silver (DuckDB)
    cd dbt_duckdb
    dbt deps
@@ -104,6 +109,16 @@ ___
    # To stop: make down
    ```
 
+6. **Run with the published Docker image (optional)**
+   ```bash
+   unzip samples/bronze_samples.zip -d samples/
+   cp docker.env.local.example docker.env.local
+
+   DOCKER_ENV_FILE=docker.env.local \
+   PIPELINE_TAG=YOUR_TAG \
+   docker compose up -d --no-build
+   ```
+
 </details>
 
 <details>
@@ -111,10 +126,16 @@ ___
 
 The repository comes pre-loaded with **Bronze Parquet samples** in `samples/bronze/` to enable immediate testing without cloud dependencies.
 
-- **Tables**: `orders`, `order_items`, `customers`, `products`, `shopping_carts`, `cart_items`, `returns`, `return_items`
-- **Date Range**: Includes slices from **Oct 2025** (simulated)
+- **Tables**: `orders`, `order_items`, `customers`, `product_catalog`, `shopping_carts`, `cart_items`, `returns`, `return_items`
+- **Partitions**:
+  - `ingest_dt`: 2020-03-01, 2023-01-01, 2024-01-01..2024-01-03, 2025-10-01
+  - `signup_date`: 2020-03-01, 2023-01-01, 2025-10-01
+  - `category`: Books, Clothing, Electronics, Home, Toys
+- **Size**: ~14MB compressed, ~18MB extracted
+- **Rows**: ~194k total rows across 8 tables (see `docs/data/BRONZE_PROFILE_REPORT.md`)
 - **Format**: Hive-partitioned Parquet with `_MANIFEST.json` files
 - **Use Case**: Run full Bronze → Silver → Enriched transformations locally using DuckDB and Polars.
+- **Profile refresh**: `make profile-bronze-samples PROFILE_DATE_RANGE=2024-01-01..2024-01-03`
 
 </details>
 
@@ -125,7 +146,7 @@ Want to see it in action instantly? Run the full local pipeline (Bronze -> Silve
 
 ```bash
 # Process sample data from Bronze to Enriched Silver (no Docker required)
-make local-silver && make local-dims && make local-enriched DATE=2025-10-01
+make local-silver && make local-dims && make local-enriched DATE=2024-01-03
 ```
 
 </details>
@@ -143,7 +164,7 @@ make local-silver && make local-dims && make local-enriched DATE=2025-10-01
 - **Quality gates**: Primary key uniqueness, foreign key referential integrity, and non-negative numeric constraints.
 - **Airflow orchestration**: DAGs for backfill, incremental processing, and partition-level recovery.
 - **Observability**: Audit JSON emitted per table/partition, ready for SLA dashboards and alerting.
-- **Dimension snapshot validation**: Lightweight quality gate for dimension snapshots (customers, products) ensuring schema and primary key integrity without expensive historical scans.
+- **Dimension snapshot validation**: Lightweight quality gate for dimension snapshots (customers, product_catalog) ensuring schema and primary key integrity without expensive historical scans.
 - **Self-documenting profiling**: Bronze profiling script auto-generates schema maps, data dictionaries, and quality reports from live data samples.
 
 ___
@@ -303,7 +324,7 @@ ecom-datalake-pipelines/
 │   ├── resources/              # Deep-dive technical documentation
 │   └── validation_reports/     # Pipeline run quality reports
 ├── samples/
-│   └── bronze/                 # Sample Parquet data (Oct 2025 slices)
+│   └── bronze/                 # Sample Parquet data (multi-period slices)
 ├── scripts/
 │   ├── describe_parquet_samples.py  # Bronze profiling & self-doc engine
 │   └── run_enriched_all_samples.py  # Local Polars transformation runner

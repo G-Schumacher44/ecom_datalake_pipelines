@@ -3,9 +3,9 @@ x-airflow-common: &airflow-common
   build:
     context: .
     dockerfile: Dockerfile
-  image: ecom-datalake-pipeline:latest
+  image: ${PIPELINE_IMAGE:-ecom-datalake-pipeline}:${PIPELINE_TAG:-latest}
   env_file:
-    - docker.env
+    - ${DOCKER_ENV_FILE:-docker.env}
   environment:
     # Airflow Core Config
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -18,8 +18,8 @@ x-airflow-common: &airflow-common
     PYTHONPATH: "/opt/airflow"
 
     # Pipeline Environment (local, dev, prod)
-    PIPELINE_ENV: "${PIPELINE_ENV:-dev}"
-    OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-dev}"
+    PIPELINE_ENV: "${PIPELINE_ENV:-local}"
+    OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-local}"
     CLOUDSDK_CONFIG: "/home/airflow/.config/gcloud"
     GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-/home/airflow/.config/gcloud/application_default_credentials.json}"
     USE_SA_AUTH: "${USE_SA_AUTH:-false}"

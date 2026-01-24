@@ -86,16 +86,16 @@ make clean
 
 ```bash
 # Trigger Main Pipeline (Soft Mode - warnings only)
-make run-sample DATE=2025-10-15
+make run-sample DATE=2024-01-03
 
 # Trigger Main Pipeline (Strict Mode - fail on quality issues)
-make run-sample-strict DATE=2025-10-15
+make run-sample-strict DATE=2024-01-03
 
 # Trigger Main Pipeline + BigQuery Load
-make run-sample-bq DATE=2025-10-15
+make run-sample-bq DATE=2024-01-03
 
 # Trigger Dimension Refresh Pipeline
-make run-dims DATE=2025-10-15
+make run-dims DATE=2024-01-03
 
 # Backfill Main Pipeline (Soft Mode)
 make backfill-easy START=2025-10-01 END=2025-10-31
@@ -108,38 +108,38 @@ make backfill-strict START=2025-10-01 END=2025-10-31
 
 ```bash
 # Run dbt + Validation locally
-make local-silver DATE=2025-10-15
+make local-silver DATE=2024-01-03
 
 # Run dbt + Validation locally (Strict)
-make local-silver-strict DATE=2025-10-15
+make local-silver-strict DATE=2024-01-03
 
 # Run enriched transforms locally
-make local-enriched DATE=2025-10-15
+make local-enriched DATE=2024-01-03
 
 # Run enriched transforms locally (Strict)
-make local-enriched-strict DATE=2025-10-15
+make local-enriched-strict DATE=2024-01-03
 
 # Run customer + product catalog dims locally
-make local-dims DATE=2025-10-15
+make local-dims DATE=2024-01-03
 
 # Run customer + product catalog dims locally (Strict)
-make local-dims-strict DATE=2025-10-15
+make local-dims-strict DATE=2024-01-03
 ```
 
 ### GCS Pipeline Execution (Native)
 
 ```bash
 # Run Pipeline with GCS (Native, No Docker)
-make run-dev-gcs DATE=2025-10-15
+make run-dev-gcs DATE=2024-01-03
 
 # Simulate prod run against GCS (Native, No Docker)
-make run-sim-prod-gcs DATE=2025-10-15
+make run-sim-prod-gcs DATE=2024-01-03
 
 # Run Pipeline with GCS (Docker + Airflow, dev)
-make run-dev-docker DATE=2025-10-15
+make run-dev-docker DATE=2024-01-03
 
 # Run Pipeline with GCS (Docker + Airflow, prod-sim)
-make run-prod-sim-docker DATE=2025-10-15
+make run-prod-sim-docker DATE=2024-01-03
 ```
 
 ### Development & Testing
@@ -198,26 +198,26 @@ Validates Bronze layer inputs before Silver transformations.
 # Validate Bronze partition for specific date
 python -m src.validation.bronze_quality \
   --bronze-path samples/bronze \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --lookback-days 0 \
   --output-report docs/validation_reports/BRONZE_QUALITY.md
 
 # Enforce quality gates (fail on issues)
 python -m src.validation.bronze_quality \
   --bronze-path samples/bronze \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --enforce-quality
 
 # Validate specific tables only
 python -m src.validation.bronze_quality \
   --bronze-path samples/bronze \
-  --partition-date 2025-10-15 \
-  --tables orders,customers,products
+  --partition-date 2024-01-03 \
+  --tables orders,customers,product_catalog
 
 # Use spec file for table list
 python -m src.validation.bronze_quality \
   --bronze-path samples/bronze \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --spec-path config/specs/base.yml
 ```
 
@@ -267,22 +267,22 @@ Validates Silver layer transformation quality and data integrity.
 python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
-  --partition-date 2025-10-15 \
-  --tables orders,customers,products \
+  --partition-date 2024-01-03 \
+  --tables orders,customers,product_catalog \
   --output-report docs/validation_reports/SILVER_QUALITY.md
 
 # Enforce quality gates (fail on SLA breach)
 python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --enforce-quality
 
 # Validate with 7-day lookback (for incremental processing)
 python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --lookback-days 7 \
   --enforce-quality
 
@@ -290,7 +290,7 @@ python -m src.validation.silver \
 python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --spec-path config/specs/base.yml
 ```
 
@@ -341,20 +341,20 @@ Validates Enriched Silver layer business rules and schema consistency.
 # Validate Enriched layer for specific partition
 python -m src.validation.enriched \
   --enriched-path data/silver/enriched \
-  --ingest-dt 2025-10-15 \
+  --ingest-dt 2024-01-03 \
   --output-report docs/validation_reports/ENRICHED_QUALITY.md
 
 # Enforce quality gates
 python -m src.validation.enriched \
   --enriched-path data/silver/enriched \
-  --ingest-dt 2025-10-15 \
+  --ingest-dt 2024-01-03 \
   --enforce-quality
 
 # Validate with custom config
 python -m src.validation.enriched \
   --config config/config.yml \
   --enriched-path data/silver/enriched \
-  --ingest-dt 2025-10-15
+  --ingest-dt 2024-01-03
 ```
 
 #### Key Arguments
@@ -451,7 +451,7 @@ python scripts/describe_parquet_samples.py \
 
 # Profile specific tables only
 python scripts/describe_parquet_samples.py \
-  --tables orders,customers,products \
+  --tables orders,customers,product_catalog \
   --months 2020-01,2020-02
 
 # Profile multiple specific dates
@@ -836,34 +836,34 @@ cat docs/data/BRONZE_PROFILE_REPORT.md | grep "⚠️"
 # Step 1: Validate Bronze samples
 python -m src.validation.bronze_quality \
   --bronze-path samples/bronze \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 2: Run Base Silver transformations
-make local-silver DATE=2025-10-15
+make local-silver DATE=2024-01-03
 
 # Step 3: Validate Silver outputs
 python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 4: Run dimension snapshots
-make local-dims DATE=2025-10-15
+make local-dims DATE=2024-01-03
 
 # Step 5: Validate dimension snapshots
 python -m src.validation.dims_snapshot \
-  --run-date 2025-10-15 \
+  --run-date 2024-01-03 \
   --enforce-quality
 
 # Step 6: Run Enriched transforms
-make local-enriched DATE=2025-10-15
+make local-enriched DATE=2024-01-03
 
 # Step 7: Validate Enriched outputs
 python -m src.validation.enriched \
   --enriched-path data/silver/enriched \
-  --ingest-dt 2025-10-15 \
+  --ingest-dt 2024-01-03 \
   --enforce-quality
 ```
 
@@ -929,25 +929,25 @@ echo "✅ All validations passed"
 # Step 1: Validate Bronze inputs
 python -m src.validation.bronze_quality \
   --bronze-path gs://acme-analytics-raw/ecom/raw \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --enforce-quality \
   --run-id airflow_prod_20251015_123456
 
 # Step 2: Run Base Silver (dbt-duckdb)
-make local-silver-strict DATE=2025-10-15
+make local-silver-strict DATE=2024-01-03
 
 # Step 3: Validate Silver outputs
 python -m src.validation.silver \
   --bronze-path gs://acme-analytics-raw/ecom/raw \
   --silver-path gs://acme-analytics-silver/base \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 4: Run dimension snapshots
-make local-dims-strict DATE=2025-10-15
+make local-dims-strict DATE=2024-01-03
 
 # Step 5: Run enriched transforms
-make local-enriched-strict DATE=2025-10-15
+make local-enriched-strict DATE=2024-01-03
 
 # Step 6: Publish to GCS with staging prefix
 # (handled by runners with SILVER_PUBLISH_MODE=staging)
@@ -981,14 +981,14 @@ make local-enriched-strict DATE=2025-10-15
 # Use --enforce-quality in CI/CD, omit for exploratory analysis
 
 # Development (warnings only)
-python -m src.validation.bronze_quality --partition-date 2025-10-15
-python -m src.validation.silver --partition-date 2025-10-15
-python -m src.validation.enriched --ingest-dt 2025-10-15
+python -m src.validation.bronze_quality --partition-date 2024-01-03
+python -m src.validation.silver --partition-date 2024-01-03
+python -m src.validation.enriched --ingest-dt 2024-01-03
 
 # CI/CD (fail on issues)
-python -m src.validation.bronze_quality --partition-date 2025-10-15 --enforce-quality
-python -m src.validation.silver --partition-date 2025-10-15 --enforce-quality
-python -m src.validation.enriched --ingest-dt 2025-10-15 --enforce-quality
+python -m src.validation.bronze_quality --partition-date 2024-01-03 --enforce-quality
+python -m src.validation.silver --partition-date 2024-01-03 --enforce-quality
+python -m src.validation.enriched --ingest-dt 2024-01-03 --enforce-quality
 ```
 
 ### Output Organization
@@ -1063,10 +1063,10 @@ gcloud auth login
 
 ```bash
 # Warning-only mode (exit 0 even on failures)
-python -m src.validation.silver --partition-date 2025-10-15
+python -m src.validation.silver --partition-date 2024-01-03
 
 # Enforce mode (exit non-zero on failures)
-python -m src.validation.silver --partition-date 2025-10-15 --enforce-quality
+python -m src.validation.silver --partition-date 2024-01-03 --enforce-quality
 ```
 
 ---
