@@ -536,7 +536,7 @@ pre-commit run --all-files
 
 ___
 
-## 🏗️ Architecture Overview
+## 🏗️ Teqnique and Technology Overview
 
 ### Medallion Layers
 
@@ -555,6 +555,13 @@ ___
 │ • Foreign key validation                                        │
 │ • Null handling and integrity checks                            │
 │ • Partitioned by event_dt                                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ DIMENSION SNAPSHOTS (dbt-duckdb)                                │
+│ • Daily snapshots of customers & products                       │
+│ • Freshness gates avoid re-reading Bronze                       │
+│ • Validated schema & PK integrity                               │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -580,10 +587,12 @@ ___
 
 - **Bronze ingestion**: GCS, Parquet, Hive partitioning, manifest validation
 - **Base Silver**: dbt-duckdb (local dev and transformation)
+- **Dimension Snapshots**: dbt-duckdb + Python runner (daily snapshots)
 - **Enriched Silver**: Polars (pure Python transforms), GCS (storage)
 - **Gold marts**: dbt-bigquery (SQL aggregations in BigQuery)
 - **Orchestration**: Apache Airflow (Docker), TaskGroups, dynamic DAGs
 - **Observability**: Audit JSON, SLA dashboards, dbt test results
+- **Validation**: Three-layer framework (Bronze, Silver, Enriched)
 - **Testing**: pytest (Polars transforms), dbt tests (SQL models)
 
 ___
@@ -603,11 +612,13 @@ ___
 <p align="center">
   <a href="README.md">🏠 <b>Home</b></a>
   &nbsp;·&nbsp;
-  <a href="docs/planning/SILVER_PLAN.md">🗺️ <b>Architecture</b></a>
+  <a href="docs/resources/ARCHITECTURE.md">🗺️ <b>Architecture</b></a>
   &nbsp;·&nbsp;
-  <a href="docs/resources/DATA_CONTRACT.md">📋 <b>Data Contract</b></a>
+  <a href="docs/resources/SPEC_OVERVIEW.md">⚙️ <b>Spec Overview</b></a>
   &nbsp;·&nbsp;
-  <a href="docs/planning/TESTING_RUNBOOK.md">🧪 <b>Testing</b></a>
+  <a href="docs/data/DATA_CONTRACT.md">📋 <b>Data Contract</b></a>
+  &nbsp;·&nbsp;
+  <a href="docs/resources/TESTING_GUIDE.md">🧪 <b>Testing Guide</b></a>
   &nbsp;·&nbsp;
   <a href="docs/data/BRONZE_PROFILE_REPORT.md">📊 <b>Bronze Profile</b></a>
   &nbsp;·&nbsp;
