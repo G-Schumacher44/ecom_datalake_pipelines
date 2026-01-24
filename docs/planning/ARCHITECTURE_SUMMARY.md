@@ -1,5 +1,15 @@
 # Architecture Summary: Local-First Hybrid Pattern
 
+> **📌 HISTORICAL DOCUMENT - Original Architecture Overview (Early Planning)**
+>
+> This document represents the initial architectural vision for the local-first hybrid pattern.
+> For **current architecture documentation**, see:
+> - [ARCHITECTURE.md](../resources/ARCHITECTURE.md) - Complete current architecture
+> - [SPEC_OVERVIEW.md](../resources/SPEC_OVERVIEW.md) - Spec-driven orchestration pattern
+> - [CONFIG_STRATEGY.md](../resources/CONFIG_STRATEGY.md) - Configuration architecture
+>
+> **Status**: ✅ Implemented - Core pattern validated and enhanced with spec-driven orchestration
+
 ## Overview
 
 This pipeline uses a **local-first hybrid architecture** where heavy compute happens locally (DuckDB + Polars) and only final results are loaded to BigQuery for serving.

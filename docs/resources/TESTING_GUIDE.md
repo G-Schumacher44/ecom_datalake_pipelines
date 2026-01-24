@@ -1,0 +1,521 @@
+# Testing Guide - Bronze → Silver → Gold Pipeline
+
+## Overview
+
+This guide covers testing strategies for the complete medallion lakehouse pipeline, from Bronze validation through Gold mart testing. The project maintains **51% test coverage** with unit tests, integration tests, and full E2E pipeline validation.
+
+## Test Categories
+
+### 1. Unit Tests (`tests/unit/`)
+
+**Coverage**: Transform logic, validation modules, runners
+
+```bash
+# Run all unit tests
+pytest tests/unit/ -v
+
+# Run with coverage
+pytest tests/unit/ --cov=src --cov-report=term-missing
+
+# Run specific test module
+pytest tests/unit/test_transforms.py -v
+```
+
+**Key Test Modules:**
+- `test_transforms.py` - Polars transform logic (cart attribution, customer retention, etc.)
+- `test_validation.py` - Bronze/Silver/Enriched validation modules
+- `test_runners_base.py` - Base silver runner and manifest generation
+- `test_runners_dims.py` - Dimension snapshot runner
+- `test_bronze_quality.py` - Bronze quality validation
+- `test_settings.py` - Configuration and settings validation
+
+### 2. Integration Tests
+
+**E2E Pipeline Check** (CI/CD):
+
+```bash
+# Full Bronze → Silver → Enriched → Gold pipeline on sample data
+make local-silver DATE=2025-10-15
+make local-dims DATE=2025-10-15
+make local-enriched DATE=2025-10-15
+```
+
+This validates:
+- Bronze data loading and manifest validation
+- Base Silver dbt transformations
+- Dimension snapshot creation
+- Enriched Silver Polars transforms
+- Schema consistency across layers
+
+### 3. dbt Tests
+
+**Base Silver (dbt-duckdb)**:
+
+```bash
+cd dbt_duckdb
+dbt test --target dev --select base_silver.*
+```
+
+Tests:
+- Schema enforcement (required columns, data types)
+- Primary key uniqueness and non-null constraints
+- Foreign key relationships
+- Not-null constraints on critical fields
+
+**Gold Marts (dbt-bigquery)**:
+
+```bash
+cd dbt_bigquery
+dbt test --target dev --select gold.*
+```
+
+Tests:
+- Aggregation sanity checks (non-negative totals)
+- Row count drift detection
+- Referential integrity with Silver layer
+
+## Bronze Data Profiling
+
+### Purpose
+
+Understand Bronze data quality before building Silver transforms:
+- Schema structure and data types
+- Null rates and cardinality
+- Volume characteristics
+- Temporal schema drift detection
+
+### Profiling Script
+
+```bash
+# Basic profile with quality report
+python scripts/describe_parquet_samples.py \
+  --date-range 2020-01-01..2020-12-31
+
+# Generate schema JSON map
+python scripts/describe_parquet_samples.py \
+  --date-range 2020-01-01..2020-12-31 \
+  --schema-json docs/data/BRONZE_SCHEMA_MAP.json
+
+# Auto-update data contract
+python scripts/describe_parquet_samples.py \
+  --date-range 2020-01-01..2020-12-31 \
+  --update-contract docs/resources/DATA_CONTRACT.md
+
+# Generate data dictionary
+python scripts/describe_parquet_samples.py \
+  --date-range 2020-01-01..2020-12-31 \
+  --data-dictionary docs/data/DATA_DICTIONARY.md
+```
+
+### Sampling Strategy: Stratified Temporal Sampling
+
+Sample 3 months from different periods to detect drift:
+- Early period: `2020-03` (first year)
+- Middle period: `2023-01` (mid-dataset)
+- Recent period: `2025-10` (latest year)
+
+**Why this works:**
+- Fast feedback loop (seconds vs minutes)
+- Detects schema drift over time
+- Identifies quality degradation patterns
+- Representative of dataset characteristics
+
+### Quality Check Logic
+
+**Primary Entity IDs** (customer_id, order_id, product_id):
+- Expected: High cardinality (thousands to millions)
+- Flagged if: <10 distinct values (data corruption)
+
+**Lookup IDs** (agent_id, region_id, tier_id):
+- Expected: Low cardinality (3-50 distinct values)
+- NOT flagged (normal for reference data)
+
+**Metadata Columns** (batch_id, ingestion_ts):
+- Expected: Low cardinality for batch metadata
+- Excluded from quality checks
+
+### Interpreting the Profile Report
+
+- ✅ **No quality flags**: Bronze data looks healthy
+- ⚠️ **High null rate**: Investigate if column is optional or upstream issue
+- ⚠️ **Low cardinality on entity ID**: Data corruption or incomplete load
+- ⚠️ **Cardinality mismatch**: FK relationships might be broken
+
+## Validation Framework Testing
+
+### Three-Layer Validation
+
+The pipeline implements validation at each layer with distinct quality requirements:
+
+**1. Bronze Validation** (`src/validation/bronze_quality.py`):
+
+```bash
+python -m src.validation.bronze_quality \
+  --bronze-path samples/bronze \
+  --partition-date 2025-10-15 \
+  --lookback-days 0 \
+  --output-report docs/validation_reports/bronze_quality.md
+```
+
+Validates:
+- Manifest completeness and row counts
+- Schema conformance
+- Partition coverage
+- File integrity
+
+**2. Silver Validation** (`src/validation/silver`):
+
+```bash
+python -m src.validation.silver \
+  --bronze-path samples/bronze \
+  --silver-path data/silver/base \
+  --partition-date 2025-10-15 \
+  --tables orders,customers,products \
+  --output-report docs/validation_reports/silver_quality.md \
+  --enforce-quality
+```
+
+Validates:
+- Bronze-to-Silver row count reconciliation
+- Primary key uniqueness
+- Foreign key referential integrity
+- Quarantine analysis
+- Schema consistency
+
+**3. Enriched Validation** (`src/validation/enriched`):
+
+```bash
+python -m src.validation.enriched \
+  --enriched-path data/silver/enriched \
+  --ingest-dt 2025-10-15 \
+  --output-report docs/validation_reports/enriched_quality.md \
+  --enforce-quality
+```
+
+Validates:
+- Business rule enforcement
+- Required column presence
+- Minimum row count thresholds
+- Schema snapshot consistency
+- Null rate analysis
+
+## Test Matrix (Progressive Testing)
+
+### Phase 1: Small Batch Validation
+
+**Scope**: Single partition window across all tables (one `ingest_dt`)
+
+**Goals**:
+- Schema enforcement
+- Date parsing
+- FK checks
+- Partition write path
+
+**Pass Criteria**:
+- All tables write Silver output
+- No missing required columns
+- Reject rate within expected bounds (<5%)
+
+**Example**:
+
+```bash
+make local-silver DATE=2025-10-15
+make local-dims DATE=2025-10-15
+make local-enriched DATE=2025-10-15
+```
+
+### Phase 2: Medium Batch
+
+**Scope**: Short batch window across all tables (7 days)
+
+**Goals**:
+- Batching logic
+- Idempotency
+- Performance baseline
+
+**Pass Criteria**:
+- Each day produces partitions
+- No duplicate partitions on rerun
+- Runtime within expected SLA
+
+**Example**:
+
+```bash
+for date in 2025-10-{15..21}; do
+  make local-silver DATE=$date
+  make local-enriched DATE=$date
+done
+```
+
+### Phase 3: Large Batch
+
+**Scope**: Extended batch window across all tables (30+ days)
+
+**Goals**:
+- Stability under longer windows
+- Row count drift checks
+- Memory footprint validation
+
+**Pass Criteria**:
+- Row counts within thresholds
+- Audit logs generated for all partitions
+- Memory usage <10GB peak
+
+## CI/CD Pipeline Testing
+
+### GitHub Actions Workflow
+
+The project includes automated E2E pipeline validation:
+
+```yaml
+# .github/workflows/test.yml
+- name: Run E2E Pipeline Check
+  run: |
+    make local-silver DATE=2025-10-15
+    make local-dims DATE=2025-10-15
+    make local-enriched DATE=2025-10-15
+```
+
+**What This Validates**:
+- Full Bronze → Silver → Enriched flow
+- Schema consistency across layers
+- Transform logic integrity
+- Configuration loading
+- Sample data compatibility
+
+## Performance Testing
+
+### Benchmarking Transforms
+
+```bash
+# Benchmark specific transform
+pytest tests/unit/test_transforms.py::test_cart_attribution -v --durations=10
+
+# Profile memory usage
+python -m memory_profiler scripts/run_enriched_all_samples.py
+```
+
+### Expected Performance
+
+**Base Silver** (dbt-duckdb):
+- 8 tables, 100K rows each
+- Runtime: <2 minutes
+- Memory: <2GB
+
+**Enriched Silver** (Polars):
+- 10 transforms, 100K rows input each
+- Runtime: <5 minutes
+- Memory: <6GB peak
+
+**Gold Marts** (dbt-bigquery):
+- 8 fact tables
+- Runtime: <3 minutes (warehouse execution)
+
+## Troubleshooting
+
+### Missing Partitions
+
+**Symptom**: No Silver output for expected partition
+
+**Debug**:
+
+```bash
+# Check Bronze input
+ls -lh samples/bronze/orders/ingest_dt=2025-10-15/
+
+# Verify manifest
+cat samples/bronze/orders/ingest_dt=2025-10-15/_MANIFEST.json
+
+# Check dbt run output
+cat /tmp/dbt_logs/dbt.log
+```
+
+### FK Failures
+
+**Symptom**: Foreign key validation failures in Silver
+
+**Debug**:
+
+```bash
+# Verify parent tables loaded for same window
+ls -lh data/silver/base/customers/ingestion_dt=2025-10-15/
+ls -lh data/silver/base/products/ingestion_dt=2025-10-15/
+
+# Check dimension snapshots
+ls -lh data/silver/dims/customers/
+cat data/silver/dims/_latest.json
+```
+
+### Date Parsing Errors
+
+**Symptom**: Failed date/timestamp parsing in transforms
+
+**Debug**:
+
+```bash
+# Profile Bronze data types
+python scripts/describe_parquet_samples.py \
+  --tables orders \
+  --date-range 2025-10-15..2025-10-15
+
+# Check data contract expectations
+cat docs/resources/DATA_CONTRACT.md | grep -A 5 "order_date"
+```
+
+### Transform Failures
+
+**Symptom**: Enriched transforms fail with Polars errors
+
+**Debug**:
+
+```bash
+# Run specific transform with verbose logging
+python -m src.runners.enriched.cart_attribution \
+  --ingest-dt 2025-10-15 \
+  --base-path data/silver/base \
+  --output-path data/silver/enriched
+
+# Check input schemas
+python scripts/describe_parquet_samples.py \
+  --bronze-path data/silver/base \
+  --tables orders,shopping_carts
+```
+
+## Test Data Management
+
+### Sample Data
+
+The project includes Bronze Parquet samples in `samples/bronze/`:
+- **Tables**: 8 tables (orders, customers, products, etc.)
+- **Date Range**: Oct 2025 (simulated)
+- **Format**: Hive-partitioned Parquet with manifests
+- **Use Case**: Full local testing without GCS dependencies
+
+### Refreshing Samples
+
+```bash
+# Generate new samples from data generator
+# (requires ecom_sales_data_generator repo)
+python generate_samples.py --start-date 2025-10-01 --end-date 2025-10-31
+
+# Or sync from GCS
+gsutil -m rsync -r gs://your-bucket/bronze/orders/ingest_dt=2025-10-15 \
+  samples/bronze/orders/ingest_dt=2025-10-15
+```
+
+## Observability Checks
+
+### Audit Logs
+
+**Verify audit logs generated**:
+
+```bash
+# Check local audit JSON files
+ls -lh data/metrics/audit/
+
+# View audit summary
+cat data/metrics/audit/run_2025-10-15_*.json | jq .
+```
+
+**Audit Schema** (see [AUDIT_SCHEMA.md](../planning/AUDIT_SCHEMA.md)):
+- `run_id`, `table_name`, `partition_value`
+- `input_rows`, `output_rows`, `quarantine_rows`
+- `quality_checks_passed`, `execution_time_seconds`
+
+### Validation Reports
+
+**Check validation report outputs**:
+
+```bash
+# Bronze quality report
+cat docs/validation_reports/BRONZE_QUALITY_*.md
+
+# Silver quality report
+cat docs/validation_reports/SILVER_QUALITY_*.md
+
+# Enriched quality report
+cat docs/validation_reports/ENRICHED_QUALITY_*.md
+```
+
+## Success Criteria
+
+### Test Coverage Goals
+
+- ✅ **Unit Tests**: >50% coverage (current: 51%)
+- ✅ **Integration Tests**: E2E pipeline passes on sample data
+- ✅ **dbt Tests**: 100% pass rate on schema/relationship tests
+- ✅ **Validation Framework**: All three layers tested
+
+### Quality Gates
+
+From [SLA_AND_QUALITY.md](../resources/SLA_AND_QUALITY.md):
+
+**Bronze**:
+- Manifest row counts match actual
+- No missing required partitions
+- Schema drift detected and reported
+
+**Silver**:
+- Row loss <1% (Bronze → Silver)
+- Quarantine rate <5%
+- PK uniqueness 100%
+- FK integrity >99%
+
+**Enriched**:
+- All business rules enforced
+- Required columns present
+- Minimum row thresholds met
+- Schema consistent with specifications
+
+## Best Practices
+
+### 1. Test Early and Often
+
+```bash
+# Run unit tests before committing
+pytest tests/unit/ -v
+
+# Run pre-commit hooks
+pre-commit run --all-files
+```
+
+### 2. Use Stratified Sampling
+
+Don't profile the full 6-year dataset—use temporal sampling for fast feedback.
+
+### 3. Validate at Each Layer
+
+Run validation after each layer transformation to catch issues early:
+- Bronze → validate manifests and schemas
+- Silver → validate row counts and integrity
+- Enriched → validate business rules
+
+### 4. Monitor Test Coverage
+
+```bash
+# Generate coverage report
+pytest --cov=src --cov-report=html tests/
+
+# Open in browser
+open htmlcov/index.html
+```
+
+### 5. Document Failures
+
+When tests fail, document:
+- Root cause analysis
+- Fix implemented
+- Preventive measures added
+
+## Related Documentation
+
+- **[Validation Guide](VALIDATION_GUIDE.md)** - Three-layer validation framework details
+- **[SLA & Quality Gates](SLA_AND_QUALITY.md)** - Quality thresholds and acceptance criteria
+- **[Data Contract](DATA_CONTRACT.md)** - Bronze → Silver schema expectations
+- **[Audit Schema](../planning/AUDIT_SCHEMA.md)** - Audit trail structure and fields
+
+---
+
+**Last Updated**: 2026-01-23
+**Test Coverage**: 51%
+**CI/CD Status**: ✅ Automated E2E pipeline validation enabled

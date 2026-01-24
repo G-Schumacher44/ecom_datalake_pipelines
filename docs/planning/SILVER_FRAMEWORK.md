@@ -1,5 +1,15 @@
 # Silver Transform Framework (Hybrid)
 
+> **📌 HISTORICAL DOCUMENT - Original Framework Design (Pre-Implementation)**
+>
+> This document represents the initial framework design for the hybrid dbt + Polars transformation approach.
+> For **current implementation and patterns**, see:
+> - [ARCHITECTURE.md](../resources/ARCHITECTURE.md) - Current system architecture
+> - [SPEC_OVERVIEW.md](../resources/SPEC_OVERVIEW.md) - Spec-driven orchestration
+> - [VALIDATION_GUIDE.md](../resources/VALIDATION_GUIDE.md) - Three-layer validation framework
+>
+> **Status**: ✅ Implemented - Framework executed with production enhancements
+
 ## Purpose
 Define how Base Silver and Enriched Silver transformations are organized and executed.
 This document reflects the hybrid dbt + Polars approach used in this repo.
