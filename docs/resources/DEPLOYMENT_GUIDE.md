@@ -628,11 +628,4 @@ docker-compose build --no-cache
 
 ---
 
-## Next Steps
-
-1. **Local validation**: Run full pipeline locally first
-2. **Deploy to dev**: Test with real GCS/BigQuery
-3. **Production**: Enable monitoring, alerting, SLA enforcement
-4. **Schedule**: Set `schedule="0 2 * * *"` for daily 2am runs
-
 For questions or issues, see [CONTRIBUTING.md](../CONTRIBUTING.md).
