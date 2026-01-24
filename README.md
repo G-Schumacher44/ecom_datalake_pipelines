@@ -14,6 +14,18 @@
   <img alt="dbt" src="https://img.shields.io/badge/dbt-1.8%2B-orange">
 </p>
 
+<p align="center">
+  <a href="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/pipeline-e2e.yml">
+    <img alt="Pipeline E2E" src="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/pipeline-e2e.yml/badge.svg">
+  </a>
+  <a href="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/python-quality.yml">
+    <img alt="Python Quality" src="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/python-quality.yml/badge.svg">
+  </a>
+  <a href="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/dbt-validation.yml">
+    <img alt="dbt Validation" src="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/dbt-validation.yml/badge.svg">
+  </a>
+</p>
+
 ---
 
 # ecom-datalake-pipelines
