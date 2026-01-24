@@ -71,6 +71,44 @@ if os.getenv("USE_SA_AUTH", "").lower() in {"1", "true", "yes", "on"}:
 **Note:** ADC (`gcloud auth application-default login`) is the default for local/dev
 and does not require `GOOGLE_APPLICATION_CREDENTIALS` unless `USE_SA_AUTH=true`.
 
+#### GCP Authentication Patterns
+
+**Local Development (ADC - Default)**:
+```bash
+# docker.env
+USE_SA_AUTH=false
+CLOUDSDK_CONFIG=/home/airflow/.config/gcloud
+
+# Your local ~/.config/gcloud is mounted via docker-compose.yml
+# No service account key needed!
+```
+
+**Production (Service Account)**:
+```bash
+# docker.env (or Cloud Composer env vars)
+USE_SA_AUTH=true
+GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/.gcp/sa.json
+GCP_SA_KEY_PATH=/path/to/host/service-account.json  # For docker-compose mount
+```
+
+**Testing Prod-like Locally**:
+```bash
+# 1. Download service account key
+gcloud iam service-accounts keys create ~/my-sa-key.json \
+  --iam-account=airflow@my-project.iam.gserviceaccount.com
+
+# 2. Update docker.env
+USE_SA_AUTH=true
+GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/.gcp/sa.json
+GCP_SA_KEY_PATH=/Users/you/my-sa-key.json
+
+# 3. Uncomment SA volume mount in docker-compose.yml
+# - ${GCP_SA_KEY_PATH}:/opt/airflow/.gcp/sa.json:ro
+
+# 4. Restart docker-compose
+docker-compose down && docker-compose up -d
+```
+
 ---
 
 ### 3. Business Logic (Config-Only)
@@ -148,6 +186,15 @@ PIPELINE_ENV=local|dev|prod
 ECOM_CONFIG_PATH=/opt/airflow/config/config.yml
 ECOM_SPEC_PATH=/opt/airflow/config/specs
 BASE_SILVER_LOOKBACK_DAYS=0
+BRONZE_VALIDATION_LOOKBACK_DAYS=0
+SILVER_VALIDATION_LOOKBACK_DAYS=0
+```
+
+**Docker image versioning (baked at build time)**
+```bash
+GIT_COMMIT=a1b2c3d                    # Git commit SHA (short)
+GIT_BRANCH=main                       # Git branch name
+PIPELINE_VERSION=main-a1b2c3d         # Full version string (tag or branch-commit)
 ```
 
 **Paths / storage**
@@ -167,14 +214,21 @@ SILVER_ENRICHED_GCS_TARGET=gs://bucket/silver/enriched
 GOOGLE_CLOUD_PROJECT=your-project
 GCS_BUCKET=your-bronze-bucket
 BQ_LOCATION=US
-USE_SA_AUTH=true|false
-CLOUDSDK_CONFIG=/home/airflow/.config/gcloud
-GCP_SA_KEY_PATH=/path/to/service-account.json
-GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/.gcp/sa.json
+
+# GCP Authentication (two modes - ADC or Service Account)
+USE_SA_AUTH=false                                        # false=ADC (default), true=SA
+CLOUDSDK_CONFIG=/home/airflow/.config/gcloud             # ADC config path (when USE_SA_AUTH=false)
+CLOUDSDK_CONFIG_PATH=$HOME/.config/gcloud                # Host path for docker-compose mount
+GCP_SA_KEY_PATH=/path/to/service-account.json           # Host path (when USE_SA_AUTH=true)
+GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/.gcp/sa.json # Container path (when USE_SA_AUTH=true)
+
+# BigQuery / dbt
 DBT_BIGQUERY_KEYFILE=/path/to/sa.json
 DBT_BQ_METHOD=oauth|service-account
 BQ_LOAD_ENABLED=true|false
 GOLD_PIPELINE_ENABLED=true|false
+
+# Legacy (deprecated - use GOOGLE_CLOUD_PROJECT instead)
 ECOM_PROJECT_ID=your-project
 ECOM_BRONZE_BUCKET=your-bronze-bucket
 ECOM_SILVER_BUCKET=your-silver-bucket
@@ -183,18 +237,27 @@ ECOM_SILVER_BUCKET=your-silver-bucket
 **Observability**
 ```bash
 OBSERVABILITY_ENV=local|dev|prod
-METRICS_BUCKET=ecom-datalake-metrics
-LOGS_BUCKET=ecom-datalake-logs
-METRICS_BASE_PATH=/tmp/metrics
-LOGS_BASE_PATH=/tmp/logs
+METRICS_BUCKET=ecom-datalake-metrics     # Metrics bucket (GCS or local path)
+LOGS_BUCKET=ecom-datalake-logs           # Logs bucket (GCS or local path)
+REPORTS_BUCKET=data-reporting            # Validation reports bucket (GCS or local)
+METRICS_BASE_PATH=/tmp/metrics           # Local metrics output (Docker)
+LOGS_BASE_PATH=/tmp/logs                 # Local logs output (Docker)
+REPORTS_BASE_PATH=docs/validation_reports # Local reports output
+```
+
+**Feature flags**
+```bash
+GOLD_PIPELINE_ENABLED=false              # Enable/disable Gold layer pipeline
+BQ_LOAD_ENABLED=false                    # Enable/disable BigQuery loads
+SILVER_PUBLISH_MODE=direct|staging       # direct=immediate, staging=versioned runs
 ```
 
 **Quality gates**
 ```bash
-STRICT_FK=true|false
-BRONZE_QA_REQUIRED=true|false
-BRONZE_QA_FAIL=true|false
-SILVER_PROFILE_ENABLED=true|false
+STRICT_FK=false                          # Enforce FK validation failures
+BRONZE_QA_REQUIRED=true                  # Require Bronze QA phase
+BRONZE_QA_FAIL=false                     # Fail pipeline on Bronze issues (vs warn)
+SILVER_PROFILE_ENABLED=false             # Enable profiling for Silver tables
 SILVER_PROFILE_REPORT=docs/validation_reports/SILVER_PROFILE.md
 ```
 
@@ -340,6 +403,18 @@ Is it a secret/credential?
 ```
 
 **Your current setup:**
-- ✅ Observability: Config-first for buckets (overrides apply to observability only)
-- ⚠️ Secrets: Should be env-only
-- ✅ Business logic: Config-only (correct!)
+- ✅ Infrastructure: Config-first with env overrides (buckets, datasets, project IDs)
+- ✅ Secrets: Env-only (GCP credentials via ADC or service account)
+- ✅ Business logic: Config-only (SLA thresholds, attribution windows, etc.)
+- ✅ Feature flags: Env-only (GOLD_PIPELINE_ENABLED, BQ_LOAD_ENABLED, etc.)
+- ✅ Docker versioning: Build-time args (GIT_COMMIT, GIT_BRANCH, PIPELINE_VERSION)
+
+---
+
+## Related Documentation
+
+- **[CONFIG_STRATEGY.md](CONFIG_STRATEGY.md)** - Configuration hierarchy and precedence rules
+- **[CREDENTIALS_SAFETY_AUDIT.md](CREDENTIALS_SAFETY_AUDIT.md)** - GCP credential security and Docker safety
+- **[DOCKER_VERSIONING.md](DOCKER_VERSIONING.md)** - Git-based image versioning with env vars
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Local, dev, and production deployment patterns
+- **[SPEC_OVERVIEW.md](SPEC_OVERVIEW.md)** - Spec-driven orchestration and environment variable support
