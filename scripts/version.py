@@ -9,26 +9,33 @@ import sys
 def get_git_version():
     """Get version from Git (when running outside Docker)."""
     try:
-        commit = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL
-        ).decode().strip()
-        branch = subprocess.check_output(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], stderr=subprocess.DEVNULL
-        ).decode().strip()
+        commit = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL
+            )
+            .decode()
+            .strip()
+        )
+        branch = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], stderr=subprocess.DEVNULL
+            )
+            .decode()
+            .strip()
+        )
         try:
-            tag = subprocess.check_output(
-                ["git", "describe", "--tags", "--exact-match"],
-                stderr=subprocess.DEVNULL
-            ).decode().strip()
+            tag = (
+                subprocess.check_output(
+                    ["git", "describe", "--tags", "--exact-match"],
+                    stderr=subprocess.DEVNULL,
+                )
+                .decode()
+                .strip()
+            )
             version = tag
         except subprocess.CalledProcessError:
             version = f"{branch}-{commit}"
-        return {
-            "commit": commit,
-            "branch": branch,
-            "version": version,
-            "source": "git"
-        }
+        return {"commit": commit, "branch": branch, "version": version, "source": "git"}
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
@@ -44,7 +51,7 @@ def get_docker_version():
             "commit": commit,
             "branch": branch,
             "version": version,
-            "source": "docker"
+            "source": "docker",
         }
     return None
 
