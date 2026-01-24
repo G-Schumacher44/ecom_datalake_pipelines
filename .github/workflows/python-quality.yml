@@ -33,4 +33,4 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           files: ./coverage.xml
-          fail_ci_if_error: false
+          fail_ci_if_error: true

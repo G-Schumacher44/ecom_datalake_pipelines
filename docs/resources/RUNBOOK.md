@@ -10,9 +10,10 @@ This runbook covers common failure scenarios and their resolution for the ecom-d
 2. [Dimension Snapshot Failures](#2-dimension-snapshot-failures)
 3. [Base Silver dbt Failures](#3-base-silver-dbt-failures)
 4. [Enriched Silver Validation Failures](#4-enriched-silver-validation-failures)
-5. [Airflow DAG Failures](#5-airflow-dag-failures)
-6. [GCS Connectivity Issues](#6-gcs-connectivity-issues)
-7. [Docker & Environment Issues](#7-docker--environment-issues)
+5. [Quarantine Data Management](#5-quarantine-data-management)
+6. [Airflow DAG Failures](#6-airflow-dag-failures)
+7. [GCS Connectivity Issues](#7-gcs-connectivity-issues)
+8. [Docker & Environment Issues](#8-docker--environment-issues)
 
 ---
 
@@ -251,7 +252,241 @@ cat data/metrics/enriched_quality_*.json | jq .
 
 ---
 
-## 5. Airflow DAG Failures
+## 5. Quarantine Data Management
+
+### What is Quarantined Data?
+
+Records that fail validation checks during Silver processing are written to `quarantine/` subdirectories instead of main Silver tables. This **prevents bad data from propagating to Gold marts** while preserving raw inputs for debugging and recovery.
+
+### Quarantine Architecture
+
+**Location Pattern:**
+```
+{silver_base_path}/quarantine/{table_name}/ingest_dt={YYYY-MM-DD}/*.parquet
+```
+
+**Example:**
+```
+data/silver/base/quarantine/orders/ingest_dt=2025-01-15/part-0.parquet
+```
+
+**Metadata:** Each quarantined record includes:
+- `_quarantine_reason`: Validation failure description
+- `_quarantine_timestamp`: When record was quarantined
+- All original columns from Bronze layer
+
+### Retention Policy
+
+| Environment | TTL | Review Cadence | Alert Threshold |
+|-------------|-----|----------------|-----------------|
+| **Production** | 30 days | Weekly | >5% of valid records |
+| **Development** | 7 days | Manual | >10% |
+| **Local** | Manual cleanup | N/A | None |
+
+### Common Quarantine Reasons
+
+1. **Null Primary Keys**
+   - **Reason:** `customer_id IS NULL` or `order_id IS NULL`
+   - **Impact:** Records cannot be uniquely identified
+   - **Fix:** Investigate Bronze data quality; contact source system team
+
+2. **Invalid Foreign Keys**
+   - **Reason:** `product_id` not in `product_catalog` dimension
+   - **Impact:** Cannot join to reference data
+   - **Fix:** Ensure dimension snapshots are current; check for orphaned records
+
+3. **Type Casting Failures**
+   - **Reason:** Cannot cast `order_total` from VARCHAR to DECIMAL
+   - **Impact:** Numeric operations fail
+   - **Fix:** Review Bronze schema changes; add explicit type handling
+
+4. **Out-of-Range Values**
+   - **Reason:** `order_date` in future or `price < 0`
+   - **Impact:** Violates business logic
+   - **Fix:** Check source system data entry validation
+
+5. **Duplicate Primary Keys**
+   - **Reason:** Multiple records with same PK after deduplication
+   - **Impact:** Cannot load to Silver (unique constraint)
+   - **Fix:** Review deduplication logic in `stg_*` models
+
+### Diagnosis
+
+**Check Quarantine Size:**
+```bash
+# Count quarantined records by table
+make quarantine-stats
+
+# Manual check (local)
+find data/silver/base/quarantine -name "*.parquet" -exec wc -l {} \; | awk '{sum+=$1} END {print sum}'
+
+# GCS (production)
+gsutil du -sh gs://${GCS_BUCKET}/silver/base/quarantine/
+```
+
+**Inspect Quarantine Records:**
+```python
+import polars as pl
+
+# Read quarantined orders
+df = pl.read_parquet('data/silver/base/quarantine/orders/ingest_dt=2025-01-15/*.parquet')
+
+# Group by failure reason
+df.group_by('_quarantine_reason').agg([
+    pl.count().alias('record_count'),
+    pl.col('order_id').first().alias('example_order_id')
+])
+
+# Export sample for analysis
+df.head(100).write_csv('quarantine_sample.csv')
+```
+
+**Check Quarantine Rate:**
+```bash
+# Run Silver validation
+python -m src.validation.silver --silver-path data/silver/base --env local
+
+# Check metrics output
+cat data/metrics/silver_quality_*.json | jq '.table_metrics[] | select(.table_name=="orders") | .quarantine_pct'
+```
+
+### Resolution
+
+**High Quarantine Rate (>5%):**
+
+1. **Identify Pattern:**
+   ```python
+   import polars as pl
+   df = pl.read_parquet('data/silver/base/quarantine/orders/**/*.parquet')
+
+   # Most common failure reasons
+   reasons = df.group_by('_quarantine_reason').len().sort('len', descending=True)
+   print(reasons)
+   ```
+
+2. **Fix Upstream:**
+   - **Preferred:** Fix Bronze data quality at source
+   - **Alternative:** Update validation rules in dbt models if business logic changed
+
+3. **Reprocess:**
+   ```bash
+   # After fixing upstream, reprocess partition
+   make local-silver DATE=2025-01-15
+
+   # Verify quarantine reduced
+   python -m src.validation.silver --silver-path data/silver/base --env local
+   ```
+
+**Recover Quarantined Records:**
+
+If quarantined records are determined to be valid:
+
+1. **Manual Fix:**
+   ```python
+   import polars as pl
+
+   # Read quarantine
+   df = pl.read_parquet('data/silver/base/quarantine/orders/ingest_dt=2025-01-15/*.parquet')
+
+   # Fix issue (example: fill nulls)
+   df_fixed = df.with_columns([
+       pl.col('customer_id').fill_null('UNKNOWN')
+   ]).drop(['_quarantine_reason', '_quarantine_timestamp'])
+
+   # Write to valid Silver path
+   df_fixed.write_parquet('data/silver/base/orders/ingest_dt=2025-01-15/recovered.parquet')
+   ```
+
+2. **Update Validation Rules:**
+   - Edit `dbt_duckdb/models/base_silver/stg_orders.sql`
+   - Adjust `WHERE` clause to allow previously quarantined records
+   - Reprocess partition with `--full-refresh`
+
+### Monitoring & Alerts
+
+**Airflow Alerting:**
+
+The Silver DAG will fail if quarantine rate exceeds threshold:
+
+```python
+# Configurable via environment variable
+MAX_QUARANTINE_RATE = float(os.getenv('MAX_QUARANTINE_RATE', '0.05'))  # 5%
+
+# DAG task checks validation metrics
+if quarantine_pct > MAX_QUARANTINE_RATE:
+    raise AirflowException(f"Quarantine rate {quarantine_pct:.2%} exceeds {MAX_QUARANTINE_RATE:.2%}")
+```
+
+**Weekly Review (Production):**
+
+```bash
+# Generate quarantine report
+python scripts/generate_quarantine_report.py --week 2025-W03 --output docs/validation_reports/
+
+# Review top reasons
+cat docs/validation_reports/quarantine_summary_2025W03.json | jq
+```
+
+**Metrics Dashboard:**
+
+Key metrics to track:
+- `quarantine_pct` by table and date
+- Top 5 `_quarantine_reason` patterns
+- Quarantine growth rate (week-over-week)
+
+### Cleanup (Manual)
+
+**Local Development:**
+```bash
+# Remove all quarantine data older than 7 days
+find data/silver/base/quarantine -type f -mtime +7 -delete
+```
+
+**Production (GCS):**
+```bash
+# List old quarantine partitions
+gsutil ls gs://${GCS_BUCKET}/silver/base/quarantine/orders/ | grep -v $(date -d '30 days ago' +%Y-%m-%d)
+
+# Delete (dry-run first)
+gsutil -m rm -r gs://${GCS_BUCKET}/silver/base/quarantine/orders/ingest_dt=2024-12-*
+```
+
+### Escalation
+
+**When to Escalate:**
+
+1. **Quarantine rate >10%** for 3+ consecutive days
+   - Indicates systemic issue in Bronze data or validation logic
+   - **Action:** Engage source system team and data platform lead
+
+2. **New quarantine reason appears**
+   - Could indicate schema change or new data quality issue
+   - **Action:** Review Bronze schema changes; update validation specs
+
+3. **Quarantine storage >1TB**
+   - Cost/performance impact
+   - **Action:** Expedite root cause fix or adjust retention policy
+
+### Prevention
+
+- **Set Alerts:** Configure `MAX_QUARANTINE_RATE` in production Airflow
+- **Pre-Bronze Validation:** Add quality checks at ingestion time
+- **Schema Contracts:** Use dbt contracts to enforce column presence/types
+- **Regular Reviews:** Weekly quarantine report analysis
+- **Document Patterns:** Update runbook with new failure patterns
+
+### Reference: Quarantine vs. Validation Failure
+
+| Scenario | Quarantine? | Pipeline Fails? | Gold Impact |
+|----------|-------------|-----------------|-------------|
+| 1% null PKs | ✅ Yes | ❌ No | None (records excluded) |
+| 15% null PKs | ✅ Yes | ✅ Yes (exceeds threshold) | Blocked |
+| Invalid JSON | ❌ No | ✅ Yes (parsing error) | Blocked |
+| Schema mismatch | ❌ No | ✅ Yes (dbt fails) | Blocked |
+
+---
+
+## 6. Airflow DAG Failures
 
 ### Symptoms
 - DAG tasks marked as failed in Airflow UI
@@ -300,7 +535,7 @@ docker-compose exec airflow-scheduler airflow dags list-import-errors
 
 ---
 
-## 6. GCS Connectivity Issues
+## 7. GCS Connectivity Issues
 
 ### Symptoms
 - `google.auth.exceptions.DefaultCredentialsError`
@@ -357,7 +592,7 @@ gcloud projects get-iam-policy your-project-id \
 
 ---
 
-## 7. Docker & Environment Issues
+## 8. Docker & Environment Issues
 
 ### Symptoms
 - `ModuleNotFoundError` when running Airflow tasks

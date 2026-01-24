@@ -62,6 +62,9 @@ x-airflow-common: &airflow-common
     - airflow-data:/opt/airflow/data
     - ./docs:/opt/airflow/docs
     # ADC (default): mount gcloud application-default credentials
+    # ⚠️  WARNING: Exposes local gcloud credentials to container. DEV/LOCAL ONLY.
+    #              For production deployments, use Service Account authentication:
+    #              Set USE_SA_AUTH=true and mount service account key file.
     - ${CLOUDSDK_CONFIG_PATH:-~/.config/gcloud}:/home/airflow/.config/gcloud:rw
     # Optional service account key (set USE_SA_AUTH=true + GOOGLE_APPLICATION_CREDENTIALS)
     # - ${GCP_SA_KEY_PATH}:/opt/airflow/.gcp/sa.json:ro

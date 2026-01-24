@@ -240,11 +240,36 @@ def run_dbt(
     logger.info(f"Executing: {' '.join(cmd)}")
 
     try:
-        # Stream output to stdout/stderr
-        subprocess.run(cmd, env=env, check=True)
-    except subprocess.CalledProcessError as e:
-        logger.error(f"dbt run failed with exit code {e.returncode}")
-        sys.exit(e.returncode)
+        result = subprocess.run(
+            cmd,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            logger.error(
+                f"dbt run failed with exit code {result.returncode}",
+                stdout=result.stdout[-500:] if result.stdout else "",
+                stderr=result.stderr[-500:] if result.stderr else "",
+            )
+            # Print full output for local debugging
+            if result.stderr:
+                print(f"\n--- dbt stderr ---\n{result.stderr}", file=sys.stderr)
+            if result.stdout:
+                print(f"\n--- dbt stdout ---\n{result.stdout}")
+            sys.exit(result.returncode)
+
+        # Success - log summary
+        logger.info("dbt run completed successfully")
+        if result.stdout:
+            # Print output for visibility
+            print(result.stdout)
+
+    except Exception as e:
+        logger.error(f"Unexpected error running dbt: {str(e)}")
+        raise
 
 
 def main() -> None:

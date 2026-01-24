@@ -163,10 +163,20 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
 
     if dims_gcs_path:
         logger.info("Syncing dims snapshot to GCS", dims_path=dims_gcs_path)
-        subprocess.run(
+        result = subprocess.run(
             ["gcloud", "storage", "rsync", "-r", dims_local_path, dims_gcs_path],
-            check=True,
+            check=False,
+            capture_output=True,
+            text=True,
         )
+        if result.returncode != 0:
+            logger.error(
+                f"GCS rsync failed with exit code {result.returncode}",
+                stderr=result.stderr,
+            )
+            raise RuntimeError(
+                f"Failed to sync dims to GCS: {result.stderr or 'Unknown error'}"
+            )
 
 
 def publish_dims_latest(run_date: str, run_id: str) -> None:
@@ -185,7 +195,7 @@ def publish_dims_latest(run_date: str, run_id: str) -> None:
     latest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     if dims_gcs_path:
-        subprocess.run(
+        result = subprocess.run(
             [
                 "gcloud",
                 "storage",
@@ -193,5 +203,15 @@ def publish_dims_latest(run_date: str, run_id: str) -> None:
                 str(latest_path),
                 f"{dims_gcs_path}/_latest.json",
             ],
-            check=True,
+            check=False,
+            capture_output=True,
+            text=True,
         )
+        if result.returncode != 0:
+            logger.error(
+                f"GCS copy failed with exit code {result.returncode}",
+                stderr=result.stderr,
+            )
+            raise RuntimeError(
+                f"Failed to copy _latest.json to GCS: {result.stderr or 'Unknown error'}"
+            )
