@@ -251,7 +251,7 @@ cat data/metrics/enriched_quality_*.json | jq .
 
 ---
 
-## 4. Airflow DAG Failures
+## 5. Airflow DAG Failures
 
 ### Symptoms
 - DAG tasks marked as failed in Airflow UI
@@ -300,7 +300,7 @@ docker-compose exec airflow-scheduler airflow dags list-import-errors
 
 ---
 
-## 5. GCS Connectivity Issues
+## 6. GCS Connectivity Issues
 
 ### Symptoms
 - `google.auth.exceptions.DefaultCredentialsError`
@@ -354,6 +354,41 @@ gcloud projects get-iam-policy your-project-id \
 - Use Workload Identity in GKE instead of key files
 - Rotate service account keys regularly
 - Set up IAM alerts for permission changes
+
+---
+
+## 7. Docker & Environment Issues
+
+### Symptoms
+- `ModuleNotFoundError` when running Airflow tasks
+- `Errno 35: Resource temporarily unavailable` (file locking)
+- Dependencies missing in container
+
+### Diagnosis
+
+```bash
+# Check installed packages
+docker-compose exec airflow-scheduler pip list | grep ecom-datalake
+
+# Verify mounts
+docker inspect airflow-scheduler | jq .[0].Mounts
+```
+
+### Resolution
+
+**File locking (Errno 35 on macOS):**
+1. This is a known issue with VirtioFS on macOS.
+2. Fix: Configure writable paths to `/tmp` in `docker-compose.yml`:
+   ```yaml
+   DBT_TARGET_PATH: "/tmp/dbt_target"
+   DBT_LOG_PATH: "/tmp/dbt_logs"
+   ```
+3. Restart Docker Desktop and switch file sharing implementation to gRPC FUSE if persistent.
+
+**Missing dependencies:**
+1. Rebuild the image: `docker-compose build`
+2. Ensure `setup.py` or `pyproject.toml` is copied in Dockerfile
+3. Check `.dockerignore` isn't excluding source code
 
 ---
 
