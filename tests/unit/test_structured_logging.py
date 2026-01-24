@@ -264,7 +264,7 @@ class TestJSONLFormatting:
             )
             logger = StructuredLogger("test_logger", config)
 
-            # Write multiple metrics quickly (same timestamp/token might create same file)
+            # Write multiple metrics quickly (same timestamp might create same file)
             logger.metric("metric_1", 100)
             logger.metric("metric_2", 200)
 
