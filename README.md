@@ -47,6 +47,8 @@ ___
 - **Observability**: Audit trails, data quality metrics, and SLA monitoring baked into every transformation.
 - **Spec-driven orchestration**: Layered YAML specs drive table lists, partitions, and gates (see [Spec Overview](docs/resources/SPEC_OVERVIEW.md)).
 
+
+
 <details>
 <summary> ⏯️ Quick Start</summary>
 
@@ -73,7 +75,7 @@ ___
 3. **Pull sample Bronze data**
    ```bash
    # Profile your Bronze samples
-   python scripts/describe_parquet_samples.py --date-range 2020-01-01..2020-02-29
+   python scripts/describe_parquet_samples.py --date-range 2025-10-01..2025-10-01
    ```
 
 4. **Run transformations locally**
@@ -120,7 +122,7 @@ Want to see it in action instantly? Run the full local pipeline (Bronze -> Silve
 
 ```bash
 # Process sample data from Bronze to Enriched Silver (no Docker required)
-make local-silver && make local-dims && make local-enriched DATE=2025-10-15
+make local-silver && make local-dims && make local-enriched DATE=2025-10-01
 ```
 
 </details>
@@ -141,7 +143,9 @@ make local-silver && make local-dims && make local-enriched DATE=2025-10-15
 - **Dimension snapshot validation**: Lightweight quality gate for dimension snapshots (customers, products) ensuring schema and primary key integrity without expensive historical scans.
 - **Self-documenting profiling**: Bronze profiling script auto-generates schema maps, data dictionaries, and quality reports from live data samples.
 
-### 🧭 Orientation & Getting Started
+___
+
+## 🧭 Orientation & Getting Started
 
 <details><summary><strong>⚠️ Limitations & Constraints (Portfolio Scope)</strong></summary>
 <br>
@@ -256,14 +260,11 @@ This repository is part of a larger data engineering portfolio demonstrating end
 <summary><strong>💪 Future Enhancements</strong></summary>
 
 - **Incremental materialization**: Optimize Silver transformations with incremental models and merge strategies.
-- **Data quality dashboard**: Load audit records into BigQuery and build Looker/Metabase dashboards for SLA tracking.
-- **Great Expectations integration**: Add data quality profiling and anomaly detection.
-- **CI/CD for dbt**: Automated testing, schema validation, and deployment via GitHub Actions.
+- **CLI improvements**: Replace Makefile/arg parsing with Click or Typer for a robust developer experience.
+- **Great Expectations**: Add data quality profiling and anomaly detection.
+- **CI/CD**: Automated testing, schema validation, and deployment via GitHub Actions.
 - **dbt docs hosting**: Publish dbt lineage graphs and data dictionary to GitHub Pages.
-- **Cost optimization**: Partition pruning, clustering, and query optimization for BigQuery.
-- **Per-model orchestration**: Replace the DuckDB single-task run with per-model dbt tasks when using BigQuery/Snowflake.
 - **Atomic GCS publishes**: Add a staging + manifest publish step for GCS syncs.
-- **Validation severity**: Introduce warn vs drop semantics in enriched data quality checks.
 - **Workload Identity**: Document and optionally wire production-grade auth (GKE/Composer/Cloud Run).
 
 </details>
@@ -279,39 +280,141 @@ ecom-datalake-pipelines/
 │   └── config/                 # Airflow configuration
 ├── config/
 │   ├── config.yml              # Pipeline settings (buckets, prefixes, targets)
+│   └── specs/                  # YAML-driven pipeline definitions
 ├── dbt_duckdb/                 # Base Silver dbt project (DuckDB)
 │   ├── models/
 │   │   └── base_silver/        # Type-safe, integrity-checked Silver tables
-│   ├── macros/                 # Custom dbt macros for validation
-│   ├── tests/                  # dbt tests for quality gates
+│   ├── macros/                 # Custom dbt macros for cleaning & validation
 │   └── dbt_project.yml
 ├── dbt_bigquery/               # Gold dbt project (BigQuery)
 │   ├── models/
-│   │   └── gold/               # Aggregated analytics marts (SQL only)
+│   │   ├── enriched_silver/    # External tables pointing to GCS
+│   │   └── gold_marts/         # Aggregated analytics marts (Fact/Dim)
 │   └── dbt_project.yml
 ├── docs/
-│   ├── img/
-│   │   └── pipelines_banner.png
-│   └── planning/               # Architecture docs, contracts, and planning artifacts
+│   ├── data/                   # Auto-generated profiling reports
+│   ├── img/                    # Project assets & diagrams
+│   ├── planning/               # Architecture docs & design logs
+│   ├── resources/              # Deep-dive technical documentation
+│   └── validation_reports/     # Pipeline run quality reports
+├── samples/
+│   └── bronze/                 # Sample Parquet data (Oct 2025 slices)
 ├── scripts/
-│   ├── describe_parquet_samples.py  # Bronze profiling and quality checks
-│   └── bootstrap_airflow.sh         # Airflow setup helper
+│   ├── describe_parquet_samples.py  # Bronze profiling & self-doc engine
+│   └── run_enriched_all_samples.py  # Local Polars transformation runner
 ├── src/
-│   ├── transforms/             # Pure Polars enrichment logic
-│   ├── runners/                # I/O wrappers and domain runners
-│   ├── validation/             # Bronze, Silver, Enriched validation packages
-│   ├── observability/          # Structured logging, metrics, audit trails
-│   └── settings.py             # Pydantic config models
-├── tests/                      # pytest suite for Python modules
-├── environment.yml             # Conda environment
-├── pyproject.toml              # Python package config
-├── Makefile                    # Common tasks (test, lint, airflow)
+│   ├── transforms/             # Pure Polars business logic
+│   ├── runners/                # I/O orchestration & domain runners
+│   ├── validation/             # Multi-layer QA gate logic
+│   ├── observability/          # Structured logging & audit trails
+│   ├── specs/                  # Spec loading & validation models
+│   └── settings.py             # Pydantic environment configuration
+├── tests/                      # pytest suite (Unit & Integration)
+├── Makefile                    # Developer productivity commands
 └── README.md
 ```
 
 </details>
 
 ---
+
+## 🏗️ Architecture & Engineering Decisions
+
+<details>
+
+<summary><strong>🗺️ Medallion Architecture Diagram</strong></summary>
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ BRONZE (Raw)                                                    │
+│ • GCS Parquet (Hive partitioned by ingest_dt)                  │
+│ • Lineage metadata: batch_id, event_id, ingestion_ts           │
+│ • Manifest validation: row counts, checksums                   │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ BASE SILVER (dbt-duckdb)                                        │
+│ • Type casting and normalization                                │
+│ • Deduplication by primary key                                  │
+│ • Foreign key validation                                        │
+│ • Null handling and integrity checks                            │
+│ • Partitioned by event_dt                                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ DIMENSION SNAPSHOTS (dbt-duckdb)                                │
+│ • Daily snapshots of customers & products                       │
+│ • Freshness gates avoid re-reading Bronze                       │
+│ • Validated schema & PK integrity                               │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ ENRICHED SILVER (Polars runners)                                │
+│ • Customer cohorts and LTV segmentation                         │
+│ • Product velocity and inventory metrics                        │
+│ • Order attribution and channel analysis                        │
+│ • Returns risk scoring                                          │
+│ • Precomputed features for ML                                   │
+│ • Written to GCS, then loaded into BigQuery                     │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ GOLD (dbt-bigquery)                                             │
+│ • Aggregated fact tables (daily sales, returns)                 │
+│ • Dimension tables (customers, products, dates)                 │
+│ • BI-optimized views for Looker/Tableau                         │
+│ • Incremental marts with SCD Type 2 support                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+</details>
+
+<details>
+
+<summary><strong>🛠️ Technology Stack</strong></summary>
+
+- **Bronze Layer**: GCS Parquet ingestion with manifest & lineage validation.
+- **Base Silver**: dbt-duckdb for type-safe normalization & deduplication.
+- **Dimension Snapshots**: dbt-duckdb + Python for efficient daily SCD-like snapshots.
+- **Enriched Silver**: High-performance Polars transforms for complex business logic & cohorts.
+- **Gold Marts**: dbt-bigquery for SQL-based analytics & BI-ready aggregates.
+- **Orchestration**: Airflow (Docker) using dynamic TaskGroups & spec-driven DAGs.
+- **Observability**: JSON audit trails, SLA monitoring, and structured logging.
+- **Validation**: Three-layer quality gates (Bronze/Silver/Enriched) with strict-mode enforcement.
+- 🧪**Testing**: Pytest for transform logic and dbt data tests for SQL integrity.
+
+</details>
+
+<details>
+
+<summary><strong>🧠 Why Hybrid? (Cost & Polars Analysis)</strong></summary>
+
+### 💰 Cost Analysis (Hybrid vs. Warehouse-Only)
+
+This architecture intentionally offloads compute-heavy transformations to local/containerized runners (DuckDB/Polars) to minimize BigQuery slot usage.
+
+| Component | Standard (BigQuery Only) | Hybrid (DuckDB + Polars + BigQuery) | Why? |
+|-----------|--------------------------|--------------------------------------|------|
+| **Base Silver** | High (Slot usage for dedup/cleaning) | **$0** (Local/Container compute) | Raw row processing is CPU-bound; DuckDB handles it efficiently. |
+| **Enriched** | High (Complex Python UDFs / SQL Joins) | **$0** (Local/Container compute) | Polars executes complex window/cohort logic 10-100x faster than SQL. |
+| **Storage** | BigQuery Active Storage ($$) | **GCS Standard Storage ($)** | Keeping detailed Silver data in GCS is cheaper than BQ active storage. |
+| **Gold Marts** | Low (Aggregations) | Low (Aggregations) | BigQuery is excellent for final serving layer aggregations. |
+| **Est. Monthly** | ~$500+ (Compute + Storage) | **~$150** (VM + GCS + minimal BQ) | **~70% Cost Reduction** |
+
+### ⚡ Why Polars for Enriched Silver?
+
+While SQL is excellent for aggregation, it struggles with complex procedural logic like:
+- **Sessionization & Attribution**: Linking cart sessions to orders with time windows.
+- **Iterative Cohort Analysis**: Calculating LTV and retention across rolling windows.
+- **Complex Window Functions**: Recursive stock checks and inventory risk scoring.
+
+**Polars** allows us to write this logic in pure Python with:
+1.  **Testability**: Unit test complex logic with `pytest` without a warehouse connection.
+2.  **Performance**: Vectorized execution on a single node is often faster than distributed shuffle for these datasets.
+3.  **Expressiveness**: Clean, readable Python code vs. 1000-line SQL CTE spaghetti.
+
+</details>
+___
 
 ## ▶️ Setup
 
@@ -411,24 +514,24 @@ The profiling script auto-generates multiple documentation artifacts from live d
 
 ```bash
 # Basic profile: generates quality report with schema drift detection
-python scripts/describe_parquet_samples.py --date-range 2020-01-01..2020-01-31
+python scripts/describe_parquet_samples.py --date-range 2025-10-01..2025-10-01
 
 # Profile specific tables or months
-python scripts/describe_parquet_samples.py --tables orders,customers --months 2020-01,2020-02
+python scripts/describe_parquet_samples.py --tables orders,customers --months 2025-10
 
 # Generate schema JSON map for programmatic use
 python scripts/describe_parquet_samples.py \
-  --date-range 2020-01-01..2020-12-31 \
+  --date-range 2025-10-01..2025-10-01 \
   --schema-json docs/data/BRONZE_SCHEMA_MAP.json
 
 # Auto-update data contract with observed Bronze → Silver type mappings
 python scripts/describe_parquet_samples.py \
-  --date-range 2020-01-01..2020-12-31 \
+  --date-range 2025-10-01..2025-10-01 \
   --update-contract docs/resources/DATA_CONTRACT.md
 
 # Generate data dictionary with field descriptions
 python scripts/describe_parquet_samples.py \
-  --date-range 2020-01-01..2020-12-31 \
+  --date-range 2025-10-01..2025-10-01 \
   --data-dictionary docs/data/DATA_DICTIONARY.md \
   --update-contract docs/resources/DATA_CONTRACT.md
 ```
@@ -533,67 +636,6 @@ pre-commit run --all-files
 ```
 
 </details>
-
-___
-
-## 🏗️ Teqnique and Technology Overview
-
-### Medallion Layers
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ BRONZE (Raw)                                                    │
-│ • GCS Parquet (Hive partitioned by ingest_dt)                  │
-│ • Lineage metadata: batch_id, event_id, ingestion_ts           │
-│ • Manifest validation: row counts, checksums                   │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ BASE SILVER (dbt-duckdb)                                        │
-│ • Type casting and normalization                                │
-│ • Deduplication by primary key                                  │
-│ • Foreign key validation                                        │
-│ • Null handling and integrity checks                            │
-│ • Partitioned by event_dt                                       │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ DIMENSION SNAPSHOTS (dbt-duckdb)                                │
-│ • Daily snapshots of customers & products                       │
-│ • Freshness gates avoid re-reading Bronze                       │
-│ • Validated schema & PK integrity                               │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ ENRICHED SILVER (Polars runners)                                │
-│ • Customer cohorts and LTV segmentation                         │
-│ • Product velocity and inventory metrics                        │
-│ • Order attribution and channel analysis                        │
-│ • Returns risk scoring                                          │
-│ • Precomputed features for ML                                   │
-│ • Written to GCS, then loaded into BigQuery                     │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ GOLD (dbt-bigquery)                                             │
-│ • Aggregated fact tables (daily sales, returns)                 │
-│ • Dimension tables (customers, products, dates)                 │
-│ • BI-optimized views for Looker/Tableau                         │
-│ • Incremental marts with SCD Type 2 support                     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Technology Stack
-
-- **Bronze ingestion**: GCS, Parquet, Hive partitioning, manifest validation
-- **Base Silver**: dbt-duckdb (local dev and transformation)
-- **Dimension Snapshots**: dbt-duckdb + Python runner (daily snapshots)
-- **Enriched Silver**: Polars (pure Python transforms), GCS (storage)
-- **Gold marts**: dbt-bigquery (SQL aggregations in BigQuery)
-- **Orchestration**: Apache Airflow (Docker), TaskGroups, dynamic DAGs
-- **Observability**: Audit JSON, SLA dashboards, dbt test results
-- **Validation**: Three-layer framework (Bronze, Silver, Enriched)
-- **Testing**: pytest (Polars transforms), dbt tests (SQL models)
 
 ___
 

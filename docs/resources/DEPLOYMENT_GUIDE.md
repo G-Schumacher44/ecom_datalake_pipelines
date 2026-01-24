@@ -84,9 +84,9 @@ docker-compose up -d
 **Option B: Manual CLI execution** (for testing individual steps):
 ```bash
 # Run in correct order:
-make local-dims DATE=2025-10-15      # 1. Create dimension snapshots
-make local-silver DATE=2025-10-15    # 2. Run Base Silver (needs dims for FK checks)
-make local-enriched DATE=2025-10-15  # 3. Run Enriched transforms
+make local-dims DATE=2025-10-01      # 1. Create dimension snapshots
+make local-silver DATE=2025-10-01    # 2. Run Base Silver (needs dims for FK checks)
+make local-enriched DATE=2025-10-01  # 3. Run Enriched transforms
 ```
 
 **Note**: Base Silver models perform FK validation against dimension snapshots, so dims must be created first
@@ -108,7 +108,7 @@ cat docs/validation_reports/ENRICHED_QUALITY.md
 The sample archive contains representative Bronze Parquet data for testing and development:
 
 - **8 tables**: orders, customers, products, carts, cart_items, order_items, returns, return_items
-- **Date range**: October 2025 (1 month of sample data)
+- **Date range**: First day of sample months (e.g., Oct 1, 2025)
 - **Format**: Hive-partitioned Parquet with `_MANIFEST.json` metadata
 - **Size**: ~150MB compressed, ~400MB extracted
 - **Rows**: ~100K orders, ~50K customers, ~300K order items
@@ -118,14 +118,11 @@ The sample archive contains representative Bronze Parquet data for testing and d
 ```
 samples/bronze/
   orders/
-    ingest_dt=2025-10-15/
-      part-00000.parquet
-      _MANIFEST.json
-    ingest_dt=2025-10-16/
+    ingest_dt=2025-10-01/
       part-00000.parquet
       _MANIFEST.json
   customers/
-    signup_date=2025-10-15/
+    signup_date=2025-10-01/
       part-00000.parquet
       _MANIFEST.json
   product_catalog/
