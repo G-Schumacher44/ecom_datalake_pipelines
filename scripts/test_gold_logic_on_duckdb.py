@@ -61,48 +61,218 @@ def main():
     settings = load_settings()
     models_dir = PROJECT_ROOT / "dbt_bigquery" / "models" / "gold_marts"
 
-    print("--- Gold Logic Pre-flight (DuckDB) ---")
-    print(f"Models directory: {models_dir}")
+                            print("--- Gold Logic Pre-flight (DuckDB) ---")
+
+                            print(f"Models directory: {models_dir}")
+
+                
 
     con = duckdb.connect(database=":memory:")
 
-    # Register BQ compatibility macros
-    con.execute("CREATE MACRO safe_divide(a, b) AS a / NULLIF(b, 0)")
-    con.execute("CREATE MACRO countif(x) AS sum(CASE WHEN x THEN 1 ELSE 0 END)")
+                
 
-    success_count = 0
-    fail_count = 0
+                            # Workaround for DuckDB 1.1.x 'INTERNAL Error: Unsupported type for
 
-    for model_file in models_dir.glob("*.sql"):
-        model_name = model_file.stem
-        print(f"\nChecking model: {model_name}")
+                
 
-        bq_sql = model_file.read_text()
-        duck_sql = transpile_bq_to_duckdb(bq_sql, settings)
+                            # NumericValueUnionToValue'
 
-        if "MISSING_" in duck_sql or "EMPTY_" in duck_sql:
-            print(f"  ⚠️  Skipped: Source data missing for {model_name}")
-            continue
+                
 
-        try:
-            # Create a view to test the logic
-            con.execute(f"CREATE OR REPLACE VIEW {model_name} AS {duck_sql}")
-            # Verify we can select from it
-            res = con.execute(f"SELECT * FROM {model_name} LIMIT 5").pl()
-            print(f"  ✅ SUCCESS: Logic valid. Sample rows: {len(res)}")
-            success_count += 1
-        except Exception as e:
-            print(f"  ❌ FAILED: Logic error in {model_name}")
-            print(f"     Error: {str(e)}")
-            fail_count += 1
+                            # This error occurs during statistics propagation for certain Decimal types in
 
-    print("\n--- Summary ---")
-    print(f"Passed: {success_count}")
-    print(f"Failed: {fail_count}")
+                
 
-    if fail_count > 0:
-        sys.exit(1)
+                            # aggregations.
 
+                
 
-if __name__ == "__main__":
-    main()
+                            con.execute("SET optimizer_disabled_optimizers = 'statistics_propagation'")
+
+                
+
+                        
+
+                
+
+                            # Register BQ compatibility macros
+
+                
+
+                            con.execute("CREATE MACRO safe_divide(a, b) AS a / NULLIF(b, 0)")
+
+                
+
+                            con.execute("CREATE MACRO countif(x) AS sum(CASE WHEN x THEN 1 ELSE 0 END)")
+
+                
+
+                            con.execute("CREATE MACRO current_date() AS today()")
+
+                
+
+                        
+
+                
+
+                            success_count = 0
+
+                
+
+                            fail_count = 0
+
+                
+
+                        
+
+                
+
+                            for model_file in models_dir.glob("*.sql"):
+
+                
+
+                                model_name = model_file.stem
+
+                
+
+                                print(f"\nChecking model: {model_name}")
+
+                
+
+                        
+
+                
+
+                                bq_sql = model_file.read_text()
+
+                
+
+                                duck_sql = transpile_bq_to_duckdb(bq_sql, settings)
+
+                
+
+                        
+
+                
+
+                                        if "MISSING_" in duck_sql or "EMPTY_" in duck_sql:
+
+                
+
+                        
+
+                
+
+                                            print(f"  ⚠️  Skipped: Source data missing for {model_name}")
+
+                
+
+                        
+
+                
+
+                                            continue
+
+                
+
+                        
+
+                
+
+                                try:
+
+                
+
+                                            try:
+
+                
+
+                                                # Create a view to test the logic
+
+                
+
+                                                con.execute(f"CREATE OR REPLACE VIEW {model_name} AS {duck_sql}")
+
+                
+
+                                                # Verify we can select from it
+
+                
+
+                                                res = con.execute(f"SELECT * FROM {model_name} LIMIT 5").pl()
+
+                
+
+                                                print(f"  ✅ SUCCESS: Logic valid. Sample rows: {len(res)}")
+
+                
+
+                                                success_count += 1
+
+                
+
+                                except Exception as e:
+
+                
+
+                                    print(f"  ❌ FAILED: Logic error in {model_name}")
+
+                
+
+                                    print(f"     Error: {str(e)}")
+
+                
+
+                                    fail_count += 1
+
+                
+
+                        
+
+                
+
+                            print("\n--- Summary ---")
+
+                
+
+                            print(f"Passed: {success_count}")
+
+                
+
+                            print(f"Failed: {fail_count}")
+
+                
+
+                        
+
+                
+
+                            if fail_count > 0:
+
+                
+
+                                sys.exit(1)
+
+                
+
+                        
+
+                
+
+                        
+
+                
+
+                        if __name__ == "__main__":
+
+                
+
+                        
+
+                
+
+                        
+
+                
+
+                            main()
