@@ -35,9 +35,16 @@ pytest tests/unit/test_transforms.py -v
 
 ```bash
 # Full Bronze → Silver → Enriched → Gold pipeline on sample data
-make local-silver DATE=2025-10-15
-make local-dims DATE=2025-10-15
-make local-enriched DATE=2025-10-15
+for day in 2024-01-01 2024-01-02 2024-01-03; do
+  python scripts/run_dims_from_spec.py --run-date "$day"
+  python -m src.validation.dims_snapshot --run-date "$day"
+done
+
+python -m src.runners.base_silver \
+  --select "base_silver.*" \
+  --vars "{run_date: '2024-01-03', lookback_days: 2}"
+
+make local-enriched DATE=2024-01-03
 ```
 
 This validates:
@@ -112,7 +119,7 @@ python scripts/describe_parquet_samples.py \
 Sample 3 months from different periods to detect drift:
 - Early period: `2020-03` (first year)
 - Middle period: `2023-01` (mid-dataset)
-- Recent period: `2025-10` (latest year)
+- Recent period: `2025-10-01` (latest year, single-day sample)
 
 **Why this works:**
 - Fast feedback loop (seconds vs minutes)
@@ -152,7 +159,7 @@ The pipeline implements validation at each layer with distinct quality requireme
 ```bash
 python -m src.validation.bronze_quality \
   --bronze-path samples/bronze \
-  --partition-date 2025-10-15 \
+  --partition-date 2024-01-03 \
   --lookback-days 0 \
   --output-report docs/validation_reports/bronze_quality.md
 ```
@@ -169,8 +176,8 @@ Validates:
 python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
-  --partition-date 2025-10-15 \
-  --tables orders,customers,products \
+  --partition-date 2024-01-03 \
+  --tables orders,customers,product_catalog \
   --output-report docs/validation_reports/silver_quality.md \
   --enforce-quality
 ```
@@ -187,7 +194,7 @@ Validates:
 ```bash
 python -m src.validation.enriched \
   --enriched-path data/silver/enriched \
-  --ingest-dt 2025-10-15 \
+  --ingest-dt 2024-01-03 \
   --output-report docs/validation_reports/enriched_quality.md \
   --enforce-quality
 ```
@@ -219,9 +226,11 @@ Validates:
 **Example**:
 
 ```bash
-make local-silver DATE=2025-10-15
-make local-dims DATE=2025-10-15
-make local-enriched DATE=2025-10-15
+python -m src.runners.base_silver \
+  --select "base_silver.*" \
+  --vars "{run_date: '2024-01-03', lookback_days: 0}"
+python scripts/run_dims_from_spec.py --run-date 2024-01-03
+make local-enriched DATE=2024-01-03
 ```
 
 ### Phase 2: Medium Batch
@@ -241,8 +250,10 @@ make local-enriched DATE=2025-10-15
 **Example**:
 
 ```bash
-for date in 2025-10-{15..21}; do
-  make local-silver DATE=$date
+for date in 2024-01-01 2024-01-02 2024-01-03; do
+  python -m src.runners.base_silver \
+    --select "base_silver.*" \
+    --vars "{run_date: '${date}', lookback_days: 0}"
   make local-enriched DATE=$date
 done
 ```
@@ -268,12 +279,17 @@ done
 The project includes automated E2E pipeline validation:
 
 ```yaml
-# .github/workflows/test.yml
+# .github/workflows/pipeline-e2e.yml
 - name: Run E2E Pipeline Check
   run: |
-    make local-silver DATE=2025-10-15
-    make local-dims DATE=2025-10-15
-    make local-enriched DATE=2025-10-15
+    for day in 2024-01-01 2024-01-02 2024-01-03; do
+      python scripts/run_dims_from_spec.py --run-date "$day"
+      python -m src.validation.dims_snapshot --run-date "$day"
+    done
+    python -m src.runners.base_silver \
+      --select "base_silver.*" \
+      --vars "{run_date: '2024-01-03', lookback_days: 2}"
+    make local-enriched DATE=2024-01-03
 ```
 
 **What This Validates**:
@@ -298,12 +314,12 @@ python -m memory_profiler scripts/run_enriched_all_samples.py
 ### Expected Performance
 
 **Base Silver** (dbt-duckdb):
-- 8 tables, 100K rows each
+- 8 tables, ~194k total rows across sample partitions
 - Runtime: <2 minutes
 - Memory: <2GB
 
 **Enriched Silver** (Polars):
-- 10 transforms, 100K rows input each
+- 10 transforms on sample partitions (single-day window)
 - Runtime: <5 minutes
 - Memory: <6GB peak
 
@@ -321,10 +337,10 @@ python -m memory_profiler scripts/run_enriched_all_samples.py
 
 ```bash
 # Check Bronze input
-ls -lh samples/bronze/orders/ingest_dt=2025-10-15/
+ls -lh samples/bronze/orders/ingest_dt=2024-01-03/
 
 # Verify manifest
-cat samples/bronze/orders/ingest_dt=2025-10-15/_MANIFEST.json
+cat samples/bronze/orders/ingest_dt=2024-01-03/_MANIFEST.json
 
 # Check dbt run output
 cat /tmp/dbt_logs/dbt.log
@@ -338,8 +354,8 @@ cat /tmp/dbt_logs/dbt.log
 
 ```bash
 # Verify parent tables loaded for same window
-ls -lh data/silver/base/customers/ingestion_dt=2025-10-15/
-ls -lh data/silver/base/products/ingestion_dt=2025-10-15/
+ls -lh data/silver/base/customers/ingestion_dt=2024-01-03/
+ls -lh data/silver/base/product_catalog/ingestion_dt=2024-01-03/
 
 # Check dimension snapshots
 ls -lh data/silver/dims/customers/
@@ -356,10 +372,10 @@ cat data/silver/dims/_latest.json
 # Profile Bronze data types
 python scripts/describe_parquet_samples.py \
   --tables orders \
-  --date-range 2025-10-15..2025-10-15
+  --date-range 2024-01-03..2024-01-03
 
 # Check data contract expectations
-cat docs/resources/DATA_CONTRACT.md | grep -A 5 "order_date"
+cat docs/data/DATA_CONTRACT.md | grep -A 5 "order_date"
 ```
 
 ### Transform Failures
@@ -371,7 +387,7 @@ cat docs/resources/DATA_CONTRACT.md | grep -A 5 "order_date"
 ```bash
 # Run specific transform with verbose logging
 python -m src.runners.enriched.cart_attribution \
-  --ingest-dt 2025-10-15 \
+  --ingest-dt 2024-01-03 \
   --base-path data/silver/base \
   --output-path data/silver/enriched
 
@@ -386,8 +402,10 @@ python scripts/describe_parquet_samples.py \
 ### Sample Data
 
 The project includes Bronze Parquet samples in `samples/bronze/`:
-- **Tables**: 8 tables (orders, customers, products, etc.)
-- **Date Range**: Oct 2025 (simulated)
+- **Tables**: 8 tables (orders, customers, product_catalog, shopping_carts, cart_items, order_items, returns, return_items)
+- **Partitions**: ingest_dt (2020-03-01, 2023-01-01, 2024-01-01..2024-01-03, 2025-10-01), signup_date (2020-03-01, 2023-01-01, 2025-10-01), category (Books, Clothing, Electronics, Home, Toys)
+- **Size**: ~14MB compressed, ~18MB extracted
+- **Rows**: ~194k total rows across 8 tables (see `docs/data/BRONZE_PROFILE_REPORT.md`)
 - **Format**: Hive-partitioned Parquet with manifests
 - **Use Case**: Full local testing without GCS dependencies
 
@@ -396,11 +414,11 @@ The project includes Bronze Parquet samples in `samples/bronze/`:
 ```bash
 # Generate new samples from data generator
 # (requires ecom_sales_data_generator repo)
-python generate_samples.py --start-date 2025-10-01 --end-date 2025-10-31
+python generate_samples.py --start-date 2024-01-01 --end-date 2024-01-03
 
 # Or sync from GCS
-gsutil -m rsync -r gs://your-bucket/bronze/orders/ingest_dt=2025-10-15 \
-  samples/bronze/orders/ingest_dt=2025-10-15
+gsutil -m rsync -r gs://your-bucket/bronze/orders/ingest_dt=2024-01-03 \
+  samples/bronze/orders/ingest_dt=2024-01-03
 ```
 
 ## Observability Checks
@@ -414,7 +432,7 @@ gsutil -m rsync -r gs://your-bucket/bronze/orders/ingest_dt=2025-10-15 \
 ls -lh data/metrics/audit/
 
 # View audit summary
-cat data/metrics/audit/run_2025-10-15_*.json | jq .
+cat data/metrics/audit/run_2024-01-03_*.json | jq .
 ```
 
 **Audit Schema** (see [AUDIT_SCHEMA.md](../planning/AUDIT_SCHEMA.md)):
