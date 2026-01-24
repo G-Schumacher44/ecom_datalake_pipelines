@@ -5,8 +5,6 @@ import os
 import subprocess
 
 import pendulum
-
-from airflow import DAG  # type: ignore
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import (
@@ -31,6 +29,8 @@ from common import (
     resolve_bool,
     resolve_dims_base_path,
 )
+
+from airflow import DAG  # type: ignore
 from src.runners.enriched import (
     run_cart_attribution,
     run_cart_attribution_summary,

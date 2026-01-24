@@ -61,8 +61,10 @@ def test_observability_config_resolution(monkeypatch):
     monkeypatch.setenv("USE_SA_AUTH", "false")  # Skip real auth checks
 
     # Mock load_settings to return a config that matches our environment variables
-    with patch("src.settings.load_settings") as mock_load, \
-            patch("src.observability.config._cloud_auth_available", return_value=True):
+    with (
+        patch("src.settings.load_settings") as mock_load,
+        patch("src.observability.config._cloud_auth_available", return_value=True),
+    ):
         mock_config = MagicMock()
         mock_config.pipeline.environment = "prod"
         mock_config.pipeline.reports_bucket = "my-reports"
