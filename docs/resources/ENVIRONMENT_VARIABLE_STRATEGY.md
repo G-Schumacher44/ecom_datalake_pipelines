@@ -418,3 +418,16 @@ Is it a secret/credential?
 - **[DOCKER_VERSIONING.md](DOCKER_VERSIONING.md)** - Git-based image versioning with env vars
 - **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Local, dev, and production deployment patterns
 - **[SPEC_OVERVIEW.md](SPEC_OVERVIEW.md)** - Spec-driven orchestration and environment variable support
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

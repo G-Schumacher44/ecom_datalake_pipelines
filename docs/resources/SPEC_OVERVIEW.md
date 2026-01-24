@@ -920,3 +920,16 @@ tables:
 **Last Updated**: 2026-01-23
 **Spec Version**: 1.0.0
 **Required Spec Files**: 5 (bronze, silver_base, dims, enriched, validation)
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

@@ -135,3 +135,16 @@ airflow/dags/
 2. Implement Polars transform logic in src/transforms/
 3. Add unit tests for Polars transforms
 4. Test end-to-end: Airflow → dbt → Polars → GCS → BigQuery → Gold
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>
