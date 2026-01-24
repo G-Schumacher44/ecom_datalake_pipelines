@@ -12,6 +12,7 @@ jobs:
       PIPELINE_ENV: local
       BRONZE_BASE_PATH: ${{ github.workspace }}/samples/bronze
       SILVER_BASE_PATH: ${{ github.workspace }}/data/silver/base
+      SILVER_DIMS_PATH: ${{ github.workspace }}/data/silver/dims
       SILVER_ENRICHED_PATH: ${{ github.workspace }}/data/silver/enriched
       DATE: "2025-10-15"
     steps:

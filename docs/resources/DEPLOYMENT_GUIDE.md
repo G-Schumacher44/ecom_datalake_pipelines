@@ -74,10 +74,22 @@ docker-compose up -d
 - ✅ Mounts sample data at `samples/bronze/` for immediate pipeline execution
 
 **Next steps**:
+
+**Option A: Use Airflow UI** (Recommended - handles dependencies automatically):
 1. Open Airflow UI: http://localhost:8080
 2. Navigate to **DAGs** → `ecom_silver_to_gold_pipeline`
 3. Click **Trigger DAG** (play button)
-4. Watch the pipeline execute Bronze → Silver → Enriched transformations
+4. Watch the pipeline execute: Dims → Base Silver → Enriched Silver
+
+**Option B: Manual CLI execution** (for testing individual steps):
+```bash
+# Run in correct order:
+make local-dims DATE=2025-10-15      # 1. Create dimension snapshots
+make local-silver DATE=2025-10-15    # 2. Run Base Silver (needs dims for FK checks)
+make local-enriched DATE=2025-10-15  # 3. Run Enriched transforms
+```
+
+**Note**: Base Silver models perform FK validation against dimension snapshots, so dims must be created first
 
 **Validate outputs**:
 ```bash
