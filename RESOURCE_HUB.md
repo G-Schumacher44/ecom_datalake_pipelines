@@ -111,16 +111,9 @@ The original vision and decision logs that shaped the project.
   <a href="README.md">🏠 <b>Home</b></a>
   &nbsp;·&nbsp;
   <a href="RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/resources/ARCHITECTURE.md">🗺️ <b>Architecture</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/resources/CLI_USAGE_GUIDE.md">💻 <b>CLI Guide</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/resources/DEPLOYMENT_GUIDE.md">🚀 <b>Deployment</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/data/DATA_CONTRACT.md">📋 <b>Data Contract</b></a>
 </p>
 
 <p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
   <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
 </p>

@@ -255,3 +255,16 @@ dbt run --select stg_ecommerce__TABLE_NAME_quarantine
 8. Repeat for next table
 
 With AI assistance, you should complete all 5 remaining tables in **30-60 minutes**.
+
+---
+
+<p align="center">
+  <a href="../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

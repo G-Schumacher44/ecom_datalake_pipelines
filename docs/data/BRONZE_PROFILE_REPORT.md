@@ -261,3 +261,16 @@ Showing detailed stats for one representative partition per table.
 Last updated (UTC): 2026-01-12T19:47:22Z
 Content hash (SHA-256): 7a45617d90ee8cdec879b2874db9896853bd5f3eaadf06fc0fb9490ffc019c56
 <!-- END GENERATED META -->
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

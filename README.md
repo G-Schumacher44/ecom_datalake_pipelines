@@ -656,20 +656,15 @@ This project is licensed under the [MIT License](LICENSE).
 
 ___
 
+---
+
 <p align="center">
   <a href="README.md">🏠 <b>Home</b></a>
   &nbsp;·&nbsp;
   <a href="RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/resources/ARCHITECTURE.md">🗺️ <b>Architecture</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/resources/SPEC_OVERVIEW.md">⚙️ <b>Spec Overview</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/data/DATA_CONTRACT.md">📋 <b>Data Contract</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/resources/TESTING_GUIDE.md">🧪 <b>Testing Guide</b></a>
 </p>
 
 <p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
   <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
 </p>
