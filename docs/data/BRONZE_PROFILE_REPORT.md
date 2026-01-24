@@ -4,38 +4,31 @@ Generated from local parquet samples in `samples/bronze/`.
 
 ## Sample Scope
 
-- **Months**: 2020-03, 2023-01, 2025-10
+- **Ingest dates**: 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03, 2025-10-01
 
 ## Overview
 
-- **Tables sampled**: 7
-- **Partitions sampled**: 93
-- **Total sample rows**: 5,504,825
+- **Tables sampled**: 8
+- **Partitions sampled**: 11
+- **Total sample rows**: 194,325
 
 ### Per-Table Summary
 
 | Table | Partitions | Sample Rows |
 | --- | --- | --- |
-| cart_items | 93 | 3,688,292 |
-| customers | 93 | 6,412 |
-| order_items | 93 | 654,480 |
-| orders | 93 | 130,166 |
-| return_items | 88 | 34,249 |
-| returns | 88 | 8,808 |
-| shopping_carts | 93 | 982,418 |
+| cart_items | 6 | 132,693 |
+| customers | 3 | 211 |
+| order_items | 6 | 20,371 |
+| orders | 6 | 4,215 |
+| product_catalog | 5 | 3,000 |
+| return_items | 1 | 615 |
+| returns | 1 | 153 |
+| shopping_carts | 6 | 33,067 |
 
 ### Data Quality Flags
 
-- ⚠️ **return_items.return_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=6, samples=return_items:2020-03-02, return_items:2023-01-16, return_items:2023-01-17, return_items:2025-10-02, return_items:2025-10-03)
-- ⚠️ **return_items.order_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=6, samples=return_items:2020-03-02, return_items:2023-01-16, return_items:2023-01-17, return_items:2025-10-02, return_items:2025-10-03)
-- ⚠️ **returns.return_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=6, samples=returns:2020-03-02, returns:2023-01-16, returns:2023-01-17, returns:2025-10-02, returns:2025-10-03)
-- ⚠️ **returns.order_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=6, samples=returns:2020-03-02, returns:2023-01-16, returns:2023-01-17, returns:2025-10-02, returns:2025-10-03)
-- ⚠️ **returns.customer_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=6, samples=returns:2020-03-02, returns:2023-01-16, returns:2023-01-17, returns:2025-10-02, returns:2025-10-03)
-- 📊 **cart_items** partition `2020-03-26`: 67,704 rows (+70% above average) (count=1, samples=cart_items:2020-03-26)
-- 📊 **cart_items** partition `2020-03-27`: 77,978 rows (+96% above average) (count=1, samples=cart_items:2020-03-27)
-- 📊 **cart_items** partition `2020-03-28`: 95,661 rows (+141% above average) (count=1, samples=cart_items:2020-03-28)
-- 📊 **cart_items** partition `2020-03-29`: 100,000 rows (+152% above average) (count=1, samples=cart_items:2020-03-29)
-- 📊 **cart_items** partition `2020-03-30`: 100,000 rows (+152% above average) (count=1, samples=cart_items:2020-03-30)
+- 📊 **order_items** partition `2023-01-01`: 5,180 rows (+52% above average) (count=1, samples=order_items:2023-01-01)
+- 📊 **orders** partition `2023-01-01`: 1,070 rows (+52% above average) (count=1, samples=orders:2023-01-01)
 
 ## Schema Drift
 
@@ -47,52 +40,56 @@ _Note: Partitions with all-null values for a column may show `Null` type instead
 
 Shows which partitions were sampled per table (for temporal schema drift detection).
 
-**cart_items** (93 partitions):
-- `2020-03`: 2020-03-01 ... 2020-03-31 (31 days)
-- `2023-01`: 2023-01-01 ... 2023-01-31 (31 days)
-- `2025-10`: 2025-10-01 ... 2025-10-31 (31 days)
+**cart_items** (6 partitions):
+- `2020-03`: 2020-03-01
+- `2023-01`: 2023-01-01
+- `2024-01`: 2024-01-01, 2024-01-02, 2024-01-03
+- `2025-10`: 2025-10-01
 
-**customers** (93 partitions):
-- `2020-03`: 2020-03-01 ... 2020-03-31 (31 days)
-- `2023-01`: 2023-01-01 ... 2023-01-31 (31 days)
-- `2025-10`: 2025-10-01 ... 2025-10-31 (31 days)
+**customers** (3 partitions):
+- `2020-03`: 2020-03-01
+- `2023-01`: 2023-01-01
+- `2025-10`: 2025-10-01
 
-**order_items** (93 partitions):
-- `2020-03`: 2020-03-01 ... 2020-03-31 (31 days)
-- `2023-01`: 2023-01-01 ... 2023-01-31 (31 days)
-- `2025-10`: 2025-10-01 ... 2025-10-31 (31 days)
+**order_items** (6 partitions):
+- `2020-03`: 2020-03-01
+- `2023-01`: 2023-01-01
+- `2024-01`: 2024-01-01, 2024-01-02, 2024-01-03
+- `2025-10`: 2025-10-01
 
-**orders** (93 partitions):
-- `2020-03`: 2020-03-01 ... 2020-03-31 (31 days)
-- `2023-01`: 2023-01-01 ... 2023-01-31 (31 days)
-- `2025-10`: 2025-10-01 ... 2025-10-31 (31 days)
+**orders** (6 partitions):
+- `2020-03`: 2020-03-01
+- `2023-01`: 2023-01-01
+- `2024-01`: 2024-01-01, 2024-01-02, 2024-01-03
+- `2025-10`: 2025-10-01
 
-**return_items** (88 partitions):
-- `2020-03`: 2020-03-02 ... 2020-03-30 (29 days)
-- `2023-01`: 2023-01-01 ... 2023-01-31 (30 days)
-- `2025-10`: 2025-10-02 ... 2025-10-30 (29 days)
+**product_catalog** (5 partitions):
+- `non-date`: category=Books, category=Clothing, category=Electronics, category=Home, category=Toys
 
-**returns** (88 partitions):
-- `2020-03`: 2020-03-02 ... 2020-03-30 (29 days)
-- `2023-01`: 2023-01-01 ... 2023-01-31 (30 days)
-- `2025-10`: 2025-10-02 ... 2025-10-30 (29 days)
+**return_items** (1 partitions):
+- `2023-01`: 2023-01-01
 
-**shopping_carts** (93 partitions):
-- `2020-03`: 2020-03-01 ... 2020-03-31 (31 days)
-- `2023-01`: 2023-01-01 ... 2023-01-31 (31 days)
-- `2025-10`: 2025-10-01 ... 2025-10-31 (31 days)
+**returns** (1 partitions):
+- `2023-01`: 2023-01-01
+
+**shopping_carts** (6 partitions):
+- `2020-03`: 2020-03-01
+- `2023-01`: 2023-01-01
+- `2024-01`: 2024-01-01, 2024-01-02, 2024-01-03
+- `2025-10`: 2025-10-01
 
 ## Canonical Schema Keys
 
 | Table | Canonical Schema Key | Sample Partitions |
 | --- | --- | --- |
-| cart_items | `cart_item_id:Int64|cart_id:String|product_id:Int64|product_name:String|category:String|added_at:String|quantity:Int64|unit_price:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2020-03-02, 2020-03-03, 2020-03-04, 2020-03-05 |
-| customers | `customer_id:String|first_name:String|last_name:String|email:String|phone_number:String|signup_date:String|gender:String|age:Float64|is_guest:Boolean|customer_status:String|signup_channel:String|loyalty_tier:String|initial_loyalty_tier:String|email_verified:Boolean|marketing_opt_in:Boolean|mailing_address:String|billing_address:String|loyalty_enrollment_date:String|clv_bucket:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2020-03-02, 2020-03-03, 2020-03-04, 2020-03-05 |
-| order_items | `order_id:String|product_id:Int64|product_name:String|category:String|quantity:Int64|unit_price:Float64|discount_amount:Float64|cost_price:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2020-03-02, 2020-03-03, 2020-03-04, 2020-03-05 |
-| orders | `order_id:String|total_items:Int64|order_date:String|customer_id:String|email:String|order_channel:String|is_expedited:Boolean|customer_tier:String|gross_total:Float64|net_total:Float64|total_discount_amount:Float64|payment_method:String|shipping_speed:String|shipping_cost:Float64|agent_id:String|actual_shipping_cost:Float64|payment_processing_fee:Float64|shipping_address:String|billing_address:String|clv_bucket:String|is_reactivated:Boolean|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2020-03-02, 2020-03-03, 2020-03-04, 2020-03-05 |
-| return_items | `return_item_id:Int64|return_id:String|order_id:String|product_id:Int64|product_name:String|category:String|quantity_returned:Int64|unit_price:Float64|cost_price:Float64|refunded_amount:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-02, 2020-03-03, 2020-03-04, 2020-03-05, 2020-03-06 |
-| returns | `return_id:String|order_id:String|customer_id:String|email:String|return_date:String|reason:String|return_type:String|refunded_amount:Float64|return_channel:String|agent_id:String|refund_method:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-02, 2020-03-03, 2020-03-04, 2020-03-05, 2020-03-06 |
-| shopping_carts | `cart_id:String|customer_id:String|created_at:String|updated_at:String|cart_total:Float64|status:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2020-03-02, 2020-03-03, 2020-03-04, 2020-03-05 |
+| cart_items | `cart_item_id:Int64|cart_id:String|product_id:Int64|product_name:String|category:String|added_at:String|quantity:Int64|unit_price:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03 |
+| customers | `customer_id:String|first_name:String|last_name:String|email:String|phone_number:String|signup_date:String|gender:String|age:Float64|is_guest:Boolean|customer_status:String|signup_channel:String|loyalty_tier:String|initial_loyalty_tier:String|email_verified:Boolean|marketing_opt_in:Boolean|mailing_address:String|billing_address:String|loyalty_enrollment_date:String|clv_bucket:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2025-10-01 |
+| order_items | `order_id:String|product_id:Int64|product_name:String|category:String|quantity:Int64|unit_price:Float64|discount_amount:Float64|cost_price:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03 |
+| orders | `order_id:String|total_items:Int64|order_date:String|customer_id:String|email:String|order_channel:String|is_expedited:Boolean|customer_tier:String|gross_total:Float64|net_total:Float64|total_discount_amount:Float64|payment_method:String|shipping_speed:String|shipping_cost:Float64|agent_id:String|actual_shipping_cost:Float64|payment_processing_fee:Float64|shipping_address:String|billing_address:String|clv_bucket:String|is_reactivated:Boolean|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03 |
+| product_catalog | `product_id:Int64|product_name:String|category:String|unit_price:Float64|cost_price:Float64|inventory_quantity:Int64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | Books, Clothing, Electronics, Home, Toys |
+| return_items | `return_item_id:Int64|return_id:String|order_id:String|product_id:Int64|product_name:String|category:String|quantity_returned:Int64|unit_price:Float64|cost_price:Float64|refunded_amount:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2023-01-01 |
+| returns | `return_id:String|order_id:String|customer_id:String|email:String|return_date:String|reason:String|return_type:String|refunded_amount:Float64|return_channel:String|agent_id:String|refund_method:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2023-01-01 |
+| shopping_carts | `cart_id:String|customer_id:String|created_at:String|updated_at:String|cart_total:Float64|status:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03 |
 
 ## Column Statistics (Sample Partition)
 
@@ -198,48 +195,65 @@ Showing detailed stats for one representative partition per table.
 | event_id | String | 0.0% | 621 | Top: `evt_1c68f045d72215bd32907a79f803e9d3fbb585ab97277e24a21746915ea67023` (1), `evt_aef33d2865b4e97e4e5ed1c1ece133e731d87c77419e061bda3c5d4d0643add5` (1), `evt_b983f2244bba0b2f28f6c39c2ee6d099b4cec05afd53bb0eaa6cc7013e53c6fe` (1) |
 | source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/orders/ingest_dt=2020-03-01/part-0000.parquet` (621) |
 
-### return_items
+### product_catalog
 
-**Sample**: `ingest_dt=2020-03-02` (17 rows)
+**Sample**: `category=Books` (598 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| return_item_id | Int64 | 0.0% | 17 | Range: `4` to `333`<br>p25=279.0, p50=293.0, p75=297.0, p95=332.0 |
-| return_id | String | 0.0% | 4 | Top: `RTN-00388674` (8), `RTN-00388597` (4), `RTN-00388671` (3) |
-| order_id | String | 0.0% | 4 | Top: `ORD-01422691` (8), `ORD-01422440` (4), `ORD-01422678` (3) |
-| product_id | Int64 | 0.0% | 17 | Range: `233` to `2663`<br>p25=939.0, p50=1452.0, p75=2036.0, p95=2586.0 |
-| product_name | String | 0.0% | 15 | Top: `Illustrated Anthology` (2), `Wireless Headphones` (2), `Compact Speaker` (1) |
-| category | String | 0.0% | 4 | Top: `Electronics` (6), `Books` (6), `Clothing` (3) |
-| quantity_returned | Int64 | 0.0% | 3 | Range: `1` to `3`<br>p25=1.0, p50=2.0, p75=2.0, p95=3.0 |
-| unit_price | Float64 | 0.0% | 17 | Range: `34.9` to `242.17`<br>p25=109.74, p50=142.94, p75=167.17, p95=227.98 |
-| cost_price | Float64 | 0.0% | 17 | Range: `19.29` to `141.73`<br>p25=56.49, p50=66.67, p75=98.83, p95=137.52 |
-| refunded_amount | Float64 | 0.0% | 17 | Range: `34.9` to `726.51`<br>p25=134.76, p50=167.17, p75=301.0, p95=683.94 |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (17) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T17:07:59+00:00` (17) |
-| event_id | String | 0.0% | 17 | Top: `evt_17e28442a177effc114a19741f55aef451887cec2070bf0ef9d3cfb7318bf576` (1), `evt_ef3f0e7ff27adfda6e266f7a34b996cee90f0c3f2ccf6b6b0c6a47a54a1ed87f` (1), `evt_6834ef08b98cf84c0e429b43fd921aad6766d07ad99a24bdd90e38503bd023ad` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/return_items/ingest_dt=2020-03-02/part-0000.parquet` (17) |
+| product_id | Int64 | 0.0% | 598 | Range: `8` to `2998`<br>p25=661.0, p50=1402.0, p75=2156.0, p95=2868.0 |
+| product_name | String | 0.0% | 16 | Top: `Modern Guide` (45), `Modern Memoir` (45), `Illustrated Memoir` (45) |
+| category | String | 0.0% | 1 | Top: `Books` (598) |
+| unit_price | Float64 | 0.0% | 591 | Range: `5.36` to `249.61`<br>p25=65.0, p50=127.78, p75=190.36, p95=238.1 |
+| cost_price | Float64 | 0.0% | 583 | Range: `2.46` to `164.64`<br>p25=34.59, p50=68.15, p75=101.18, p95=143.34 |
+| inventory_quantity | Int64 | 0.0% | 147 | Range: `100` to `250`<br>p25=135.0, p50=175.0, p75=212.0, p95=243.0 |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (598) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:34+00:00` (598) |
+| event_id | String | 0.0% | 598 | Top: `evt_38bd8d51c5f4ad7c74f65ab8dfcf4d49ec54765ec7c05ecef3dae6b3b212a590` (1), `evt_62220d5155bb967bebe9dcbf358d96fee0fdc9ac7efc3429ab0e17506bdaf048` (1), `evt_e237c63d597aa9e870d2b749432e384ad8e93526f2e1d53aaa0053792a87e9ce` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/product_catalog/category=Books/part-0000.parquet` (598) |
+
+### return_items
+
+**Sample**: `ingest_dt=2023-01-01` (615 rows)
+
+| Column | Type | Null % | Distinct | Stats |
+| --- | --- | --- | --- | --- |
+| return_item_id | Int64 | 0.0% | 615 | Range: `262` to `20739`<br>p25=4782.0, p50=10644.0, p75=15721.0, p95=19527.0 |
+| return_id | String | 0.0% | 151 | Top: `RTN-00828082` (14), `RTN-00826048` (12), `RTN-00827804` (11) |
+| order_id | String | 0.0% | 151 | Top: `ORD-03027133` (14), `ORD-03019942` (12), `ORD-03026232` (11) |
+| product_id | Int64 | 0.0% | 567 | Range: `7` to `2999`<br>p25=825.0, p50=1554.0, p75=2340.0, p95=2886.0 |
+| product_name | String | 0.0% | 147 | Top: `Rustic Rug` (14), `Compact Headphones` (14), `Rustic Table` (14) |
+| category | String | 0.0% | 5 | Top: `Home` (149), `Electronics` (144), `Books` (113) |
+| quantity_returned | Int64 | 0.0% | 6 | Range: `1` to `6`<br>p25=1.0, p50=2.0, p75=3.0, p95=5.0 |
+| unit_price | Float64 | 0.0% | 561 | Range: `5.25` to `249.65`<br>p25=59.03, p50=130.07, p75=195.53, p95=239.25 |
+| cost_price | Float64 | 0.0% | 560 | Range: `2.69` to `165.25`<br>p25=33.76, p50=70.17, p75=103.52, p95=140.73 |
+| refunded_amount | Float64 | 0.0% | 596 | Range: `6.26` to `1491.48`<br>p25=93.7, p50=197.41, p75=385.5, p95=758.52 |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T140649` (615) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T22:54:41+00:00` (615) |
+| event_id | String | 0.0% | 615 | Top: `evt_4b43f57680e2d59841752f7dc70152fa6073b596f6495555dea15d551d6b7eff` (1), `evt_093420196d7415768953d8e57e2cfe63465a273280be60605d63ee71467b347d` (1), `evt_51c763a2c4cf16c921033740990a6777d11b5f41564027bed0917efd20fd41cf` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/return_items/ingest_dt=2023-01-01/part-0000.parquet` (615) |
 
 ### returns
 
-**Sample**: `ingest_dt=2020-03-02` (4 rows)
+**Sample**: `ingest_dt=2023-01-01` (153 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| return_id | String | 0.0% | 4 | Top: `RTN-00388597` (1), `RTN-00388671` (1), `RTN-00388674` (1) |
-| order_id | String | 0.0% | 4 | Top: `ORD-01422440` (1), `ORD-01422678` (1), `ORD-01422691` (1) |
-| customer_id | String | 0.0% | 4 | Top: `GUEST-121883` (1), `GUEST-117584` (1), `GUEST-126332` (1) |
-| email | String | 0.0% | 4 | Top: `noah53@example.com` (1), `rnichols@example.net` (1), `david60@example.org` (1) |
-| return_date | String | 0.0% | 1 | Top: `2020-03-02` (4) |
-| reason | String | 0.0% | 4 | Top: `Damaged in transit` (1), `Item arrived late` (1), `Arrived damaged` (1) |
-| return_type | String | 0.0% | 1 | Top: `Refund` (4) |
-| refunded_amount | Float64 | 0.0% | 4 | Range: `397.71` to `1736.21`<br>p25=604.38, p50=1577.62, p75=1577.62, p95=1736.21 |
-| return_channel | String | 0.0% | 3 | Top: `Phone` (2), `Web` (1), `Ebay` (1) |
-| agent_id | String | 0.0% | 3 | Top: `ONLINE` (2), `CSR-0015` (1), `CSR-0014` (1) |
-| refund_method | String | 0.0% | 2 | Top: `Credit Card` (3), `ACH` (1) |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (4) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T17:07:59+00:00` (4) |
-| event_id | String | 0.0% | 4 | Top: `evt_ea567ed9068e8ecaeb1366129dd49548b7a5ba0ce67ed5a6b81d3d2311419613` (1), `evt_0fb86a7ff76238791cfd1114066de72db5160f4295b1acadc1907f8bed663532` (1), `evt_1bc64aa10f4bd627f95502eaeec9bf5bce1e9c20802edaceee1a96f4a2a40e17` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/returns/ingest_dt=2020-03-02/part-0000.parquet` (4) |
+| return_id | String | 0.0% | 153 | Top: `RTN-00825054` (1), `RTN-00825110` (1), `RTN-00825244` (1) |
+| order_id | String | 0.0% | 153 | Top: `ORD-03016384` (1), `ORD-03016574` (1), `ORD-03017004` (1) |
+| customer_id | String | 0.0% | 153 | Top: `CUST-106936` (1), `GUEST-114301` (1), `CUST-85405` (1) |
+| email | String | 0.0% | 153 | Top: `ryan.khan@gmail.com` (1), `lesliemartinez@example.org` (1), `martin.walker@yahoo.com` (1) |
+| return_date | String | 0.0% | 1 | Top: `2023-01-01` (153) |
+| reason | String | 0.0% | 27 | Top: `No longer needed` (20), `Found a better price` (19), `Defective` (17) |
+| return_type | String | 0.0% | 6 | Top: `Refund` (137), `refund` (5), `  Refund ` (4) |
+| refunded_amount | Float64 | 0.0% | 152 | Range: `0.0` to `7937.01`<br>p25=301.06, p50=812.15, p75=1476.85, p95=2710.68 |
+| return_channel | String | 0.0% | 18 | Top: `Web` (58), `Phone` (30), `Social Media` (23) |
+| agent_id | String | 4.58% | 18 | Top: `ONLINE` (113), `None` (7), `CSR-0009` (5) |
+| refund_method | String | 0.0% | 5 | Top: `Credit Card` (95), `PayPal` (27), `Apple Pay` (20) |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T140649` (153) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T22:54:41+00:00` (153) |
+| event_id | String | 0.0% | 153 | Top: `evt_c32ba1378ea83d2f12b37130f04982422f9e320a2f937ff3255de649f18accf2` (1), `evt_637cb0e4c7a1f6b82ebb1d75535d6e94b142e963f5a6f562a63133d15aa9998d` (1), `evt_210b9e5f99319344e0f9329705a49fdf33d7e02c3d3411eaee4a9acfd8a43649` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/returns/ingest_dt=2023-01-01/part-0000.parquet` (153) |
 
 ### shopping_carts
 
@@ -258,19 +272,6 @@ Showing detailed stats for one representative partition per table.
 | event_id | String | 0.0% | 5,089 | Top: `evt_6fe812c5617c8dd0f98430c40b4e9613678f1eb8173baf837eeccf5da41e59d6` (1), `evt_9fde26223b1d1845a033744594586c167fc44e921508a0c3a90acaf6ecced20f` (1), `evt_62719919106dace9f47ae6a27b5d6a743bde5edc0cb27b7a07692d8f55daad45` (1) |
 | source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/shopping_carts/ingest_dt=2020-03-01/part-0000.parquet` (5089) |
 <!-- GENERATED META -->
-Last updated (UTC): 2026-01-12T19:47:22Z
-Content hash (SHA-256): 7a45617d90ee8cdec879b2874db9896853bd5f3eaadf06fc0fb9490ffc019c56
+Last updated (UTC): 2026-01-24T20:59:59Z
+Content hash (SHA-256): c0c61d5e5f60158fc17417d4a4657276ec9f9166569678fb11d96b3ace99cda1
 <!-- END GENERATED META -->
-
----
-
-<p align="center">
-  <a href="../../README.md">🏠 <b>Home</b></a>
-  &nbsp;·&nbsp;
-  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
-</p>
-
-<p align="center">
-  <sub>Last updated: 2026-01-24</sub><br>
-  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
-</p>

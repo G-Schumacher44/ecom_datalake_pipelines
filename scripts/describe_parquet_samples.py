@@ -69,12 +69,20 @@ def parse_date(value: str) -> date | None:
 
 
 def matches_partition(
+    partition_key: str,
     partition: str,
     ingest_dts: set[str],
     months: set[str],
     start_date: date | None,
     end_date: date | None,
 ) -> bool:
+    # Non-date partitions (e.g., product categories) should always be included,
+    # even when date filters are provided.
+    if parse_date(partition) is None and partition_key not in {
+        "ingest_dt",
+        "signup_date",
+    }:
+        return True
     if ingest_dts and partition in ingest_dts:
         return True
     if months and partition[:7] in months:
@@ -113,7 +121,12 @@ def find_parquet_files(
                 continue
             partition_value = partition_dir.name.split("=", 1)[-1]
             if not matches_partition(
-                partition_value, ingest_dts, months, start_date, end_date
+                partition_key,
+                partition_value,
+                ingest_dts,
+                months,
+                start_date,
+                end_date,
             ):
                 continue
             parquet_files = sorted(partition_dir.glob("*.parquet"))

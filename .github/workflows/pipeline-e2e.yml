@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PIPELINE_ENV: local
+      ECOM_CONFIG_PATH: ${{ github.workspace }}/config/config.yml
       BRONZE_BASE_PATH: ${{ github.workspace }}/samples/bronze
       SILVER_BASE_PATH: ${{ github.workspace }}/data/silver/base
       SILVER_DIMS_PATH: ${{ github.workspace }}/data/silver/dims
@@ -33,16 +34,30 @@ jobs:
           mkdir -p data/silver/base/quarantine data/silver/enriched data/silver/dims data/metrics docs/validation_reports
       - name: dbt Dependencies
         run: make dbt-deps
-      - name: Dimensions (Day 1)
+      - name: Dimensions (3 Days)
         run: |
-          python scripts/run_dims_from_spec.py --run-date 2024-01-01
-          python -m src.validation.dims_snapshot --run-date 2024-01-01 --run-id "ci_${{ github.run_id }}"
+          for day in 2024-01-01 2024-01-02 2024-01-03; do
+            python scripts/run_dims_from_spec.py --run-date "$day"
+            python -m src.validation.dims_snapshot --run-date "$day" --run-id "ci_${{ github.run_id }}"
+          done
       - name: Base Silver (Multi-Day Processing)
         run: |
-          make local-silver
+          python -m src.runners.base_silver \
+            --select "base_silver.*" \
+            --vars "{run_date: '2024-01-03', lookback_days: 2}"
           echo "Verifying all 3 days of partitions were created..."
           ls -la data/silver/base/orders/ingestion_dt=2024-01-0{1,2,3}
           echo "✓ All 3 days of partitions created successfully"
+      - name: Silver Quality Gate (3-Day Window)
+        run: |
+          python -m src.validation.silver \
+            --config config/config.yml \
+            --bronze-path samples/bronze \
+            --silver-path data/silver/base \
+            --quarantine-path data/silver/base/quarantine \
+            --partition-date 2024-01-03 \
+            --lookback-days 2 \
+            --output-report docs/validation_reports/SILVER_QUALITY_FULL.md
       - name: dbt Data Tests (Base Silver)
         run: |
           make dbt-test
