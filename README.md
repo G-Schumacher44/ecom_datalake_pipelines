@@ -174,6 +174,8 @@ Everything is designed for modularity and reusability: swap out buckets, adjust 
 <details><summary><strong>📚 Resource Hub - Technical Documentation</strong></summary>
 <br>
 
+> **[👉 Click here to visit the full Resource Hub](RESOURCE_HUB.md)**
+
 ### 🏗️ Architecture & Design
 
 - **[Architecture Overview](docs/resources/ARCHITECTURE.md)** - Complete system architecture and data flow
@@ -657,6 +659,8 @@ ___
 <p align="center">
   <a href="README.md">🏠 <b>Home</b></a>
   &nbsp;·&nbsp;
+  <a href="RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+  &nbsp;·&nbsp;
   <a href="docs/resources/ARCHITECTURE.md">🗺️ <b>Architecture</b></a>
   &nbsp;·&nbsp;
   <a href="docs/resources/SPEC_OVERVIEW.md">⚙️ <b>Spec Overview</b></a>
@@ -664,10 +668,6 @@ ___
   <a href="docs/data/DATA_CONTRACT.md">📋 <b>Data Contract</b></a>
   &nbsp;·&nbsp;
   <a href="docs/resources/TESTING_GUIDE.md">🧪 <b>Testing Guide</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/data/BRONZE_PROFILE_REPORT.md">📊 <b>Bronze Profile</b></a>
-  &nbsp;·&nbsp;
-  <a href="docs/data/DATA_DICTIONARY.md">📖 <b>Data Dictionary</b></a>
 </p>
 
 <p align="center">

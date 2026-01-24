@@ -1,4 +1,4 @@
-finance as (
+with finance as (
   select
     date(rf.order_dt) as order_date,
     rf.order_channel as order_channel,
