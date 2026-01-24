@@ -4,6 +4,22 @@
 # Base: Official Airflow 2.9.3 with Python 3.12
 FROM apache/airflow:2.9.3-python3.12
 
+# Git version metadata (passed via build args)
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG VERSION=unknown
+ARG BUILD_DATE
+
+# Add OCI labels for image metadata
+LABEL org.opencontainers.image.title="ecom-datalake-pipeline"
+LABEL org.opencontainers.image.description="E-commerce data lakehouse pipeline with dbt, DuckDB, and BigQuery"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+LABEL org.opencontainers.image.source="https://github.com/G-Schumacher44/ecom_datalake_pipelines"
+LABEL com.ecom.git.branch="${GIT_BRANCH}"
+LABEL com.ecom.git.commit="${GIT_COMMIT}"
+LABEL com.ecom.version="${VERSION}"
+
 # Switch to root for system package installation
 USER root
 
@@ -76,7 +92,10 @@ RUN python -c "from src.settings import load_settings; print('✅ Package instal
 # Set environment defaults (can be overridden in docker-compose or Cloud Composer)
 ENV PIPELINE_ENV=local \
     AIRFLOW__CORE__LOAD_EXAMPLES=False \
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG=False
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG=False \
+    GIT_COMMIT=${GIT_COMMIT} \
+    GIT_BRANCH=${GIT_BRANCH} \
+    PIPELINE_VERSION=${VERSION}
 
 # Default command (overridden by docker-compose)
 CMD ["airflow", "webserver"]
