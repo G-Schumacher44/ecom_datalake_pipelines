@@ -362,6 +362,20 @@ type-check:
 	mypy src/
 
 # ==============================================================================
+# Docs & Profiling
+# ==============================================================================
+
+PROFILE_DATE_RANGE ?= 2025-10-01..2025-10-01
+
+profile-bronze-samples:
+	python scripts/describe_parquet_samples.py \
+		--date-range $(PROFILE_DATE_RANGE) \
+		--output docs/data/BRONZE_PROFILE_REPORT.md \
+		--schema-json docs/data/BRONZE_SCHEMA_MAP.json \
+		--update-contract docs/data/DATA_CONTRACT.md \
+		--data-dictionary docs/data/DATA_DICTIONARY.md
+
+# ==============================================================================
 # dbt Commands
 # ==============================================================================
 

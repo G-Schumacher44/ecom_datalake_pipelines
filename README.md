@@ -518,6 +518,17 @@ ___
 The profiling script auto-generates multiple documentation artifacts from live data:
 
 ```bash
+# Run full profiling + doc refresh for the included sample archive (bronze_samples.zip)
+make profile-bronze-samples PROFILE_DATE_RANGE=2025-10-01..2025-10-01
+
+# Or run the full CLI directly
+python scripts/describe_parquet_samples.py \
+  --date-range 2025-10-01..2025-10-01 \
+  --output docs/data/BRONZE_PROFILE_REPORT.md \
+  --schema-json docs/data/BRONZE_SCHEMA_MAP.json \
+  --update-contract docs/data/DATA_CONTRACT.md \
+  --data-dictionary docs/data/DATA_DICTIONARY.md
+
 # Basic profile: generates quality report with schema drift detection
 python scripts/describe_parquet_samples.py --date-range 2025-10-01..2025-10-01
 

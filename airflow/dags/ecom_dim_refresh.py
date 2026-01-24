@@ -6,8 +6,6 @@ import subprocess
 from datetime import datetime, timezone
 
 import pendulum
-
-from airflow import DAG  # type: ignore
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.task_group import TaskGroup
@@ -21,6 +19,8 @@ from common import (
     get_retry_config,
     resolve_dims_base_path,
 )
+
+from airflow import DAG  # type: ignore
 from src.runners.dims_snapshot import snapshot_dims
 
 # --- Task Callables ---
