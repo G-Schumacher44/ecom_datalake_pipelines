@@ -59,6 +59,13 @@ htmlcov/
 .env
 .env.*
 
+# Google Cloud credentials (mount at runtime, never bake into image)
+.gcloud/
+.config/gcloud/
+**/application_default_credentials.json
+**/*service-account*.json
+**/*serviceaccount*.json
+
 # Documentation (not needed in runtime image)
 docs/
 README.md
