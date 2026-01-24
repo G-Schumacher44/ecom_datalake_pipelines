@@ -16,6 +16,7 @@ docker.env
 .ruff_cache/
 .vscode/
 samples/
+!samples/*.zip
 
 # Test coverage artifacts
 coverage_html/
