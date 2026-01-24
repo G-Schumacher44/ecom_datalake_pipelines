@@ -2,8 +2,8 @@
 # Makefile - Common commands for local development and deployment
 # =============================================================================
 
-.PHONY: help build up down restart logs shell log-task test lint format type-check clean clean-data
-.PHONY: dbt-deps dbt-build dbt-test local-silver push-image
+.PHONY: help build up down restart logs shell log-task test lint format type-check clean clean-data version
+.PHONY: dbt-deps dbt-build dbt-test local-silver push-image build-versioned push-image-versioned
 .PHONY: strict-mode easy-mode run-sample run-sample-strict run-sample-bq backfill-easy backfill-strict run-dims backfill-dims
 .PHONY: run-dev-gcs dev-mode run-dev-docker prod-sim-mode run-prod-sim-docker
 
@@ -16,6 +16,7 @@ help:
 	@echo "======================================================================"
 	@echo ""
 	@echo "Environment Control:"
+	@echo "  make version         Show pipeline version information"
 	@echo "  make up              Start local Airflow (Webserver: http://localhost:8080)"
 	@echo "  make down            Stop Airflow services"
 	@echo "  make restart         Restart Scheduler & Webserver"
@@ -78,14 +79,21 @@ help:
 	@echo "  make dbt-test        Run dbt data tests"
 	@echo ""
 	@echo "Deployment:"
-	@echo "  make push-image      Build & Push Docker Image"
+	@echo "  make build-versioned       Build Docker image with Git version tags"
+	@echo "  make push-image            Build & Push Docker Image (latest only)"
 	@echo "      Required: PROJECT_ID=<gcp_project_id>"
+	@echo "  make push-image-versioned  Build & Push versioned Docker Image"
+	@echo "      Required: PROJECT_ID=<gcp_project_id>"
+	@echo "      Tags: <VERSION> (git tag or branch-commit), latest"
 	@echo ""
 
 
 # ==============================================================================
 # Docker Commands
 # ==============================================================================
+
+version:
+	@python scripts/version.py
 
 build:
 	@echo "Building Docker image (building scheduler service only, others will reuse)..."
@@ -440,6 +448,29 @@ local-dims-strict:
 # Production Deployment (requires gcloud CLI + PROJECT_ID env var)
 # ==============================================================================
 
+# Git version variables
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+GIT_TAG := $(shell git describe --tags --exact-match 2>/dev/null || echo "")
+VERSION := $(if $(GIT_TAG),$(GIT_TAG),$(GIT_BRANCH)-$(GIT_COMMIT))
+IMAGE_NAME := ecom-datalake-pipeline
+
+build-versioned:
+	@echo "Building versioned Docker image..."
+	@echo "Git Commit: $(GIT_COMMIT)"
+	@echo "Git Branch: $(GIT_BRANCH)"
+	@echo "Version: $(VERSION)"
+	docker build \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--build-arg GIT_BRANCH=$(GIT_BRANCH) \
+		--build-arg VERSION=$(VERSION) \
+		-t $(IMAGE_NAME):$(VERSION) \
+		-t $(IMAGE_NAME):latest \
+		.
+	@echo "Built images:"
+	@echo "  - $(IMAGE_NAME):$(VERSION)"
+	@echo "  - $(IMAGE_NAME):latest"
+
 push-image:
 ifndef PROJECT_ID
 	@echo "ERROR: PROJECT_ID not set. Usage: make push-image PROJECT_ID=my-project-123"
@@ -451,4 +482,23 @@ endif
 		us-central1-docker.pkg.dev/$(PROJECT_ID)/airflow-images/ecom-datalake-pipeline:latest
 	gcloud auth configure-docker us-central1-docker.pkg.dev
 	docker push us-central1-docker.pkg.dev/$(PROJECT_ID)/airflow-images/ecom-datalake-pipeline:latest
+
+push-image-versioned:
+ifndef PROJECT_ID
+	@echo "ERROR: PROJECT_ID not set. Usage: make push-image-versioned PROJECT_ID=my-project-123"
+	@exit 1
+endif
+	@echo "Building and pushing versioned image to Artifact Registry..."
+	@echo "Version: $(VERSION)"
+	@$(MAKE) build-versioned
+	docker tag $(IMAGE_NAME):$(VERSION) \
+		us-central1-docker.pkg.dev/$(PROJECT_ID)/airflow-images/$(IMAGE_NAME):$(VERSION)
+	docker tag $(IMAGE_NAME):$(VERSION) \
+		us-central1-docker.pkg.dev/$(PROJECT_ID)/airflow-images/$(IMAGE_NAME):latest
+	gcloud auth configure-docker us-central1-docker.pkg.dev
+	docker push us-central1-docker.pkg.dev/$(PROJECT_ID)/airflow-images/$(IMAGE_NAME):$(VERSION)
+	docker push us-central1-docker.pkg.dev/$(PROJECT_ID)/airflow-images/$(IMAGE_NAME):latest
+	@echo "Pushed images:"
+	@echo "  - us-central1-docker.pkg.dev/$(PROJECT_ID)/airflow-images/$(IMAGE_NAME):$(VERSION)"
+	@echo "  - us-central1-docker.pkg.dev/$(PROJECT_ID)/airflow-images/$(IMAGE_NAME):latest"
 	@echo "Image pushed successfully!"
