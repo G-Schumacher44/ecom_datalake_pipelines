@@ -172,7 +172,7 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
         if result.returncode != 0:
             logger.error(
                 f"GCS rsync failed with exit code {result.returncode}",
-                stderr=result.stderr,
+                extra={"stderr": result.stderr},
             )
             raise RuntimeError(
                 f"Failed to sync dims to GCS: {result.stderr or 'Unknown error'}"
@@ -210,8 +210,9 @@ def publish_dims_latest(run_date: str, run_id: str) -> None:
         if result.returncode != 0:
             logger.error(
                 f"GCS copy failed with exit code {result.returncode}",
-                stderr=result.stderr,
+                extra={"stderr": result.stderr},
             )
             raise RuntimeError(
-                f"Failed to copy _latest.json to GCS: {result.stderr or 'Unknown error'}"
+                f"Failed to copy _latest.json to GCS: "
+                f"{result.stderr or 'Unknown error'}"
             )
