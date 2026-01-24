@@ -40,7 +40,7 @@ def transpile_bq_to_duckdb(sql: str, settings) -> str:
     """Convert BQ dbt SQL to DuckDB compatible SQL for local logic testing."""
     # 1. Replace {{ source('silver', 'table') }} with read_parquet(...)
     source_pattern = (
-        r"{{{\s*source\s*\(\s*['\"]silver['\"]\s*,\s*['\"](.+?)['\"]\s*\)\s*}}}"
+        r"\{\{\s*source\s*\(\s*['\"]silver['\"]\s*,\s*['\"](.+?)['\"]\s*\)\s*\}\}"
     )
 
     def replace_source(match):
