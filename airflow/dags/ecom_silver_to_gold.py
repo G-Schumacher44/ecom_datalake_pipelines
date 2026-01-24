@@ -5,6 +5,18 @@ import os
 import subprocess
 
 import pendulum
+
+from airflow import DAG  # type: ignore
+from airflow.operators.bash import BashOperator
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import (
+    BranchPythonOperator,
+    PythonOperator,
+    ShortCircuitOperator,
+)
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+from airflow.utils.task_group import TaskGroup
 from common import (
     AIRFLOW_HOME,
     COMMON_ENV,
@@ -19,18 +31,6 @@ from common import (
     resolve_bool,
     resolve_dims_base_path,
 )
-
-from airflow import DAG  # type: ignore
-from airflow.operators.bash import BashOperator
-from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import (
-    BranchPythonOperator,
-    PythonOperator,
-    ShortCircuitOperator,
-)
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
-from airflow.utils.task_group import TaskGroup
 from src.runners.enriched import (
     run_cart_attribution,
     run_cart_attribution_summary,

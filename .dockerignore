@@ -58,7 +58,6 @@ htmlcov/
 # Environment files (use env vars instead)
 .env
 .env.*
-.gcloud/
 
 # Documentation (not needed in runtime image)
 docs/

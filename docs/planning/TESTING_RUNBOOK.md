@@ -1,6 +1,13 @@
 # Testing Runbook (Bronze -> Silver)
 
-## Purpose
+> **📌 HISTORICAL DOCUMENT - Original Testing Runbook (Pre-Implementation)**
+>
+> This document represents the initial testing strategy for the Bronze → Silver pipeline.
+> For **current testing practices and comprehensive guide**, see:
+> - **[TESTING_GUIDE.md](../resources/TESTING_GUIDE.md)** - Complete testing guide with unit tests, E2E validation, and CI/CD
+>
+> **Status**: ✅ Implemented and enhanced - Now includes 51% test coverage, E2E CI pipeline, and three-layer validation framework
+
 Provide a repeatable testing sequence for the bronze -> silver pipeline.
 
 ## Preconditions

@@ -1,7 +1,14 @@
 # Enriched Silver Strategy: Polars-Powered Business Metrics
 
-**Last Updated:** 2026-01-11
-**Status:** Phase 1-3 Implemented
+> **📌 HISTORICAL DOCUMENT - Original Enriched Silver Strategy (2026-01-11)**
+>
+> This document represents the initial strategy for Polars-powered business metrics in the Enriched Silver layer.
+> For **current implementation**, see:
+> - [TRANSFORMATION_SUMMARY.md](../resources/TRANSFORMATION_SUMMARY.md) - Current transform catalog
+> - `src/transforms/` - Production Polars transform modules
+> - `src/runners/enriched/` - Production enriched runners
+>
+> **Status**: ✅ Phase 1-3 Implemented - 10 enriched transforms in production
 
 ## Purpose
 

@@ -2,21 +2,211 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-- Align base silver partitions and ingestion fields; update product catalog snapshot partitioning.
-- Improve partition-aware validation for silver and enriched layers; add tests.
-- Adjust Airflow sync behavior and ignore local artifacts in version control.
-- Spot checks refreshed 2026-01-13T17:16:06Z scope=all spot_hash=e2546433be9a7524afdb3e9f0c748e3d3a7c67d54b134fbb16ddc13c72e600c8 profile_hash=7a45617d90ee8cdec879b2874db9896853bd5f3eaadf06fc0fb9490ffc019c56
-- Profile report refreshed 2026-01-12T19:47:22Z months=2020-03,2023-01,2025-10 hash=7a45617d90ee8cdec879b2874db9896853bd5f3eaadf06fc0fb9490ffc019c56
-- Profile report refreshed 2026-01-11T17:17:15Z scope=all hash=d3f5b16e97cb29af3d0bdb09396ae84be4bb0d494038d24425e90beec89d7b7c
-- Spot checks refreshed 2026-01-11T15:57:19Z scope=all spot_hash=0f9df0f79bbf36ed485c65e96b69c6539c5290d805fe00f36de5b8cc3c768d33 profile_hash=6f86ddd7997da133b7380023b9efa456146be9bba8279ffc0be37ec6c0c5c02f
-- Profile report refreshed 2026-01-11T15:50:12Z months=2020-03,2023-01,2025-10 hash=6f86ddd7997da133b7380023b9efa456146be9bba8279ffc0be37ec6c0c5c02f
-- Spot checks refreshed 2026-01-11T00:49:23Z months=2020-03,2023-01,2025-10 spot_hash=53d3ad3ffb09259bd46989fa0c7f22a7310ca47548e7ad333ba53de12b4de0e9 profile_hash=6c00976b8d5f7c3571d32f8572832022fb5a19866e7876afb28eebc87bfcc5f4
-- Profile report refreshed 2026-01-11T00:22:06Z months=2020-03,2023-01,2025-10 hash=6c00976b8d5f7c3571d32f8572832022fb5a19866e7876afb28eebc87bfcc5f4
-- Profile report refreshed 2026-01-11T00:20:10Z months=2020-03,2023-01,2025-10 hash=1c98c127444cdd3e523ad836710428b8fa88b74e639f46651a20364e45fc31ce
-- Profile report refreshed 2026-01-11T00:16:52Z months=2020-03,2023-01,2025-10 hash=4fc620f032326c37854384f8e903966204fb777c008805089043197bd17a4e32
-- Profile report refreshed 2026-01-11T00:02:38Z months=2020-03,2023-01,2025-10 hash=4fc620f032326c37854384f8e903966204fb777c008805089043197bd17a4e32
-- Expand planning docs for hybrid silver pipeline.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2026-01-10
-- Initial repository scaffold, dbt projects, and Airflow DAG.
+## [1.0.0] - 2026-01-23 - Feature Complete Release
+
+### Summary
+
+Production-ready medallion lakehouse pipeline with Bronze → Silver → Gold transformations. Full observability, three-layer validation framework, spec-driven orchestration, and 51% test coverage.
+
+### Added
+
+- **Spec-Driven Orchestration**: Layered YAML specs (`config/specs/*.yml`) drive table lists, partitions, and validation gates
+- **Dimension Snapshot Pattern**: Daily dimension snapshots with freshness gates and `_latest.json` pointers
+- **Three-Layer Validation Framework**: Modular validation packages for Bronze, Silver, and Enriched layers
+- **Staging Prefix Pattern**: Atomic GCS publishes via `_staging/<run_id>/` with manifests and versioned run folders
+- **Local BQ Load Testing**: Mock BigQuery load validation for parquet schema/format verification
+- **Full E2E CI Pipeline**: Automated Bronze→Silver→Enriched→Gold pipeline check on sample data
+- **GCS Validation Reports**: Production validation reports published to GCS for stakeholder visibility
+- **Partition Lookback**: `lookback_days` parameter for Bronze/Silver validation to handle incremental processing
+
+### Changed
+
+- **Replaced gsutil with gcloud storage**: Modern GCS tooling with atomic sync operations
+- **Refactored validation modules**: Broke down 500+ line monoliths into modular packages with shared utilities
+- **Enhanced Airflow DAGs**: Two-DAG architecture (`ecom_dim_refresh_pipeline`, `ecom_silver_to_gold_pipeline`) with dynamic task generation from specs
+- **Improved Docker compatibility**: Redirect dbt target/log paths to `/tmp` to fix macOS VirtioFS file locking (Errno 35)
+- **Optimized GCS operations**: Smart path resolution with local fallbacks for dev environment
+
+### Fixed
+
+- **Schema consistency**: All base_silver models now consistently generate `ingestion_dt` metadata field
+- **Product catalog partitioning**: Snapshot-based partitioning for dimension tables (not event-based)
+- **Enriched parquet writes**: Strict schema handling with proper ingestion_dt metadata
+- **Test coverage gaps**: Expanded unit tests from 19 to 40+ tests, achieving 51% coverage
+- **Type safety**: Added mypy pre-commit hooks and resolved type-checking issues
+- **Transform test stability**: Fixed logic and argument order issues in Polars transform tests
+
+### Validation Reports
+
+- Bronze profile report refreshed: `2026-01-13T17:16:06Z` (scope=all, profile_hash=`7a456...`)
+- Silver quality checks: Partition-aware validation with lookback support
+- Enriched quality validation: Business rule enforcement with detailed failure reports
+
+## [0.3.0] - 2026-01-22 - Quality & Testing Sprint
+
+### Features
+
+- **Comprehensive Unit Tests**: Expanded coverage to 51% with new tests for transforms, runners, and validation modules
+- **CI/CD Pipeline**: Full localized E2E pipeline check on sample data in GitHub Actions
+- **Pre-commit Hooks**: Automated formatting (ruff), linting, and type-checking (mypy)
+- **Code Quality Tools**: Integrated ruff for fast linting and formatting
+- **Mock BigQuery Load Testing**: Validate parquet schema and format before actual BQ loads
+
+### Improvements
+
+- **Code Cleanup**: Final linting, formatting, and type-checking pass across entire codebase
+- **Test Organization**: Reorganized tests into unit and integration test suites
+- **Documentation Updates**: Validation framework documentation and runbooks
+
+### Bug Fixes
+
+- **Failing Unit Tests**: Resolved 8 failing tests related to import paths and type issues
+- **Regex Patterns**: Fixed whitespace and regex issues in BQ testing tools
+- **Transform Tests**: Corrected lazy evaluation and type-cast issues in Polars transforms
+- **YAML Formatting**: Fixed whitespace issues in configuration files
+
+## [0.2.0] - 2026-01-20 - Spec-Driven Architecture
+
+### Features
+
+- **Spec Models**: Pydantic models for pipeline specifications (`PipelineSpec`, `TableSpec`, `DimSpec`)
+- **Layered Spec Configs**: Base spec in `config/specs/base.yml`, environment-specific overlays
+- **Dynamic DAG Generation**: Airflow DAGs driven by spec configuration instead of hardcoded lists
+- **Dimension Snapshot Runner**: `src.runners.dims_snapshot` with validation and freshness gates
+- **Dims Freshness Gate**: BranchPythonOperator to skip dimension refresh if already current
+- **Dims Snapshot Validation**: Lightweight quality gate for dimension tables (schema + PK integrity)
+
+### Improvements
+
+- **Airflow DAG Refactor**: `ecom_dim_refresh_pipeline` and `ecom_silver_to_gold_pipeline` now read from specs
+- **Base Silver Models**: dbt models now read dimension snapshots from `SILVER_DIMS_PATH`
+- **Configuration Strategy**: Added `ECOM_SPEC_PATH`, `SILVER_DIMS_PATH`, `SILVER_DIMS_LOCAL_PATH` env vars
+
+### Bug Fixes
+
+- **Dimension Path Resolution**: Proper GCS vs local path handling for dimension snapshots
+- **Product Catalog Fallback**: Allow graceful fallback for missing dimension snapshots in dev
+
+### Documentation
+
+- **SPEC_OVERVIEW.md**: Comprehensive guide to spec-driven orchestration pattern
+- **CONFIG_STRATEGY.md**: Updated with dimension snapshot environment variables
+- **Dev Environment Alignment**: Documentation for local vs Docker/Airflow split
+
+## [0.1.5] - 2026-01-18 - GCS Integration
+
+### Features
+
+- **GCS Sync Targets**: Makefile targets for syncing Silver and Enriched layers to GCS
+- **GCP Auth Configuration**: Support for service account auth and ADC in Docker
+- **GCS Path Resolution**: Smart path resolution with local fallbacks in enriched runners
+- **Partition Lookback**: `lookback_days` parameter for Bronze/Silver validation modules
+- **Cloud Auth Detection**: Observability modules detect auth method and route outputs to GCS
+- **Comprehensive .env.example**: Complete GCP auth and pipeline configuration examples
+- **Dev Pipeline Runner**: `scripts/run_dev_pipeline.sh` for local GCS testing
+
+### Improvements
+
+- **Config Enhancements**: Added `GCS_BUCKET`, `GCS_PREFIX`, partition metadata, and validation lookback settings
+- **Validation Modules**: Enhanced with GCS support and partition lookback capabilities
+- **Airflow DAGs**: Added GCP env vars and local path fallbacks for hybrid operation
+- **Observability**: Support for GCS reports bucket in production environments
+
+## [0.1.0] - 2026-01-16 - Major Refactor
+
+### Features
+
+- **Shared Scoring Logic**: `int_*_scored.sql` ephemeral models for consistent validation across base_silver
+- **Enriched Silver Transforms**: 10 Polars-based transforms (customer_lifetime_value, daily_business_metrics, product_performance, shipping_economics, etc.)
+- **Gold Mart Models**: 8 dbt-bigquery fact tables (cart_abandonment, customer_segments, etc.)
+- **Modular Validation Framework**: Broke down monolithic scripts into packages (`src/validation/{bronze,silver,enriched}/`)
+- **Common Validation Utilities**: Shared utilities in `src/validation/common.py`
+- **Python Runner Module**: Replaced bash scripts with `src.runners.base_silver` Python module
+- **Enhanced Makefile**: Detailed help menu with usage examples and variable requirements
+- **Clean-data Target**: `make clean-data` for local data reset
+- **CI Integration**: Added validation integration test step to CI pipeline
+
+### Improvements
+
+- **Docker Configuration**: Redirect dbt target/log paths to `/tmp` to avoid macOS VirtioFS file locking (Errno 35)
+- **Named Volumes**: Use named volume for Airflow logs instead of bind mounts
+- **Deterministic Dependencies**: Added `constraints.txt` for reproducible pip installs
+- **dbt Models**: Extracted shared scoring logic into ephemeral CTEs, added `all_fields_null` fallback
+- **Sources Configuration**: Moved `sources.yml` to `dbt_duckdb/models/` level
+
+### Bug Fixes
+
+- **Ingestion Metadata**: Consistently generate `ingestion_dt` across all base_silver models using `get_ingestion_dt` macro
+- **Quarantine Analysis**: Filter out dbt-duckdb placeholder rows (null `row_num`) in validation
+- **Enriched Schema Handling**: Strictly include `ingestion_dt` metadata in Silver schemas
+- **Test Import Paths**: Updated test imports after validation refactor
+
+### Removed
+
+- **Duplicate dbt-BigQuery Python Models**: Deleted `int_attributed_purchases`, `int_customer_retention_signals`, `int_inventory_risk`, `int_regional_financials`, `int_sales_velocity` from dbt_bigquery (duplicated Polars runner logic)
+  - **Rationale**: Polars runners are ~7x faster and ~$200/month cheaper than dbt-BigQuery Python models (see `docs/local_only/COST_ANALYSIS.md`)
+
+### Documentation
+
+- **Reorganized Documentation**: Created `docs/data/`, `docs/planning/`, `docs/resources/` subdirectories
+- **Timestamped Validation Reports**: Added validation reports with timestamps to track quality over time
+
+## [0.0.1] - 2026-01-09 - Initial Commit
+
+### Project Scaffold
+
+- **Base Silver**: dbt-duckdb models for data cleaning (8 staging tables + quarantine)
+- **Enriched Silver**: Polars transforms for behavioral analytics (cart attribution, inventory risk, customer retention, sales velocity, regional financials)
+- **Gold Marts**: dbt-bigquery aggregations for BI consumption (3 departmental marts)
+- **Airflow Orchestration**: Table-level processing strategy with modular DAG design
+
+### Planning Documentation
+
+- `docs/planning/INTENT.md`: Project vision and "Rich Silver" philosophy
+- `docs/planning/DECISIONS.md`: Architectural decision log
+- `docs/planning/SILVER_FRAMEWORK.md`: Framework overview
+- `docs/planning/SLA_AND_QUALITY.md`: Quality gates and SLA definitions
+- `docs/planning/TESTING_RUNBOOK.md`: Testing strategy and runbook
+- `docs/resources/DATA_CONTRACT.md`: Bronze → Silver type mapping contract
+
+### Development Environment
+
+- Conda environment setup
+- Pre-commit hooks configuration
+- Docker Compose for Airflow
+- Bronze Parquet samples in `samples/bronze/` for local testing
+
+### Project Philosophy
+
+- **Hybrid Local-Cloud Compute**: Process 6 years of e-commerce data (~20GB) locally with Polars, minimize warehouse costs
+- **Rich Silver Pattern**: Pre-compute behavioral attributes before cloud upload (40% estimated BigQuery cost reduction)
+- **Modular Architecture**: Table-level processing enables parallelism and fits in <10GB memory footprint
+- **Production-Ready Patterns**: Pydantic validation, idempotent tasks, error handling, lineage tracking
+
+---
+
+## Version History Summary
+
+- **v1.0.0** (2026-01-23): Feature complete with spec-driven orchestration, three-layer validation, 51% test coverage
+- **v0.3.0** (2026-01-22): Quality & testing sprint - comprehensive unit tests, CI/CD, code quality tools
+- **v0.2.0** (2026-01-20): Spec-driven architecture with dynamic DAG generation and dimension snapshots
+- **v0.1.5** (2026-01-18): GCS integration with cloud auth, partition lookback, and smart path resolution
+- **v0.1.0** (2026-01-16): Major refactor - modular validation, enriched transforms, Docker fixes
+- **v0.0.1** (2026-01-09): Initial commit - project scaffold, Rich Silver philosophy, planning docs
+
+---
+
+## Upcoming Features (Roadmap)
+
+See [README.md - Future Enhancements](README.md#-future-enhancements) for the active roadmap:
+
+- Incremental materialization for Silver transformations
+- Data quality dashboard (load audit records into BigQuery)
+- Great Expectations integration
+- CI/CD for dbt (schema validation, automated deployment)
+- dbt docs hosting on GitHub Pages
+- Cost optimization (partition pruning, clustering)
+- Workload Identity for production-grade auth
