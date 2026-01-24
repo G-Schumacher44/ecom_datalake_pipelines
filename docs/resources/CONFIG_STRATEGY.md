@@ -364,11 +364,3 @@ env | grep METRICS_BUCKET
 - Maximum flexibility with clear, predictable behavior
 
 ---
-
-## Files Modified
-
-- ✅ `config/config.yml` - Added observability fields
-- ✅ `src/settings.py` - Added environment, metrics_bucket, logs_bucket fields
-- ✅ `src/observability/config.py` - Updated to read from config.yml with env overrides
-- ✅ `.env.example` - Commented out observability vars (now optional)
-- ✅ `docs/CONFIG_STRATEGY.md` - This file

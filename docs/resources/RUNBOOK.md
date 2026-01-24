@@ -7,10 +7,12 @@ This runbook covers common failure scenarios and their resolution for the ecom-d
 ## Table of Contents
 
 1. [Bronze Ingestion Failures](#1-bronze-ingestion-failures)
-2. [Base Silver dbt Failures](#2-base-silver-dbt-failures)
-3. [Enriched Silver Validation Failures](#3-enriched-silver-validation-failures)
-4. [Airflow DAG Failures](#4-airflow-dag-failures)
-5. [GCS Connectivity Issues](#5-gcs-connectivity-issues)
+2. [Dimension Snapshot Failures](#2-dimension-snapshot-failures)
+3. [Base Silver dbt Failures](#3-base-silver-dbt-failures)
+4. [Enriched Silver Validation Failures](#4-enriched-silver-validation-failures)
+5. [Airflow DAG Failures](#5-airflow-dag-failures)
+6. [GCS Connectivity Issues](#6-gcs-connectivity-issues)
+7. [Docker & Environment Issues](#7-docker--environment-issues)
 
 ---
 
@@ -62,7 +64,68 @@ cat data/bronze/orders/ingest_dt=2025-01-15/_manifest.json
 
 ---
 
-## 2. Base Silver dbt Failures
+## 2. Dimension Snapshot Failures
+
+### Symptoms
+- dbt models fail with "No files found that match the pattern" errors
+- Foreign key validation failures in Base Silver
+- Missing dimension tables (product_catalog, customer_snapshot)
+- CI/CD pipeline fails on `make local-silver` step
+
+### Diagnosis
+
+```bash
+# Check if dimension snapshots exist
+ls -la data/silver/dims/product_catalog/
+ls -la data/silver/dims/customer_snapshot/
+
+# Verify SILVER_DIMS_PATH is set
+echo $SILVER_DIMS_PATH
+
+# Check dimension snapshot creation
+python -m src.runners.dims.product_catalog --silver-path data/silver/base \
+  --output-path data/silver/dims --env local
+```
+
+### Resolution
+
+**Missing dimension snapshots:**
+1. **Root cause**: Base Silver dbt models perform FK validation by reading dimension snapshots, but those snapshots must be created first.
+2. **Correct execution order**:
+   ```bash
+   # Step 1: Create dimension snapshots from Bronze
+   make local-dims
+
+   # Step 2: Run Base Silver (reads dims for FK validation)
+   make local-silver
+
+   # Step 3: Run Enriched Silver
+   make local-enriched
+   ```
+3. **In CI/CD**: Ensure `SILVER_DIMS_PATH` environment variable is set:
+   ```yaml
+   env:
+     SILVER_DIMS_PATH: ${{ github.workspace }}/data/silver/dims
+   ```
+
+**Stale dimension snapshots:**
+1. Dimension snapshots are daily snapshots created from Bronze data
+2. If Bronze data changes but dims aren't refreshed, FK validation will fail
+3. Re-run: `make local-dims` to refresh snapshots
+
+**Performance benefit:**
+- Dimension snapshots provide 60% performance improvement
+- Avoids re-reading Bronze data for every Base Silver run
+- Trade-off: Snapshots must be created before Base Silver
+
+### Prevention
+- Always run `make local-dims` before `make local-silver`
+- In Airflow DAGs, ensure dim snapshot tasks are upstream dependencies
+- Monitor dimension snapshot freshness (should match `ingest_dt`)
+
+---
+
+## 3. Base Silver dbt Failures
 
 ### Symptoms
 - dbt run exits with non-zero code
@@ -124,7 +187,7 @@ python -m src.validation.silver --silver-path data/silver/base --env local
 
 ---
 
-## 3. Enriched Silver Validation Failures
+## 4. Enriched Silver Validation Failures
 
 ### Symptoms
 - Validation status: FAIL or WARN

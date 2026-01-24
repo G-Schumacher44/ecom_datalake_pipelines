@@ -278,18 +278,50 @@ gsutil lifecycle set metrics-lifecycle.json gs://ecom-datalake-metrics
 # 3. Grant Airflow service account access
 gsutil iam ch serviceAccount:airflow@my-project.iam.gserviceaccount.com:roles/storage.objectAdmin \
   gs://ecom-datalake-metrics
+
+gsutil iam ch serviceAccount:airflow@my-project.iam.gserviceaccount.com:roles/storage.objectAdmin \
+  gs://ecom-datalake-logs
+
+gsutil iam ch serviceAccount:airflow@my-project.iam.gserviceaccount.com:roles/storage.objectAdmin \
+  gs://ecom-datalake-reports
 ```
+
+### GCP Authentication
+
+**Local Development** (uses Application Default Credentials):
+```bash
+# Authenticate with your personal account
+gcloud auth application-default login
+
+# docker.env (default)
+USE_SA_AUTH=false
+CLOUDSDK_CONFIG=/home/airflow/.config/gcloud
+```
+
+**Production** (uses Service Account):
+```bash
+# docker.env or Cloud Composer env vars
+USE_SA_AUTH=true
+GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/.gcp/sa.json
+```
+
+See [CREDENTIALS_SAFETY_AUDIT.md](CREDENTIALS_SAFETY_AUDIT.md) for full GCP authentication details.
 
 ### Environment Configuration
 
 ```bash
-# Add to Airflow environment variables
+# Add to Airflow environment variables (or docker.env)
 PIPELINE_ENV=prod
+OBSERVABILITY_ENV=prod
 METRICS_BUCKET=ecom-datalake-metrics
 LOGS_BUCKET=ecom-datalake-logs
-# Optional: force local metrics/logs for strict local runs
-OBSERVABILITY_ENV=local
+REPORTS_BUCKET=ecom-datalake-reports
+
+# Optional: Override to force local metrics/logs for testing
+# OBSERVABILITY_ENV=local  # Forces local paths even when PIPELINE_ENV=prod
 ```
+
+**Note**: See [CONFIG_STRATEGY.md](CONFIG_STRATEGY.md) for full configuration hierarchy and [ENVIRONMENT_VARIABLE_STRATEGY.md](ENVIRONMENT_VARIABLE_STRATEGY.md) for all observability env vars.
 
 ### BigQuery Setup (For Querying)
 
@@ -325,15 +357,21 @@ LIMIT 30;
    log_metric("storage_cost_usd", 5.67, layer="silver", table="orders")
    ```
 
-2. **Data Lineage**
+2. **Data Lineage** (with Docker image versioning)
    ```python
+   import os
+
    {
      "source_tables": ["bronze.orders", "bronze.customers"],
      "output_table": "silver.orders",
-     "transformation_git_sha": "abc123def",
+     "git_commit": os.getenv("GIT_COMMIT", "unknown"),
+     "git_branch": os.getenv("GIT_BRANCH", "unknown"),
+     "pipeline_version": os.getenv("PIPELINE_VERSION", "unknown"),
      "dbt_model_version": "0.1.0"
    }
    ```
+
+   **Note**: Docker images are versioned with Git metadata (see [DOCKER_VERSIONING.md](DOCKER_VERSIONING.md)). The `GIT_COMMIT`, `GIT_BRANCH`, and `PIPELINE_VERSION` environment variables are baked into the image at build time and available at runtime for lineage tracking.
 
 3. **Business Metrics**
    ```python
@@ -477,7 +515,21 @@ print(f"SLA compliance: {sla_compliance:.1%}")
 - `src/observability/config.py` - Environment-aware config
 - `src/observability/metrics.py` - Metrics writers
 - `src/observability/structured_logging.py` - JSONL logging
+- `src/observability/audit.py` - Audit trail implementation
 - `src/observability/README.md` - Usage documentation
-- `docs/OBSERVABILITY_STRATEGY.md` - This file
+- `docs/resources/OBSERVABILITY_STRATEGY.md` - This file
 
-**Next:** Wire this framework into your validation scripts and DAG!
+---
+
+## Related Documentation
+
+- **[CONFIG_STRATEGY.md](CONFIG_STRATEGY.md)** - Configuration hierarchy (observability env vars with overrides)
+- **[ENVIRONMENT_VARIABLE_STRATEGY.md](ENVIRONMENT_VARIABLE_STRATEGY.md)** - All observability env vars documented
+- **[CREDENTIALS_SAFETY_AUDIT.md](CREDENTIALS_SAFETY_AUDIT.md)** - GCP authentication for metrics/logs buckets
+- **[DOCKER_VERSIONING.md](DOCKER_VERSIONING.md)** - Git metadata for lineage tracking
+- **[SLA_AND_QUALITY.md](SLA_AND_QUALITY.md)** - Quality thresholds and monitoring expectations
+- **[src/observability/README.md](../../src/observability/README.md)** - API usage guide
+
+---
+
+
