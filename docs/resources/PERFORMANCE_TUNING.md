@@ -641,6 +641,54 @@ When optimizing a pipeline stage:
 
 ---
 
+## Docker Performance
+
+### macOS VirtioFS Optimization
+
+On macOS with Docker Desktop, file locking can cause `Errno 35` (Resource temporarily unavailable) errors. The pipeline redirects writable paths to `/tmp` inside the container:
+
+```yaml
+# docker-compose.yml - Environment variables
+DBT_TARGET_PATH: "/tmp/dbt_target"       # dbt compiled artifacts
+DBT_LOG_PATH: "/tmp/dbt_logs"            # dbt log files
+DBT_DUCKDB_PATH: "/tmp/dbt_duckdb/ecom.duckdb"  # DuckDB database
+METRICS_BASE_PATH: "/tmp/metrics"        # Metrics output
+LOGS_BASE_PATH: "/tmp/logs"              # Log output
+DBT_PARTIAL_PARSE: "false"               # Disable partial parsing (cache conflicts)
+```
+
+### Volume Mount Performance
+
+**Use named volumes for data directories** (not host paths):
+
+```yaml
+# Good - Named volume (fast)
+volumes:
+  - airflow-data:/opt/airflow/data
+
+# Avoid - Host mount (slow on macOS)
+# - ./data:/opt/airflow/data
+```
+
+**Exception**: Mount source code for hot-reload during development:
+```yaml
+# Development only - for live code changes
+volumes:
+  - ./src:/opt/airflow/src
+  - ./config:/opt/airflow/config
+```
+
+### DuckDB Single-Writer Constraint
+
+DuckDB uses file-level locks. In Docker:
+- Base Silver runs as a single dbt task (not per-model)
+- Avoids concurrent write conflicts
+- In warehouse-backed prod (BigQuery), split into per-model tasks
+
+See [DEPLOYMENT_GUIDE.md - Limitations](DEPLOYMENT_GUIDE.md#limitations--constraints-portfolio-scope) for details.
+
+---
+
 ## Environment-Specific Tuning
 
 ### Local Development
@@ -681,6 +729,17 @@ retry_config:
     retries: 3
     retry_exponential_backoff: true
 ```
+
+---
+
+---
+
+## Related Documentation
+
+- **[SLA_AND_QUALITY.md](SLA_AND_QUALITY.md)** - Processing time SLAs and table-level performance targets
+- **[OBSERVABILITY_STRATEGY.md](OBSERVABILITY_STRATEGY.md)** - Metrics tracking for performance monitoring
+- **[CONFIG_STRATEGY.md](CONFIG_STRATEGY.md)** - Environment-specific configuration tuning
+- **[ENVIRONMENT_VARIABLE_STRATEGY.md](ENVIRONMENT_VARIABLE_STRATEGY.md)** - Performance-related env vars
 
 ---
 
