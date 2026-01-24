@@ -37,18 +37,10 @@ jobs:
         run: |
           python scripts/run_dims_from_spec.py --run-date 2024-01-01
           python -m src.validation.dims_snapshot --run-date 2024-01-01 --run-id "ci_${{ github.run_id }}"
-      - name: Base Silver Day 1 (Full Load)
+      - name: Base Silver (Multi-Day Processing)
         run: |
-          make local-silver DATE=2024-01-01
-      - name: Base Silver Day 2 (Incremental)
-        run: |
-          make local-silver DATE=2024-01-02
-      - name: Base Silver Day 3 (Incremental)
-        run: |
-          make local-silver DATE=2024-01-03
-      - name: Verify Multi-Day Partitions
-        run: |
-          echo "Checking partitions exist..."
+          make local-silver
+          echo "Verifying all 3 days of partitions were created..."
           ls -la data/silver/base/orders/ingest_dt=2024-01-0{1,2,3}
           echo "✓ All 3 days of partitions created successfully"
       - name: dbt Data Tests (Base Silver)
