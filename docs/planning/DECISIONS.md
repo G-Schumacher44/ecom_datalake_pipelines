@@ -47,3 +47,16 @@
 | 2026-01-18 | Add cloud auth detection and GCS reports bucket support | Observability metrics/logs written locally in dev, but should go to GCS in prod. Detect auth method and route outputs appropriately | Production-ready observability; metrics accessible in cloud; supports SLA dashboards | Data Engineering, SRE | Approved |
 | 2026-01-21 | Write validation reports to GCS in production | Local validation reports aren't accessible to stakeholders. Publish to GCS bucket for visibility | Stakeholder transparency; historical quality tracking; audit trail for compliance | Data Engineering, Data Quality | Approved |
 | 2026-01-22 | Add dimension snapshot validation without Bronze comparison | Dimensions are snapshots (not partitioned by Bronze ingest_dt). Validate schema and PK integrity without expensive historical scans | Lightweight quality gate; fast validation; prevents dimension drift | Data Engineering | Approved |
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

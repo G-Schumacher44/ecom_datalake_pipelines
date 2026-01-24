@@ -500,3 +500,16 @@ python src/validation/silver_quality.py --enforce-quality
 ### Configuration
 - `docs/planning/SLA_AND_QUALITY.md` - SLA thresholds and quality requirements
 - `docs/resources/DATA_CONTRACT.md` - Schema definitions
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

@@ -30,3 +30,16 @@ These records are written as JSON to GCS and optionally loaded into BigQuery.
 - Audit logs are emitted per table and partition.
 - The audit table is append-only.
 - SLA dashboards and alerting read from the BigQuery audit table.
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

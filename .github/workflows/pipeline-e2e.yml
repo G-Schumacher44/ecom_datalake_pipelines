@@ -14,7 +14,7 @@ jobs:
       SILVER_BASE_PATH: ${{ github.workspace }}/data/silver/base
       SILVER_DIMS_PATH: ${{ github.workspace }}/data/silver/dims
       SILVER_ENRICHED_PATH: ${{ github.workspace }}/data/silver/enriched
-      DATE: "2025-10-15"
+      DATE: "2025-10-01"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -53,4 +53,4 @@ jobs:
           python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt $DATE --run-id "ci_${{ github.run_id }}"
       - name: Gold Logic Pre-flight (DuckDB)
         run: |
-          python scripts/test_gold_logic_on_duckdb.py
+          python tests/integration/test_gold_logic_duckdb.py
