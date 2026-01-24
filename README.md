@@ -24,6 +24,9 @@
   <a href="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/dbt-validation.yml">
     <img alt="dbt Validation" src="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/dbt-validation.yml/badge.svg">
   </a>
+  <a href="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/docker-build.yml">
+    <img alt="Docker Build & Push" src="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/docker-build.yml/badge.svg">
+  </a>
 </p>
 
 ---
