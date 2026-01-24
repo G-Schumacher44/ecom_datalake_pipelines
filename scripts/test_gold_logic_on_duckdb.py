@@ -50,8 +50,9 @@ def transpile_bq_to_duckdb(sql: str, settings) -> str:
 
     sql = re.sub(source_pattern, replace_source, sql)
 
-    # 2. Add other BQ -> DuckDB transpilation rules here if needed
-    # (e.g. SAFE_CAST, specific date functions)
+    # 2. BQ -> DuckDB transpilation rules
+    # Replace safe_cast(x as type) -> try_cast(x as type)
+    sql = re.sub(r"safe_cast\s*\(", "try_cast(", sql, flags=re.IGNORECASE)
 
     return sql
 
@@ -64,6 +65,10 @@ def main():
     print(f"Models directory: {models_dir}")
 
     con = duckdb.connect(database=":memory:")
+
+    # Register BQ compatibility macros
+    con.execute("CREATE MACRO safe_divide(a, b) AS a / NULLIF(b, 0)")
+    con.execute("CREATE MACRO countif(x) AS sum(CASE WHEN x THEN 1 ELSE 0 END)")
 
     success_count = 0
     fail_count = 0
