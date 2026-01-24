@@ -2,6 +2,22 @@
 
 Complete guide for deploying the e-commerce data pipeline in containerized environments.
 
+---
+
+## 🎯 Quick Start (New Users)
+
+**Want to run the pipeline immediately?** Jump to the [One-Click Quickstart](#-one-click-quickstart) with sample data included.
+
+```bash
+# Complete setup in 3 commands:
+unzip samples/bronze_samples.zip -d samples/
+docker-compose build && docker-compose up airflow-init
+docker-compose up -d
+# ✅ Access Airflow at http://localhost:8080 (airflow/airflow)
+```
+
+---
+
 ## Limitations & Constraints (Portfolio Scope)
 
 - **DuckDB single-writer**: Base Silver runs as a single dbt task to avoid file locks. In a warehouse-backed prod setup, split into per-model tasks for retries and observability.
@@ -30,26 +46,108 @@ Complete guide for deploying the e-commerce data pipeline in containerized envir
 
 - Docker & Docker Compose installed
 - 8GB RAM minimum (16GB recommended)
-- Bronze sample data in `samples/bronze/`
+- Git (for cloning the repository)
 
-### Quick Start
+### 🚀 One-Click Quickstart
+
+**Complete local setup in 3 commands** (with sample data included):
 
 ```bash
-# 1. Build the custom Airflow image
-docker-compose build
+# 1. Extract bronze sample data (included in repo)
+unzip samples/bronze_samples.zip -d samples/
 
-# 2. Initialize Airflow database + admin user
-docker-compose up airflow-init
+# 2. Build and initialize Airflow
+docker-compose build && docker-compose up airflow-init
 
-# 3. Start Airflow services
+# 3. Start the pipeline
 docker-compose up -d
 
-# 4. Access Airflow UI
+# ✅ Done! Access Airflow at http://localhost:8080
+# Username: airflow | Password: airflow
+```
+
+**What this does**:
+- ✅ Extracts 3 months of sample Bronze Parquet data (Oct 2025)
+- ✅ Builds custom Airflow image with dbt + Polars + all dependencies
+- ✅ Initializes Airflow database and creates admin user
+- ✅ Starts Airflow scheduler, webserver, and PostgreSQL services
+- ✅ Mounts sample data at `samples/bronze/` for immediate pipeline execution
+
+**Next steps**:
+1. Open Airflow UI: http://localhost:8080
+2. Navigate to **DAGs** → `ecom_silver_to_gold_pipeline`
+3. Click **Trigger DAG** (play button)
+4. Watch the pipeline execute Bronze → Silver → Enriched transformations
+
+**Validate outputs**:
+```bash
+# Check Silver outputs
+ls -lh data/silver/base/orders/
+ls -lh data/silver/enriched/int_cart_attribution/
+
+# View validation reports
+cat docs/validation_reports/BRONZE_QUALITY.md
+cat docs/validation_reports/SILVER_QUALITY.md
+cat docs/validation_reports/ENRICHED_QUALITY.md
+```
+
+**What's included in `bronze_samples.zip`**:
+
+The sample archive contains representative Bronze Parquet data for testing and development:
+
+- **8 tables**: orders, customers, products, carts, cart_items, order_items, returns, return_items
+- **Date range**: October 2025 (1 month of sample data)
+- **Format**: Hive-partitioned Parquet with `_MANIFEST.json` metadata
+- **Size**: ~150MB compressed, ~400MB extracted
+- **Rows**: ~100K orders, ~50K customers, ~300K order items
+- **Use case**: Full end-to-end pipeline testing without external dependencies
+
+**Sample data structure**:
+```
+samples/bronze/
+  orders/
+    ingest_dt=2025-10-15/
+      part-00000.parquet
+      _MANIFEST.json
+    ingest_dt=2025-10-16/
+      part-00000.parquet
+      _MANIFEST.json
+  customers/
+    signup_date=2025-10-15/
+      part-00000.parquet
+      _MANIFEST.json
+  product_catalog/
+    category=Electronics/
+      part-00000.parquet
+      _MANIFEST.json
+  # ... 5 more tables
+```
+
+---
+
+### Alternative: Step-by-Step Setup
+
+If you prefer manual control over each step:
+
+```bash
+# 1. Extract sample data
+unzip samples/bronze_samples.zip -d samples/
+
+# 2. Build the custom Airflow image
+docker-compose build
+
+# 3. Initialize Airflow database + admin user
+docker-compose up airflow-init
+
+# 4. Start Airflow services
+docker-compose up -d
+
+# 5. Access Airflow UI
 open http://localhost:8080
 # Username: airflow
 # Password: airflow
 
-# 5. Trigger the DAG
+# 6. Trigger the DAG
 # In Airflow UI: DAGs -> ecom_silver_to_gold_pipeline -> Trigger DAG
 ```
 
