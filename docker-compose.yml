@@ -21,7 +21,7 @@ x-airflow-common: &airflow-common
     PIPELINE_ENV: "${PIPELINE_ENV:-dev}"
     OBSERVABILITY_ENV: "${OBSERVABILITY_ENV:-dev}"
     CLOUDSDK_CONFIG: "/home/airflow/.config/gcloud"
-    GOOGLE_APPLICATION_CREDENTIALS: "/home/airflow/.config/gcloud/application_default_credentials.json"
+    GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-/home/airflow/.config/gcloud/application_default_credentials.json}"
     USE_SA_AUTH: "${USE_SA_AUTH:-false}"
 
     # Redirect writable paths to /tmp inside container to avoid macOS Docker volume locking (Errno 35)
@@ -62,7 +62,7 @@ x-airflow-common: &airflow-common
     - airflow-data:/opt/airflow/data
     - ./docs:/opt/airflow/docs
     # ADC (default): mount gcloud application-default credentials
-    # - ${CLOUDSDK_CONFIG_PATH:-~/.config/gcloud}:/home/airflow/.config/gcloud:rw
+    - ${CLOUDSDK_CONFIG_PATH:-~/.config/gcloud}:/home/airflow/.config/gcloud:rw
     # Optional service account key (set USE_SA_AUTH=true + GOOGLE_APPLICATION_CREDENTIALS)
     # - ${GCP_SA_KEY_PATH}:/opt/airflow/.gcp/sa.json:ro
 

@@ -129,7 +129,9 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                 max_dt = None
                 if "ingestion_dt" in base_df.columns:
                     # Collect min/max to find latest available
-                    max_dt_series = base_df.select(pl.col("ingestion_dt").max()).to_series()
+                    max_dt_series = base_df.select(
+                        pl.col("ingestion_dt").max()
+                    ).to_series()
                     if len(max_dt_series) > 0 and max_dt_series[0] is not None:
                         max_dt = max_dt_series[0]
 
@@ -145,7 +147,8 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                     )
                 else:
                     logger.warning(
-                        f"No fallback possible for {table}: source is empty or has no ingestion_dt"
+                        f"No fallback possible for {table}: "
+                        "source is empty or has no ingestion_dt"
                     )
         else:
             df = df.with_columns(pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"))

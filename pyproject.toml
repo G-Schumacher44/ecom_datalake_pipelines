@@ -65,6 +65,9 @@ line_length = 88
 line-length = 88
 lint.select = ["E", "F", "I", "B"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["src", "airflow", "common"]
+
 [tool.ruff.lint.per-file-ignores]
 "airflow/dags/*.py" = ["E501"]  # Allow long lines in DAG files (Jinja templates)
 

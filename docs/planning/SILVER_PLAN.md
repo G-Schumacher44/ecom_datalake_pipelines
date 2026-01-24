@@ -1,5 +1,15 @@
 # Bronze to Silver Plan (Base + Enriched)
 
+> **📌 HISTORICAL DOCUMENT - Original Transformation Plan (Pre-Implementation)**
+>
+> This document represents the initial transformation strategy and planning for the Bronze → Silver pipeline.
+> For **current implementation details and architecture**, see:
+> - [ARCHITECTURE.md](../resources/ARCHITECTURE.md) - Current system architecture
+> - [SPEC_OVERVIEW.md](../resources/SPEC_OVERVIEW.md) - Spec-driven orchestration pattern
+> - [TRANSFORMATION_SUMMARY.md](../resources/TRANSFORMATION_SUMMARY.md) - Current transformation logic
+>
+> **Status**: ✅ Implemented - Core plan executed with enhancements (spec-driven orchestration, dimension snapshots, three-layer validation)
+
 ## Context
 We have a 6-year historical backlog (~17GB) in the bronze/raw GCS bucket. Data is partitioned by
 `ingest_dt=YYYY-MM-DD` and includes `_MANIFEST.json` per partition. The goal is to produce a clean,
