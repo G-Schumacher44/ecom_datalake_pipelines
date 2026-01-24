@@ -32,6 +32,10 @@ jobs:
           mkdir -p data/silver/base/quarantine data/silver/enriched data/silver/dims data/metrics docs/validation_reports
       - name: dbt Dependencies
         run: make dbt-deps
+      - name: Dimensions (dbt + Snapshot + Validation)
+        run: |
+          python scripts/run_dims_from_spec.py --run-date $DATE
+          python -m src.validation.dims_snapshot --run-date $DATE --run-id "ci_${{ github.run_id }}"
       - name: Base Silver (dbt + Validation)
         run: |
           # Runs dbt models and contract validation
@@ -40,10 +44,6 @@ jobs:
         run: |
           # Specifically run dbt tests to catch DQ issues
           make dbt-test
-      - name: Dimensions (dbt + Snapshot + Validation)
-        run: |
-          python scripts/run_dims_from_spec.py --run-date $DATE
-          python -m src.validation.dims_snapshot --run-date $DATE --run-id "ci_${{ github.run_id }}"
       - name: Enriched Silver (Polars)
         run: |
           make local-enriched DATE=$DATE
