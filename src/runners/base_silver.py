@@ -251,8 +251,10 @@ def run_dbt(
         if result.returncode != 0:
             logger.error(
                 f"dbt run failed with exit code {result.returncode}",
-                stdout=result.stdout[-500:] if result.stdout else "",
-                stderr=result.stderr[-500:] if result.stderr else "",
+                extra={
+                    "stdout": result.stdout[-500:] if result.stdout else "",
+                    "stderr": result.stderr[-500:] if result.stderr else "",
+                },
             )
             # Print full output for local debugging
             if result.stderr:
