@@ -41,7 +41,7 @@ jobs:
         run: |
           make local-silver
           echo "Verifying all 3 days of partitions were created..."
-          ls -la data/silver/base/orders/ingest_dt=2024-01-0{1,2,3}
+          ls -la data/silver/base/orders/ingestion_dt=2024-01-0{1,2,3}
           echo "✓ All 3 days of partitions created successfully"
       - name: dbt Data Tests (Base Silver)
         run: |
