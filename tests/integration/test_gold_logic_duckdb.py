@@ -52,7 +52,7 @@ def transpile_bq_to_duckdb(sql: str, settings) -> str:
 
     # 2. BQ -> DuckDB transpilation rules
     # Replace safe_cast(x as type) -> try_cast(x as type)
-    sql = re.sub(r"safe_cast\s*(", "try_cast(", sql, flags=re.IGNORECASE)
+    sql = re.sub(r"safe_cast\s*\(", "try_cast(", sql, flags=re.IGNORECASE)
 
     return sql
 
