@@ -14,7 +14,7 @@ jobs:
       SILVER_BASE_PATH: ${{ github.workspace }}/data/silver/base
       SILVER_DIMS_PATH: ${{ github.workspace }}/data/silver/dims
       SILVER_ENRICHED_PATH: ${{ github.workspace }}/data/silver/enriched
-      DATE: "2025-10-01"
+      DATE: "2024-01-01"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,24 +33,33 @@ jobs:
           mkdir -p data/silver/base/quarantine data/silver/enriched data/silver/dims data/metrics docs/validation_reports
       - name: dbt Dependencies
         run: make dbt-deps
-      - name: Dimensions (dbt + Snapshot + Validation)
+      - name: Dimensions (Day 1)
         run: |
-          python scripts/run_dims_from_spec.py --run-date $DATE
-          python -m src.validation.dims_snapshot --run-date $DATE --run-id "ci_${{ github.run_id }}"
-      - name: Base Silver (dbt + Validation)
+          python scripts/run_dims_from_spec.py --run-date 2024-01-01
+          python -m src.validation.dims_snapshot --run-date 2024-01-01 --run-id "ci_${{ github.run_id }}"
+      - name: Base Silver Day 1 (Full Load)
         run: |
-          # Runs dbt models and contract validation
-          make local-silver
+          make local-silver DATE=2024-01-01
+      - name: Base Silver Day 2 (Incremental)
+        run: |
+          make local-silver DATE=2024-01-02
+      - name: Base Silver Day 3 (Incremental)
+        run: |
+          make local-silver DATE=2024-01-03
+      - name: Verify Multi-Day Partitions
+        run: |
+          echo "Checking partitions exist..."
+          ls -la data/silver/base/orders/ingest_dt=2024-01-0{1,2,3}
+          echo "✓ All 3 days of partitions created successfully"
       - name: dbt Data Tests (Base Silver)
         run: |
-          # Specifically run dbt tests to catch DQ issues
           make dbt-test
-      - name: Enriched Silver (Polars)
+      - name: Enriched Silver (Day 3)
         run: |
-          make local-enriched DATE=$DATE
+          make local-enriched DATE=2024-01-03
       - name: Enriched Quality Gate
         run: |
-          python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt $DATE --run-id "ci_${{ github.run_id }}"
+          python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt 2024-01-03 --run-id "ci_${{ github.run_id }}"
       - name: Gold Logic Pre-flight (DuckDB)
         run: |
           python tests/integration/test_gold_logic_duckdb.py

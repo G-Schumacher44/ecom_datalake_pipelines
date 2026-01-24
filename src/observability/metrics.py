@@ -8,6 +8,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from .config import ObservabilityConfig
 
 
@@ -20,6 +22,24 @@ class MetricType(Enum):
     ENRICHED_SILVER = "enriched_silver"
     BRONZE_METADATA = "bronze_metadata"
     PYDANTIC_VALIDATION = "pydantic_validation"
+
+
+def _read_dbt_version() -> str:
+    """Read dbt project version from dbt_project.yml.
+
+    Returns:
+        Version string from dbt_project.yml, or "unknown" if not found.
+    """
+    dbt_project_path = Path(__file__).parents[2] / "dbt_bigquery" / "dbt_project.yml"
+    if not dbt_project_path.exists():
+        return "unknown"
+
+    try:
+        with open(dbt_project_path) as f:
+            config = yaml.safe_load(f)
+        return config.get("version", "unknown")
+    except Exception:
+        return "unknown"
 
 
 class MetricsWriter:
@@ -252,7 +272,7 @@ def write_silver_quality_metric(
         "transformation_metadata": {
             "run_id": run_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "dbt_project_version": "0.1.0",  # TODO: Read from dbt_project.yml
+            "dbt_project_version": _read_dbt_version(),
             **extra_fields,
         },
         "table_metrics": table_metrics,
