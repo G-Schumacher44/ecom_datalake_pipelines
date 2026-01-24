@@ -1,6 +1,5 @@
 import os
 import re
-from pathlib import Path
 from datetime import datetime
 
 # Regex to match the slogan (Anchor)
@@ -91,7 +90,8 @@ def update_file(file_path):
 
         # Check for Timestamp
         # We look for the regex match ending at cursor
-        # Since regex searches from start, we'll try to find all matches and check the last one
+        # Since regex searches from start, we'll try to find all matches
+        # and check the last one
 
         # Optimization: verify if the end of content[:cursor] matches the pattern
         # This is tricky with regex.
