@@ -97,3 +97,16 @@ bq load \
 - BQ dataset name and location.
 - External vs native table choice (initially external is fine).
 - Access control model for analytics users.
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

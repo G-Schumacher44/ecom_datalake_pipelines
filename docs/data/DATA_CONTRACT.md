@@ -267,3 +267,16 @@ Enriched Silver tables must include stable business keys and event timestamps.
 Last updated (UTC): 2026-01-14T05:19:11Z
 Content hash (SHA-256): fa5414e85b5732304a69cb74ad5013daa20c76e0d2101d3b67c812fdeac5f9ea
 <!-- END GENERATED META -->
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

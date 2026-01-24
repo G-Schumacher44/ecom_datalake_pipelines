@@ -11,7 +11,7 @@ from pathlib import Path
 import duckdb
 
 # Ensure src is in path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -40,7 +40,7 @@ def transpile_bq_to_duckdb(sql: str, settings) -> str:
     """Convert BQ dbt SQL to DuckDB compatible SQL for local logic testing."""
     # 1. Replace {{ source('silver', 'table') }} with read_parquet(...)
     source_pattern = (
-        r"{\{\s*source\s*\(\s*['\"]silver['\"]\s*,\s*['\"](.+?)['\"]\s*\)\s*\}\}"
+        r"\{\{\s*source\s*\(\s*['\"]silver['\"]\s*,\s*['\"](.+?)['\"]\s*\)\s*\}\}"
     )
 
     def replace_source(match):
@@ -50,8 +50,9 @@ def transpile_bq_to_duckdb(sql: str, settings) -> str:
 
     sql = re.sub(source_pattern, replace_source, sql)
 
-    # 2. Add other BQ -> DuckDB transpilation rules here if needed
-    # (e.g. SAFE_CAST, specific date functions)
+    # 2. BQ -> DuckDB transpilation rules
+    # Replace safe_cast(x as type) -> try_cast(x as type)
+    sql = re.sub(r"safe_cast\s*\(", "try_cast(", sql, flags=re.IGNORECASE)
 
     return sql
 
@@ -64,6 +65,17 @@ def main():
     print(f"Models directory: {models_dir}")
 
     con = duckdb.connect(database=":memory:")
+
+    # Workaround for DuckDB 1.1.x 'INTERNAL Error: Unsupported type for
+    # NumericValueUnionToValue'
+    # This error occurs during statistics propagation for certain Decimal types
+    # in aggregations.
+    con.execute("SET disabled_optimizers = 'statistics_propagation'")
+
+    # Register BQ compatibility macros
+    con.execute("CREATE MACRO safe_divide(a, b) AS a / NULLIF(b, 0)")
+    con.execute("CREATE MACRO countif(x) AS sum(CASE WHEN x THEN 1 ELSE 0 END)")
+    con.execute("CREATE MACRO current_date() AS today()")
 
     success_count = 0
     fail_count = 0

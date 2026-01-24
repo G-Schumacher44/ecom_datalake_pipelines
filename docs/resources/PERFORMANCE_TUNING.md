@@ -562,6 +562,98 @@ Check validation report metrics:
 - Throughput: 53,594 rows/sec
 ```
 
+
+---
+
+## GCS & I/O Optimization
+
+### Manifest-Based File Discovery
+
+**Avoid recursive globbing on GCS (`**/*.parquet`):**
+GCS is an object store, not a filesystem. Recursive listing is an `O(N)` operation where N is the number of files, leading to severe latency as the lake grows.
+
+**Optimization Strategy:**
+- **Produce Manifests:** The `base_silver` runner now auto-generates a `_MANIFEST.json` containing the list of files and row counts for every partition.
+- **Read Manifests:** Validation scripts (`src.validation.common`) prioritize reading the manifest over listing objects. This turns a multi-minute "directory scan" into a sub-second JSON read.
+
+### Batched Uploads vs. Sequential Copies
+
+**Avoid loops calling `gcloud storage cp`:**
+Executing a subprocess for every file or partition introduces massive Python and OS overhead.
+
+**Good - Batched Sync:**
+```python
+# Generate manifests locally first, then sync once
+subprocess.run(["gcloud", "storage", "rsync", "-r", local_path, remote_path])
+```
+
+**Impact:**
+Refactoring the Dimension Refresh pipeline to use manifests and `rsync` reduced stage duration from **30+ minutes to ~2 minutes**.
+
+---
+
+## Monitoring & Profiling
+
+### Polars Query Plans
+
+Inspect LazyFrame query plans:
+
+```python
+lf = pl.scan_parquet("data.parquet").filter(...).select(...)
+print(lf.explain())  # See optimized query plan
+```
+
+### DuckDB EXPLAIN
+
+Profile query execution:
+
+```sql
+EXPLAIN ANALYZE
+SELECT customer_id, COUNT(*)
+FROM orders
+WHERE order_dt >= '2020-01-01'
+GROUP BY customer_id;
+```
+
+### BigQuery Query Plan
+
+Use BigQuery Console or API:
+
+```python
+job = client.query(query)
+for stage in job.query_plan:
+    print(f"Stage {stage.name}: {stage.shuffle_output_bytes} bytes")
+```
+
+### Pipeline Metrics
+
+Monitor execution times via observability layer:
+
+```python
+from src.observability.metrics import track_table_metrics
+
+track_table_metrics(
+    table_name="int_attributed_purchases",
+    row_count=df.height,
+    run_id="manual_2020-01-01",
+    metrics={
+        "execution_time_seconds": 45.2,
+        "bytes_written": 1024 * 1024 * 50,
+    }
+)
+```
+
+### Validation Reports
+
+Check validation report metrics:
+
+```markdown
+## Validation Summary
+- Processing Time: 2.34s
+- Rows Processed: 125,432
+- Throughput: 53,594 rows/sec
+```
+
 ---
 
 ## Benchmarking Checklist
@@ -749,3 +841,16 @@ retry_config:
 - [DuckDB Performance Guide](https://duckdb.org/docs/guides/performance/overview)
 - [BigQuery Best Practices](https://cloud.google.com/bigquery/docs/best-practices-performance-overview)
 - [Airflow Performance Tuning](https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html)
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

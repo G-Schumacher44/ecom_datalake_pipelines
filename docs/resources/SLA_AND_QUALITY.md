@@ -153,3 +153,16 @@ This is a lightweight SLA/quality spec for the simulated pipeline.
 - SLA dashboards consume the audit table in BigQuery.
 - Alert when freshness or integrity thresholds are breached.
 - Alert when processing time exceeds target by >25%.
+
+---
+
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>

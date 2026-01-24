@@ -233,4 +233,15 @@ docker-compose build
 4. **Check version before deploy** - `make version` or inspect image labels
 5. **Keep Git tags clean** - Only tag stable releases, not every commit
 
+---
 
+<p align="center">
+  <a href="../../README.md">🏠 <b>Home</b></a>
+  &nbsp;·&nbsp;
+  <a href="../../RESOURCE_HUB.md">📚 <b>Resource Hub</b></a>
+</p>
+
+<p align="center">
+  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
+</p>
