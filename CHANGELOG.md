@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-01-25 - Honest Sample Data
+
+### Fixed
+
+- **Bronze sample completeness**: Replaced incomplete scattered-date sample with complete 5-day sample (2020-01-01 through 2020-01-05)
+- **Dims snapshot validation**: CI now validates actual dims generation logic instead of using pre-cooked snapshots
+- **Sample includes**:
+  - Complete customer history (all signups from 2019-01-01 through 2020-01-05 = 370 partitions)
+  - Complete product catalog (all 5 categories)
+  - 5 consecutive days of fact tables: orders, order_items, shopping_carts, **cart_items**, returns, return_items
+
+### Removed
+
+- **Pre-cooked dims workaround**: Deleted `samples/dims_samples.zip` as dims now generate correctly from complete Bronze data
+
+### Changed
+
+- **CI workflow**: Updated to process 2020-01-01 through 2020-01-05 (5-day window)
+- **Local demo**: Now generates dims from Bronze sample data instead of using pre-cooked snapshots
+- **Demo date**: Changed from 2023-01-01/2024-01-03 to 2020-01-05 to align with complete sample data
+- **Sample size**: Increased from 9.1MB to 16MB to include complete customer history and cart_items data
+
+### Validation
+
+- CI validates complete pipeline: Bronze → Dims → Silver → Enriched → Gold
+- All 10 enriched tables produce data with honest dims snapshot generation
+
 ## [1.0.0] - 2026-01-23 - Feature Complete Release
 
 ### Summary

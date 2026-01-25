@@ -1,14 +1,17 @@
+exclude: '^(samples/.*\.zip|data/)'
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.9.2
     hooks:
       - id: ruff
         args: ["--fix"]
+        exclude: '^(samples/|data/)'
 
   - repo: https://github.com/psf/black
     rev: 24.10.0
     hooks:
       - id: black
+        exclude: '^(samples/|data/)'
 
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.35.1
@@ -20,7 +23,7 @@ repos:
     rev: v1.11.2
     hooks:
       - id: mypy
-        exclude: ^scripts/adhoc/
+        exclude: ^(scripts/adhoc/|samples/|data/)
         additional_dependencies:
           - pydantic>=2.6.0
           - pydantic-settings>=2.2.0

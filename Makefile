@@ -8,10 +8,10 @@
 .PHONY: run-dev-gcs dev-mode run-dev-docker prod-sim-mode run-prod-sim-docker
 
 RUN_ID_OPT = $(if $(RUN_ID),--run-id $(RUN_ID),)
-DEMO_DATE ?= 2023-01-01
-DEMO_END_DATE ?= 2024-01-03
-DEMO_LOOKBACK ?= 2
-DEMO_DATES ?= 2024-01-01 2024-01-02 2024-01-03
+DEMO_DATE ?= 2020-01-05
+DEMO_END_DATE ?= 2020-01-05
+DEMO_LOOKBACK ?= 4
+DEMO_DATES ?= 2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05
 
 # Default target
 help:
@@ -405,50 +405,65 @@ local-demo:
 			BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 			SILVER_BASE_PATH="$(PWD)/data/silver/base" \
 			SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+			LOGS_BASE_PATH="/tmp/ecom_logs" \
+			METRICS_BASE_PATH="/tmp/ecom_metrics" \
 			python scripts/run_dims_from_spec.py --run-date "$$day"; \
-		python -m src.validation.dims_snapshot --run-date "$$day" --run-id "local_demo_$$day"; \
+		LOGS_BASE_PATH="/tmp/ecom_logs" \
+			METRICS_BASE_PATH="/tmp/ecom_metrics" \
+			python -m src.validation.dims_snapshot --run-date "$$day" --run-id "local_demo_$$day"; \
 	done
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
 		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+		LOGS_BASE_PATH="/tmp/ecom_logs" \
+		METRICS_BASE_PATH="/tmp/ecom_metrics" \
 		python -m src.runners.base_silver --select "base_silver.*" \
 		--vars "{run_date: '$(DEMO_END_DATE)', lookback_days: $(DEMO_LOOKBACK)}"
-	python -m src.validation.silver \
+	LOGS_BASE_PATH="/tmp/ecom_logs" \
+		METRICS_BASE_PATH="/tmp/ecom_metrics" \
+		python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
 		--quarantine-path data/silver/base/quarantine \
 		--partition-date $(DEMO_END_DATE) \
 		--lookback-days $(DEMO_LOOKBACK) \
+		--tables orders,order_items,shopping_carts,cart_items,returns,return_items \
 		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md
 	@$(MAKE) local-enriched DATE=$(DEMO_END_DATE)
 
 local-demo-fast:
-	@echo "Running fast local demo (pre-cooked dims + single-day silver + enriched)..."
-	@echo "Using production-quality dims snapshots from samples/dims_samples.zip"
+	@echo "Running fast local demo (5-day complete pipeline)..."
+	@echo "Sample: 2020-01-01 through 2020-01-05 with complete customer history"
 	@$(MAKE) dbt-deps
-	@echo "Extracting pre-cooked dims snapshots..."
+	@echo "Generating dims snapshots from Bronze data..."
 	@mkdir -p data/silver/dims
-	@cd data/silver/dims && unzip -o ../../../samples/dims_samples.zip
-	@echo "✓ Dims loaded (customers + product_catalog for 2024-01-01)"
-	@echo "Running single-day pipeline for $(DEMO_DATE) (no duplicates)..."
+	@$(MAKE) local-dims DATE=$(DEMO_DATE)
+	@echo "✓ Dims generated (customers + product_catalog for $(DEMO_DATE))"
+	@echo "Running single-day pipeline for $(DEMO_DATE)..."
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
 		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
 		DBT_LOG_PATH="/tmp/dbt_logs" \
 		DBT_TARGET_PATH="/tmp/dbt_target" \
+		LOGS_BASE_PATH="/tmp/ecom_logs" \
+		METRICS_BASE_PATH="/tmp/ecom_metrics" \
 		python -m src.runners.base_silver --select "base_silver.*" \
 		--vars "{run_date: '$(DEMO_DATE)', lookback_days: 0}"
-	python -m src.validation.silver \
+	LOGS_BASE_PATH="/tmp/ecom_logs" \
+		METRICS_BASE_PATH="/tmp/ecom_metrics" \
+		python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
 		--quarantine-path data/silver/base/quarantine \
 		--partition-date $(DEMO_DATE) \
 		--lookback-days 0 \
-		--tables orders,order_items,cart_items,shopping_carts,returns,return_items \
+		--tables orders,order_items,shopping_carts,cart_items,returns,return_items \
 		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md
+	@$(MAKE) dbt-test
 	@$(MAKE) local-enriched DATE=$(DEMO_DATE)
+	@echo "✅ Demo complete!"
 
 local-demo-full:
 	@echo "Running full local demo (alias for local-demo)..."
@@ -491,6 +506,8 @@ local-enriched:
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
 		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
 		SILVER_ENRICHED_PATH="$(PWD)/data/silver/enriched" \
+		LOGS_BASE_PATH="/tmp/ecom_logs" \
+		METRICS_BASE_PATH="/tmp/ecom_metrics" \
 		python scripts/run_enriched_all_samples.py \
 		--base-path "$(PWD)/data/silver/base" \
 		--output-path "$(PWD)/data/silver/enriched" \
@@ -515,9 +532,13 @@ local-dims:
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
 		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+		LOGS_BASE_PATH="/tmp/ecom_logs" \
+		METRICS_BASE_PATH="/tmp/ecom_metrics" \
 		python scripts/run_dims_from_spec.py \
 		$(if $(DATE),--run-date $(DATE),)
-	python -m src.validation.silver \
+	LOGS_BASE_PATH="/tmp/ecom_logs" \
+		METRICS_BASE_PATH="/tmp/ecom_metrics" \
+		python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
 		--quarantine-path data/silver/base/quarantine \

@@ -15,7 +15,7 @@ jobs:
       SILVER_BASE_PATH: ${{ github.workspace }}/data/silver/base
       SILVER_DIMS_PATH: ${{ github.workspace }}/data/silver/dims
       SILVER_ENRICHED_PATH: ${{ github.workspace }}/data/silver/enriched
-      DATE: "2024-01-01"
+      DATE: "2020-01-01"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,9 +34,9 @@ jobs:
           mkdir -p data/silver/base/quarantine data/silver/enriched data/silver/dims data/metrics docs/validation_reports
       - name: dbt Dependencies
         run: make dbt-deps
-      - name: Dimensions (3 Days)
+      - name: Dimensions (5 Days)
         run: |
-          for day in 2024-01-01 2024-01-02 2024-01-03; do
+          for day in 2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05; do
             python scripts/run_dims_from_spec.py --run-date "$day"
             python -m src.validation.dims_snapshot --run-date "$day" --run-id "ci_${{ github.run_id }}"
           done
@@ -44,29 +44,29 @@ jobs:
         run: |
           python -m src.runners.base_silver \
             --select "base_silver.*" \
-            --vars "{run_date: '2024-01-03', lookback_days: 2}"
-          echo "Verifying all 3 days of partitions were created..."
-          ls -la data/silver/base/orders/ingestion_dt=2024-01-0{1,2,3}
-          echo "✓ All 3 days of partitions created successfully"
-      - name: Silver Quality Gate (3-Day Window)
+            --vars "{run_date: '2020-01-05', lookback_days: 4}"
+          echo "Verifying all 5 days of partitions were created..."
+          ls -la data/silver/base/orders/ingestion_dt=2020-01-0{1,2,3,4,5}
+          echo "✓ All 5 days of partitions created successfully"
+      - name: Silver Quality Gate (5-Day Window)
         run: |
           python -m src.validation.silver \
             --config config/config.yml \
             --bronze-path samples/bronze \
             --silver-path data/silver/base \
             --quarantine-path data/silver/base/quarantine \
-            --partition-date 2024-01-03 \
-            --lookback-days 2 \
+            --partition-date 2020-01-05 \
+            --lookback-days 4 \
             --output-report docs/validation_reports/SILVER_QUALITY_FULL.md
       - name: dbt Data Tests (Base Silver)
         run: |
           make dbt-test
-      - name: Enriched Silver (Day 3)
+      - name: Enriched Silver (Day 5)
         run: |
-          make local-enriched DATE=2024-01-03
+          make local-enriched DATE=2020-01-05
       - name: Enriched Quality Gate
         run: |
-          python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt 2024-01-03 --run-id "ci_${{ github.run_id }}"
+          python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt 2020-01-05 --run-id "ci_${{ github.run_id }}"
       - name: Gold Logic Pre-flight (DuckDB)
         run: |
           python tests/integration/test_gold_logic_duckdb.py
