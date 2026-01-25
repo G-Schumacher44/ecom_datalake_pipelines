@@ -12,7 +12,7 @@
   <img alt="Status" src="https://img.shields.io/badge/status-stable-green">
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue">
   <img alt="dbt" src="https://img.shields.io/badge/dbt-1.8%2B-orange">
-  <img alt="Codecov" src="https://img.shields.io/codecov/c/github/G-Schumacher44/ecom_datalake_pipelines?logo=codecov">
+  <img alt="Codecov" src="https://codecov.io/gh/G-Schumacher44/ecom_datalake_pipelines/branch/main/graph/badge.svg">
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
     <img alt="Docker Build & Push" src="https://github.com/G-Schumacher44/ecom_datalake_pipelines/actions/workflows/docker-build.yml/badge.svg">
   </a>
   <a href="https://github.com/G-Schumacher44/ecom_datalake_pipelines/releases">
-    <img alt="Latest Release" src="https://img.shields.io/github/v/release/G-Schumacher44/ecom_datalake_pipelines?logo=github">
+    <img alt="Latest Release" src="https://img.shields.io/github/v/tag/G-Schumacher44/ecom_datalake_pipelines?sort=semver&logo=github">
   </a>
 </p>
 
