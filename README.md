@@ -52,6 +52,46 @@ ___
 
 
 
+---
+
+## ✅ Start Here
+
+<details open>
+<summary><strong>⚡ 2‑Minute Local Demo (Recommended)</strong></summary>
+<br>
+
+```bash
+# 1) Unzip sample data
+unzip samples/bronze_samples.zip -d samples/
+
+# 2) Run the local demo (mirrors CI 3-day dims + 3-day silver + enriched day 3)
+make local-demo
+
+# 3) Check outputs
+ls data/silver/base/orders/ingestion_dt=2024-01-03
+ls data/silver/enriched/int_cart_attribution/order_dt=2024-01-03
+```
+
+_Note: Some enriched tables may be empty for a given sample date (e.g., returns-based marts) because the sample archive does not include every table for every day._
+
+</details>
+
+<details>
+<summary><strong>🐳 Run with Published Docker Image (No Build)</strong></summary>
+<br>
+
+```bash
+unzip samples/bronze_samples.zip -d samples/
+cp docker.env.local.example docker.env.local
+
+DOCKER_ENV_FILE=docker.env.local \
+PIPELINE_IMAGE=ghcr.io/g-schumacher44/ecom_datalake_pipelines \
+PIPELINE_TAG=YOUR_TAG \
+docker compose up -d --no-build
+```
+
+</details>
+
 <details>
 <summary> ⏯️ Quick Start</summary>
 
@@ -84,8 +124,8 @@ ___
 4. **Run transformations locally**
    ```bash
    # Convenience Make targets
-   make local-silver DATE=2024-01-03
    make local-dims DATE=2024-01-03
+   make local-silver DATE=2024-01-03
    make local-enriched DATE=2024-01-03
 
    # Base Silver (DuckDB)
@@ -115,6 +155,7 @@ ___
    cp docker.env.local.example docker.env.local
 
    DOCKER_ENV_FILE=docker.env.local \
+   PIPELINE_IMAGE=ghcr.io/g-schumacher44/ecom_datalake_pipelines \
    PIPELINE_TAG=YOUR_TAG \
    docker compose up -d --no-build
    ```
@@ -146,7 +187,7 @@ Want to see it in action instantly? Run the full local pipeline (Bronze -> Silve
 
 ```bash
 # Process sample data from Bronze to Enriched Silver (no Docker required)
-make local-silver && make local-dims && make local-enriched DATE=2024-01-03
+make local-dims && make local-silver && make local-enriched DATE=2024-01-03
 ```
 
 </details>
