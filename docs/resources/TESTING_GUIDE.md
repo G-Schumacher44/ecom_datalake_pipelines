@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers testing strategies for the complete medallion lakehouse pipeline, from Bronze validation through Gold mart testing. The project maintains **62% test coverage** with unit tests, integration tests, and full E2E pipeline validation.
+This guide covers testing strategies for the complete medallion lakehouse pipeline, from Bronze validation through Gold mart testing. The project maintains **61.81% test coverage** with unit tests, integration tests, and full E2E pipeline validation.
 
 ## Test Categories
 
@@ -31,46 +31,37 @@ pytest tests/unit/test_transforms.py -v
 
 ### 2. Integration Tests
 
-**E2E Pipeline Check** (CI/CD - Split Jobs):
+**E2E Pipeline Check** (CI/CD):
 
-The CI workflow validates the pipeline in two independent jobs:
-
-**Job 1: Dims Pipeline** (`dims-pipeline-e2e`)
+The CI workflow validates the pipeline in a single end-to-end job:
 
 ```bash
-# Tests Bronze → Silver dims transformation
 for day in 2024-01-01 2024-01-02 2024-01-03; do
   python scripts/run_dims_from_spec.py --run-date "$day"
   python -m src.validation.dims_snapshot --run-date "$day" --run-id "ci_$RUN_ID"
 done
-```
 
-**Job 2: Silver & Enriched Pipeline** (`silver-enriched-e2e`)
-
-```bash
-# Uses pre-cooked dims + processes facts for 2023-01-01
 python -m src.runners.base_silver \
   --select "base_silver.*" \
-  --vars "{run_date: '2023-01-01', lookback_days: 0}"
+  --vars "{run_date: '2024-01-03', lookback_days: 2}"
 
 python -m src.validation.silver \
-  --partition-date 2023-01-01 \
-  --tables orders,order_items,cart_items,shopping_carts,returns,return_items
+  --partition-date 2024-01-03 \
+  --lookback-days 2
 
 make dbt-test
-make local-enriched DATE=2023-01-01
+make local-enriched DATE=2024-01-03
 
-python -m src.validation.enriched --ingest-dt 2023-01-01
+python -m src.validation.enriched --ingest-dt 2024-01-03
 python tests/integration/test_gold_logic_duckdb.py
 ```
 
 **What gets validated:**
-- Dims snapshot generation with fallback mechanisms
-- 16 dbt models for fact tables
-- 147 dbt data quality tests
-- All 10 enriched business tables
+- Dims snapshot generation
+- Base Silver dbt models + data tests
+- Silver quality gate over a 3-day window
+- Enriched business tables
 - Gold layer transformation logic
-- Returns data flow through enriched layer
 
 ### 3. dbt Tests
 
@@ -477,7 +468,7 @@ cat docs/validation_reports/ENRICHED_QUALITY_*.md
 
 ### Test Coverage Goals
 
-- ✅ **Unit Tests**: >60% coverage (current: 62%)
+- ✅ **Unit Tests**: >60% coverage (current: 61.81%)
 - ✅ **Integration Tests**: E2E pipeline passes on sample data
 - ✅ **dbt Tests**: 100% pass rate on schema/relationship tests
 - ✅ **Validation Framework**: All three layers tested

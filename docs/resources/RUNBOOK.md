@@ -10,7 +10,7 @@ This runbook covers common failure scenarios and their resolution for the ecom-d
 
 ```bash
 # 1. Unzip Bronze sample data
-unzip bronze_samples.zip
+unzip samples/bronze_samples.zip -d samples/
 
 # 2. Run fast demo (pre-cooked dims + single-day processing)
 make local-demo-fast
