@@ -44,6 +44,8 @@ docs/validation_reports/*.md
 dbt_packages/
 logs/
 target/
+dbt_duckdb/{{*/
+dbt_duckdb/tmp/
 
 # airflow
 airflow/logs/

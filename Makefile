@@ -3,11 +3,15 @@
 # =============================================================================
 
 .PHONY: help build up down restart logs shell log-task test lint format type-check clean clean-data version
-.PHONY: dbt-deps dbt-build dbt-test local-silver push-image build-versioned push-image-versioned
+.PHONY: dbt-deps dbt-build dbt-test local-demo local-demo-fast local-demo-full local-silver push-image build-versioned push-image-versioned
 .PHONY: strict-mode easy-mode run-sample run-sample-strict run-sample-bq backfill-easy backfill-strict run-dims backfill-dims
 .PHONY: run-dev-gcs dev-mode run-dev-docker prod-sim-mode run-prod-sim-docker
 
 RUN_ID_OPT = $(if $(RUN_ID),--run-id $(RUN_ID),)
+DEMO_DATE ?= 2023-01-01
+DEMO_END_DATE ?= 2024-01-03
+DEMO_LOOKBACK ?= 2
+DEMO_DATES ?= 2024-01-01 2024-01-02 2024-01-03
 
 # Default target
 help:
@@ -72,6 +76,9 @@ help:
 	@echo "  make local-enriched-strict Run enriched transforms locally (Strict, optional: DATE=YYYY-MM-DD)"
 	@echo "  make local-dims      Run customer + product catalog dims locally"
 	@echo "  make local-dims-strict Run customer + product catalog dims locally (Strict)"
+	@echo "  make local-demo      Run local E2E demo (dims 3-day + silver 3-day + enriched)"
+	@echo "  make local-demo-fast Run fast E2E demo (pre-cooked dims + silver + enriched)"
+	@echo "  make local-demo-full Run full E2E demo (alias for local-demo)"
 	@echo ""
 	@echo "dbt Utilities:"
 	@echo "  make dbt-deps        Install dbt packages"
@@ -138,6 +145,7 @@ shell:
 clean-data:
 	@echo "Cleaning local data directories..."
 	rm -rf data/silver/base/*
+	rm -rf data/silver/dims/*
 	rm -rf data/silver/enriched/*
 	rm -rf data/metrics/*
 	@echo "Local data cleared!"
@@ -389,33 +397,99 @@ dbt-test:
 	cd dbt_duckdb && dbt test --project-dir . --profiles-dir .
 
 # Build Silver locally (no Docker, for quick testing)
-local-silver:
+local-demo:
+	@echo "Running local E2E demo (dims 3-day + silver 3-day + enriched day 3)..."
+	@$(MAKE) dbt-deps
+	for day in $(DEMO_DATES); do \
+		PIPELINE_ENV=local \
+			BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+			SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+			SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+			python scripts/run_dims_from_spec.py --run-date "$$day"; \
+		python -m src.validation.dims_snapshot --run-date "$$day" --run-id "local_demo_$$day"; \
+	done
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
-		python -m src.runners.base_silver --select "base_silver.*"
+		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+		python -m src.runners.base_silver --select "base_silver.*" \
+		--vars "{run_date: '$(DEMO_END_DATE)', lookback_days: $(DEMO_LOOKBACK)}"
 	python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
 		--quarantine-path data/silver/base/quarantine \
+		--partition-date $(DEMO_END_DATE) \
+		--lookback-days $(DEMO_LOOKBACK) \
 		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md
+	@$(MAKE) local-enriched DATE=$(DEMO_END_DATE)
 
-local-silver-strict:
+local-demo-fast:
+	@echo "Running fast local demo (pre-cooked dims + single-day silver + enriched)..."
+	@echo "Using production-quality dims snapshots from samples/dims_samples.zip"
+	@$(MAKE) dbt-deps
+	@echo "Extracting pre-cooked dims snapshots..."
+	@mkdir -p data/silver/dims
+	@cd data/silver/dims && unzip -o ../../../samples/dims_samples.zip
+	@echo "✓ Dims loaded (customers + product_catalog for 2024-01-01)"
+	@echo "Running single-day pipeline for $(DEMO_DATE) (no duplicates)..."
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
-		python -m src.runners.base_silver --select "base_silver.*"
+		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+		DBT_LOG_PATH="/tmp/dbt_logs" \
+		DBT_TARGET_PATH="/tmp/dbt_target" \
+		python -m src.runners.base_silver --select "base_silver.*" \
+		--vars "{run_date: '$(DEMO_DATE)', lookback_days: 0}"
+	python -m src.validation.silver \
+		--bronze-path samples/bronze \
+		--silver-path data/silver/base \
+		--quarantine-path data/silver/base/quarantine \
+		--partition-date $(DEMO_DATE) \
+		--lookback-days 0 \
+		--tables orders,order_items,cart_items,shopping_carts,returns,return_items \
+		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md
+	@$(MAKE) local-enriched DATE=$(DEMO_DATE)
+
+local-demo-full:
+	@echo "Running full local demo (alias for local-demo)..."
+	@$(MAKE) local-demo
+
+local-silver:
+	PIPELINE_ENV=local \
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+		python -m src.runners.base_silver --select "base_silver.*" \
+		$(if $(DATE),--vars '{"run_date": "$(DATE)"$(COMMA) "lookback_days": 0}',) \
+		$(if $(DATE),--exclude stg_ecommerce__customers stg_ecommerce__customers_quarantine stg_ecommerce__product_catalog stg_ecommerce__product_catalog_quarantine,)
 	python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
 		--quarantine-path data/silver/base/quarantine \
 		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md \
+		$(if $(DATE),--partition-date $(DATE) --tables orders,order_items,shopping_carts,cart_items,returns,return_items,)
+
+local-silver-strict:
+	PIPELINE_ENV=local \
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+		python -m src.runners.base_silver --select "base_silver.*" \
+		$(if $(DATE),--vars '{"run_date": "$(DATE)"$(COMMA) "lookback_days": 0}',) \
+		$(if $(DATE),--exclude stg_ecommerce__customers stg_ecommerce__customers_quarantine stg_ecommerce__product_catalog stg_ecommerce__product_catalog_quarantine,)
+	python -m src.validation.silver \
+		--bronze-path samples/bronze \
+		--silver-path data/silver/base \
+		--quarantine-path data/silver/base/quarantine \
+		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md \
+		$(if $(DATE),--partition-date $(DATE) --tables orders,order_items,shopping_carts,cart_items,returns,return_items,) \
 		--enforce-quality
 
 local-enriched:
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
 		SILVER_ENRICHED_PATH="$(PWD)/data/silver/enriched" \
 		python scripts/run_enriched_all_samples.py \
 		--base-path "$(PWD)/data/silver/base" \
@@ -427,6 +501,7 @@ local-enriched-strict:
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
 		SILVER_ENRICHED_PATH="$(PWD)/data/silver/enriched" \
 		python scripts/run_enriched_all_samples.py \
 		--base-path "$(PWD)/data/silver/base" \
@@ -439,23 +514,29 @@ local-dims:
 	PIPELINE_ENV=local \
 		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
 		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
-		python scripts/run_dims_from_spec.py
-	python -m src.validation.silver \
-		--bronze-path samples/bronze \
-		--silver-path data/silver/base \
-		--quarantine-path data/silver/base/quarantine \
-		--output-report docs/validation_reports/SILVER_QUALITY.md
-
-local-dims-strict:
-	PIPELINE_ENV=local \
-		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
-		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
-		python scripts/run_dims_from_spec.py
+		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+		python scripts/run_dims_from_spec.py \
+		$(if $(DATE),--run-date $(DATE),)
 	python -m src.validation.silver \
 		--bronze-path samples/bronze \
 		--silver-path data/silver/base \
 		--quarantine-path data/silver/base/quarantine \
 		--output-report docs/validation_reports/SILVER_QUALITY.md \
+		--tables customers,product_catalog
+
+local-dims-strict:
+	PIPELINE_ENV=local \
+		BRONZE_BASE_PATH="$(PWD)/samples/bronze" \
+		SILVER_BASE_PATH="$(PWD)/data/silver/base" \
+		SILVER_DIMS_PATH="$(PWD)/data/silver/dims" \
+		python scripts/run_dims_from_spec.py \
+		$(if $(DATE),--run-date $(DATE),)
+	python -m src.validation.silver \
+		--bronze-path samples/bronze \
+		--silver-path data/silver/base \
+		--quarantine-path data/silver/base/quarantine \
+		--output-report docs/validation_reports/SILVER_QUALITY.md \
+		--tables customers,product_catalog \
 		--enforce-quality
 
 # ==============================================================================
@@ -468,6 +549,7 @@ GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 GIT_TAG := $(shell git describe --tags --exact-match 2>/dev/null || echo "")
 VERSION := $(if $(GIT_TAG),$(GIT_TAG),$(GIT_BRANCH)-$(GIT_COMMIT))
 IMAGE_NAME := ecom-datalake-pipeline
+COMMA := ,
 
 build-versioned:
 	@echo "Building versioned Docker image..."

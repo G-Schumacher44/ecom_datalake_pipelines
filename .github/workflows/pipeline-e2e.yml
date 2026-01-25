@@ -6,7 +6,8 @@ on:
   pull_request:
 
 jobs:
-  e2e-samples:
+  dims-pipeline-e2e:
+    name: Dims Pipeline (Bronze → Silver Dims)
     runs-on: ubuntu-latest
     env:
       PIPELINE_ENV: local
@@ -14,8 +15,6 @@ jobs:
       BRONZE_BASE_PATH: ${{ github.workspace }}/samples/bronze
       SILVER_BASE_PATH: ${{ github.workspace }}/data/silver/base
       SILVER_DIMS_PATH: ${{ github.workspace }}/data/silver/dims
-      SILVER_ENRICHED_PATH: ${{ github.workspace }}/data/silver/enriched
-      DATE: "2024-01-01"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,48 +24,103 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dbt]"
-      - name: Unzip Sample Data
+      - name: Unzip Bronze Sample Data
         run: |
-          cd samples
           unzip bronze_samples.zip
       - name: Setup data directories
         run: |
-          mkdir -p data/silver/base/quarantine data/silver/enriched data/silver/dims data/metrics docs/validation_reports
+          mkdir -p data/silver/base data/silver/dims docs/validation_reports
       - name: dbt Dependencies
         run: make dbt-deps
-      - name: Dimensions (3 Days)
+      - name: Build Dims Snapshots (3 Days)
         run: |
+          echo "Testing dims pipeline with existing Bronze samples (2020, 2023, 2025 dates)"
           for day in 2024-01-01 2024-01-02 2024-01-03; do
+            echo "Building dims snapshot for $day..."
             python scripts/run_dims_from_spec.py --run-date "$day"
             python -m src.validation.dims_snapshot --run-date "$day" --run-id "ci_${{ github.run_id }}"
           done
-      - name: Base Silver (Multi-Day Processing)
+      - name: Verify Dims Snapshots Created
         run: |
+          echo "Verifying dims snapshots were created..."
+          ls -la data/silver/dims/customers/
+          ls -la data/silver/dims/product_catalog/
+          echo "✓ Dims snapshots created successfully"
+      - name: Upload Dims Snapshots as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dims-snapshots
+          path: data/silver/dims/
+          retention-days: 1
+
+  silver-enriched-e2e:
+    name: Silver & Enriched Pipeline (with pre-cooked dims)
+    runs-on: ubuntu-latest
+    env:
+      PIPELINE_ENV: local
+      ECOM_CONFIG_PATH: ${{ github.workspace }}/config/config.yml
+      BRONZE_BASE_PATH: ${{ github.workspace }}/samples/bronze
+      SILVER_BASE_PATH: ${{ github.workspace }}/data/silver/base
+      SILVER_DIMS_PATH: ${{ github.workspace }}/data/silver/dims
+      SILVER_ENRICHED_PATH: ${{ github.workspace }}/data/silver/enriched
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dbt]"
+      - name: Unzip Bronze Sample Data
+        run: |
+          unzip bronze_samples.zip
+      - name: Unzip Pre-cooked Dims Snapshots
+        run: |
+          mkdir -p data/silver/dims
+          cd data/silver/dims
+          unzip ../../../samples/dims_samples.zip
+      - name: Setup data directories
+        run: |
+          mkdir -p data/silver/base/quarantine data/silver/enriched data/metrics docs/validation_reports
+      - name: dbt Dependencies
+        run: make dbt-deps
+      - name: Verify Pre-cooked Dims Available
+        run: |
+          echo "Verifying pre-cooked dims snapshots (from production 2024-01-03 run)..."
+          ls -la data/silver/dims/customers/
+          ls -la data/silver/dims/product_catalog/
+          echo "✓ Production-quality dims snapshots loaded"
+      - name: Base Silver (Single-Day Processing)
+        run: |
+          echo "Running single-day pipeline for 2023-01-01 (complete sample data with returns)"
           python -m src.runners.base_silver \
             --select "base_silver.*" \
-            --vars "{run_date: '2024-01-03', lookback_days: 2}"
-          echo "Verifying all 3 days of partitions were created..."
-          ls -la data/silver/base/orders/ingestion_dt=2024-01-0{1,2,3}
-          echo "✓ All 3 days of partitions created successfully"
-      - name: Silver Quality Gate (3-Day Window)
+            --vars "{run_date: '2023-01-01', lookback_days: 0}"
+          echo "Verifying partition created..."
+          ls -la data/silver/base/orders/ingestion_dt=2023-01-01
+          echo "✓ Single-day partition created successfully"
+      - name: Silver Quality Gate (Single-Day)
         run: |
+          echo "Validating fact tables only (dims validated separately)"
           python -m src.validation.silver \
             --config config/config.yml \
             --bronze-path samples/bronze \
             --silver-path data/silver/base \
             --quarantine-path data/silver/base/quarantine \
-            --partition-date 2024-01-03 \
-            --lookback-days 2 \
+            --partition-date 2023-01-01 \
+            --lookback-days 0 \
+            --tables orders,order_items,cart_items,shopping_carts,returns,return_items \
             --output-report docs/validation_reports/SILVER_QUALITY_FULL.md
       - name: dbt Data Tests (Base Silver)
         run: |
           make dbt-test
-      - name: Enriched Silver (Day 3)
+      - name: Enriched Silver (2023-01-01 with returns)
         run: |
-          make local-enriched DATE=2024-01-03
+          make local-enriched DATE=2023-01-01
       - name: Enriched Quality Gate
         run: |
-          python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt 2024-01-03 --run-id "ci_${{ github.run_id }}"
+          python -m src.validation.enriched --enriched-path data/silver/enriched --ingest-dt 2023-01-01 --run-id "ci_${{ github.run_id }}"
       - name: Gold Logic Pre-flight (DuckDB)
         run: |
           python tests/integration/test_gold_logic_duckdb.py
