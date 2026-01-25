@@ -12,6 +12,7 @@
   <img alt="Status" src="https://img.shields.io/badge/status-stable-green">
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue">
   <img alt="dbt" src="https://img.shields.io/badge/dbt-1.8%2B-orange">
+  <img alt="Codecov" src="https://img.shields.io/codecov/c/github/G-Schumacher44/ecom_datalake_pipelines?logo=codecov">
 </p>
 
 <p align="center">
@@ -62,7 +63,7 @@ ___
 
 ```bash
 # 1) Unzip sample data
-unzip bronze_samples.zip
+unzip samples/bronze_samples.zip -d samples/
 
 # 2) Run the fast local demo (pre-cooked dims + single-day processing)
 make local-demo-fast
@@ -132,6 +133,8 @@ docker compose up -d --no-build
 
 3. **Pull sample Bronze data**
    ```bash
+   unzip samples/bronze_samples.zip -d samples/
+
    # Profile your Bronze samples
    python scripts/describe_parquet_samples.py --date-range 2024-01-03..2024-01-03
    ```
@@ -156,6 +159,8 @@ docker compose up -d --no-build
    dbt deps
    dbt build --target dev
    ```
+
+_Note: Some enriched tables may be empty for 2024-01-03 because the sample archive does not include every table for every day._
 
 5. **Spin up Airflow**
    ```bash
@@ -192,18 +197,6 @@ The repository comes pre-loaded with **Bronze Parquet samples** in `samples/bron
 - **Format**: Hive-partitioned Parquet with `_MANIFEST.json` files
 - **Use Case**: Run full Bronze → Silver → Enriched transformations locally using DuckDB and Polars.
 - **Profile refresh**: `make profile-bronze-samples PROFILE_DATE_RANGE=2024-01-01..2024-01-03`
-
-</details>
-
-<details>
-<summary> 🚀 Zero-Config Demo</summary>
-
-Want to see it in action instantly? Run the full local pipeline (Bronze -> Silver -> Enriched) with a single command line:
-
-```bash
-# Process sample data from Bronze to Enriched Silver (no Docker required)
-make local-dims && make local-silver && make local-enriched DATE=2024-01-03
-```
 
 </details>
 
@@ -323,6 +316,8 @@ This repository is part of a larger data engineering portfolio demonstrating end
 <details>
 <summary><strong>🫀 Version & Status</strong></summary>
 
+### Current Version: v1.0.0
+
 ### Current Status: Feature Complete
 
 - ✅ Project scaffolding and config setup
@@ -334,7 +329,7 @@ This repository is part of a larger data engineering portfolio demonstrating end
 - ✅ Airflow DAG orchestration (2 DAGs with full Bronze→Gold flow)
 - ✅ Structured observability (metrics, logging, audit trails)
 - ✅ Three-layer validation framework (Bronze, Silver, Enriched)
-- 🚧 SLA dashboards and alerting (future enhancement)
+
 
 </details>
 
@@ -344,9 +339,7 @@ This repository is part of a larger data engineering portfolio demonstrating end
 - **Incremental materialization**: Optimize Silver transformations with incremental models and merge strategies.
 - **CLI improvements**: Replace Makefile/arg parsing with Click or Typer for a robust developer experience.
 - **Great Expectations**: Add data quality profiling and anomaly detection.
-- **CI/CD**: Automated testing, schema validation, and deployment via GitHub Actions.
-- **dbt docs hosting**: Publish dbt lineage graphs and data dictionary to GitHub Pages.
-- **Atomic GCS publishes**: Add a staging + manifest publish step for GCS syncs.
+- **SLA dashboards & alerting**: Publish SLA metrics and alert on quality gate breaches.
 - **Workload Identity**: Document and optionally wire production-grade auth (GKE/Composer/Cloud Run).
 
 </details>

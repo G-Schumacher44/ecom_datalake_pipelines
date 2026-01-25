@@ -139,6 +139,7 @@ make local-enriched DATE=2024-01-03  # 3. Run Enriched transforms
 
 - Base Silver models perform FK validation against dimension snapshots, so dims must be created first
 - `local-demo-fast` uses pre-cooked dims from `samples/dims_samples.zip` and processes 2023-01-01 (has complete Bronze data including returns)
+- For CI parity, 2024-01-03 is used; some enriched tables can be empty with the sample set, and that is expected
 - For testing individual dates, use the manual workflow above
 
 **Validate outputs**:
