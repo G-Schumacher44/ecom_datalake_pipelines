@@ -58,37 +58,40 @@ ___
 ## ✅ Start Here
 
 <details open>
-<summary><strong>⚡ 2‑Minute Local Demo (Recommended)</strong></summary>
+<summary><strong>⚡ 3‑Minute Local Demo (Recommended)</strong></summary>
 <br>
 
 ```bash
 # 1) Unzip sample data
 unzip samples/bronze_samples.zip -d samples/
 
-# 2) Run the fast local demo (pre-cooked dims + single-day processing)
-make local-demo-fast
+# 2) Run the full local demo (matches CI exactly)
+make local-demo-full
 
 # 3) Check outputs
-ls data/silver/base/orders/ingestion_dt=2023-01-01
-ls data/silver/enriched/int_cart_attribution/cart_dt=2023-01-01
+ls data/silver/base/orders/ingestion_dt=2020-01-0{1,2,3,4,5}
+ls data/silver/enriched/int_cart_attribution/cart_dt=2020-01-05
+cat docs/validation_reports/SILVER_QUALITY_FULL.md
 ```
 
 **What gets validated:**
 
-- ✅ Silver: 6/6 fact tables (orders, carts, returns, etc.)
+- ✅ Dims: Generated for all 5 days from complete customer/product history
+- ✅ Silver: 6/6 fact tables with 5-day lookback (creates partitions 2020-01-01 through 2020-01-05)
 - ✅ Enriched: 10/10 business tables with full data
 - ✅ dbt: 147 data quality tests pass
-- ✅ All dims-dependent tables now produce data
 
-**Why pre-cooked dims?**
+**Sample Data:**
 
-The demo uses pre-generated dimension snapshots (`samples/dims_samples.zip`) because:
+The demo uses a complete 5-day Bronze sample (2020-01-01 through 2020-01-05):
 
-- Bronze sample data has **fact tables** (orders, carts) for multiple dates, but **dimension tables** (customers, products) only for specific signup/catalog dates
-- Dims snapshots need to exist for the processing date to avoid FK violations in enriched layer
-- Pre-cooked dims eliminate the date alignment complexity and ensure all enriched tables produce data
+- **Complete customer history**: All signups from 2019-01-01 through 2020-01-05 (370 partitions)
+- **Complete product catalog**: All 5 categories (Books, Clothing, Electronics, Home, Toys)
+- **5 days of fact tables**: orders, order_items, shopping_carts, cart_items, returns, return_items
 
-_Demo processes 2023-01-01 which has complete Bronze data including returns. Dims snapshots loaded from `samples/dims_samples.zip` contain production-quality snapshots for 2023-01-01 and 2024-01-01/02/03._
+This validates the entire pipeline including dims snapshot generation and multi-day lookback processing.
+
+**Faster alternative:** Use `make local-demo-fast` for single-day processing (~2 minutes)
 
 </details>
 
@@ -136,15 +139,15 @@ docker compose up -d --no-build
    unzip samples/bronze_samples.zip -d samples/
 
    # Profile your Bronze samples
-   python scripts/describe_parquet_samples.py --date-range 2024-01-03..2024-01-03
+   python scripts/describe_parquet_samples.py --date-range 2020-01-05..2020-01-05
    ```
 
 4. **Run transformations locally**
    ```bash
    # Convenience Make targets
-   make local-dims DATE=2024-01-03
-   make local-silver DATE=2024-01-03
-   make local-enriched DATE=2024-01-03
+   make local-dims DATE=2020-01-05
+   make local-silver DATE=2020-01-05
+   make local-enriched DATE=2020-01-05
 
    # Base Silver (DuckDB)
    cd dbt_duckdb
@@ -316,9 +319,26 @@ This repository is part of a larger data engineering portfolio demonstrating end
 <details>
 <summary><strong>🫀 Version & Status</strong></summary>
 
-### Current Version: v1.0.0
+### Current Version: v1.0.2
 
-### Current Status: Feature Complete
+**Latest Release: [v1.0.2](https://github.com/G-Schumacher44/ecom_datalake_pipelines/releases/tag/v1.0.2)** - Honest Sample Data & Complete Validation
+
+### Release History
+
+- **v1.0.2** (2026-01-25): Fixed Bronze sample completeness for honest dims validation
+  - Complete 5-day Bronze sample (2020-01-01 through 2020-01-05)
+  - Complete customer history (370 partitions from 2019-01-01)
+  - Removed pre-cooked dims workaround
+  - CI now validates actual dims generation from Bronze data
+  - Includes cart_items table in sample
+
+- **v1.0.0** (2026-01-23): Initial feature-complete release
+  - Full Bronze → Silver → Gold pipeline
+  - Three-layer validation framework
+  - Airflow orchestration
+  - 51% test coverage
+
+### Current Status: Production-Ready
 
 - ✅ Project scaffolding and config setup
 - ✅ Bronze profiling and schema validation
@@ -329,6 +349,7 @@ This repository is part of a larger data engineering portfolio demonstrating end
 - ✅ Airflow DAG orchestration (2 DAGs with full Bronze→Gold flow)
 - ✅ Structured observability (metrics, logging, audit trails)
 - ✅ Three-layer validation framework (Bronze, Silver, Enriched)
+- ✅ Honest sample data with complete dims validation
 
 
 </details>
