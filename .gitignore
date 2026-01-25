@@ -57,6 +57,7 @@ dbt_duckdb/dbt_packages/
 dbt_duckdb/logs/
 dbt_duckdb/target/
 dbt_duckdb/tmp/
+dbt_duckdb/\{\{*/
 
 # airflow
 airflow/logs/
