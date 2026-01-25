@@ -16,6 +16,8 @@ docker.env
 .ruff_cache/
 .vscode/
 samples/
+!samples/
+samples/*
 !samples/*.zip
 CONTRIBUTING.md
 SECURITY.md
@@ -38,6 +40,9 @@ data/bronze/
 data/metrics/
 data/logs/
 data/silver/
+samples/
+!samples/
+samples/*
 !samples/dims_samples.zip
 !samples/bronze_samples.zip
 
