@@ -98,6 +98,7 @@ cp docker.env.local.example docker.env.local
 
 # 3) Run the published image (replace TAG)
 DOCKER_ENV_FILE=docker.env.local \
+PIPELINE_IMAGE=ghcr.io/g-schumacher44/ecom_datalake_pipelines \
 PIPELINE_TAG=YOUR_TAG \
 docker compose up -d --no-build
 ```
@@ -106,6 +107,7 @@ docker compose up -d --no-build
 - The compose file defaults to `ecom-datalake-pipeline:latest`. Override with `PIPELINE_TAG`.
 - GitHub releases (tags like `v1.0.0`) automatically build/push to **GHCR** via GitHub Actions.
   If you need **GCP Artifact Registry**, use `make push-image-versioned PROJECT_ID=...`.
+- Some enriched tables may be empty for a given sample date because the sample archive does not include every table for every day.
 3. Click **Trigger DAG** (play button)
 4. Watch the pipeline execute: Dims → Base Silver → Enriched Silver
 
