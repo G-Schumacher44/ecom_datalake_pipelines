@@ -4,6 +4,39 @@ This runbook covers common failure scenarios and their resolution for the ecom-d
 
 ---
 
+## Quick Start - Local Demo
+
+**2-minute demo workflow:**
+
+```bash
+# 1. Unzip Bronze sample data
+unzip bronze_samples.zip
+
+# 2. Run fast demo (pre-cooked dims + single-day processing)
+make local-demo-fast
+
+# 3. Verify outputs
+ls data/silver/base/orders/ingestion_dt=2023-01-01
+ls data/silver/enriched/int_cart_attribution/cart_dt=2023-01-01
+cat docs/validation_reports/ENRICHED_QUALITY_2023-01-01.md
+```
+
+**Expected Results:**
+
+- ✅ Silver: 6/6 fact tables passing validation
+- ✅ Enriched: 10/10 business tables with data
+- ✅ dbt: 147 data quality tests pass
+
+**What the demo validates:**
+
+- Bronze → Silver transformation via dbt
+- Dimension snapshot loading from pre-cooked archive
+- Enriched layer transformations with dims dependencies
+- Returns data flow through the pipeline
+- Quality gates at each layer
+
+---
+
 ## Table of Contents
 
 1. [Bronze Ingestion Failures](#1-bronze-ingestion-failures)

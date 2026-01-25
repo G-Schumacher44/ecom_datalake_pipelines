@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-01-24 - Enriched Layer Hotfix
+
+### Fixed
+
+- **Enriched layer dims access**: Added missing `SILVER_DIMS_PATH` environment variable to `local-enriched` and `local-enriched-strict` Makefile targets, fixing issue where enriched transformations couldn't access dimension snapshots
+- **Demo date alignment**: Changed demo date from 2024-01-01 to 2023-01-01 to use Bronze sample data that includes returns
+- **Dims snapshot coverage**: Generated and included `snapshot_dt=2023-01-01` in `samples/dims_samples.zip` (now contains 4 snapshots: 2023-01-01, 2024-01-01/02/03)
+
+### Changed
+
+- **CI workflow restructure**: Split E2E workflow into two independent jobs:
+  - `dims-pipeline-e2e`: Tests Bronze → Silver dims transformation with snapshot generation
+  - `silver-enriched-e2e`: Tests Silver facts + Enriched layer using pre-cooked dims
+- **Demo workflow**: Updated `make local-demo-fast` to use single-day processing with 2023-01-01 date
+- **Silver validation**: Excluded dims tables from Silver quality validation (validated separately in dims job)
+
+### Validation
+
+- All 10 enriched tables now produce data successfully (previously 3 were empty)
+- Demo validation: ✅ PASS - Silver 6/6 tables, Enriched 10/10 tables
+- CI validates: 16 dbt models, 147 data tests, full enriched layer, Gold logic
+
 ## [1.0.0] - 2026-01-23 - Feature Complete Release
 
 ### Summary
