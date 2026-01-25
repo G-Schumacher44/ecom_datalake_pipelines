@@ -735,6 +735,12 @@ Generative AI tools (Claude Sonnet 4.5, ChatGPT, Gemini) were used throughout th
 
 This project is licensed under the [MIT License](LICENSE).
 
+---
+
+## 🙌 Contributions
+
+This repository is a portfolio showcase and is not currently accepting external contributions or PRs.
+
 ___
 
 ---

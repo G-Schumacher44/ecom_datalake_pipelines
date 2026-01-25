@@ -17,6 +17,8 @@ docker.env
 .vscode/
 samples/
 !samples/*.zip
+CONTRIBUTING.md
+SECURITY.md
 
 # Test coverage artifacts
 coverage_html/
@@ -46,7 +48,9 @@ docs/validation_reports/*.md
 dbt_packages/
 logs/
 target/
-dbt_duckdb/{{*/
+dbt_duckdb/dbt_packages/
+dbt_duckdb/logs/
+dbt_duckdb/target/
 dbt_duckdb/tmp/
 
 # airflow
