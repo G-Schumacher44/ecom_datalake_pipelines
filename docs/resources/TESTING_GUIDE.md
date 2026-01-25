@@ -36,23 +36,23 @@ pytest tests/unit/test_transforms.py -v
 The CI workflow validates the pipeline in a single end-to-end job:
 
 ```bash
-for day in 2024-01-01 2024-01-02 2024-01-03; do
+for day in 2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05; do
   python scripts/run_dims_from_spec.py --run-date "$day"
   python -m src.validation.dims_snapshot --run-date "$day" --run-id "ci_$RUN_ID"
 done
 
 python -m src.runners.base_silver \
   --select "base_silver.*" \
-  --vars "{run_date: '2024-01-03', lookback_days: 2}"
+  --vars "{run_date: '2020-01-05', lookback_days: 4}"
 
 python -m src.validation.silver \
-  --partition-date 2024-01-03 \
-  --lookback-days 2
+  --partition-date 2020-01-05 \
+  --lookback-days 4
 
 make dbt-test
-make local-enriched DATE=2024-01-03
+make local-enriched DATE=2020-01-05
 
-python -m src.validation.enriched --ingest-dt 2024-01-03
+python -m src.validation.enriched --ingest-dt 2020-01-05
 python tests/integration/test_gold_logic_duckdb.py
 ```
 
@@ -168,7 +168,7 @@ The pipeline implements validation at each layer with distinct quality requireme
 ```bash
 python -m src.validation.bronze_quality \
   --bronze-path samples/bronze \
-  --partition-date 2024-01-03 \
+  --partition-date 2020-01-05 \
   --lookback-days 0 \
   --output-report docs/validation_reports/bronze_quality.md
 ```
@@ -185,7 +185,7 @@ Validates:
 python -m src.validation.silver \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
-  --partition-date 2024-01-03 \
+  --partition-date 2020-01-05 \
   --tables orders,customers,product_catalog \
   --output-report docs/validation_reports/silver_quality.md \
   --enforce-quality
@@ -203,7 +203,7 @@ Validates:
 ```bash
 python -m src.validation.enriched \
   --enriched-path data/silver/enriched \
-  --ingest-dt 2024-01-03 \
+  --ingest-dt 2020-01-05 \
   --output-report docs/validation_reports/enriched_quality.md \
   --enforce-quality
 ```
@@ -237,9 +237,9 @@ Validates:
 ```bash
 python -m src.runners.base_silver \
   --select "base_silver.*" \
-  --vars "{run_date: '2024-01-03', lookback_days: 0}"
-python scripts/run_dims_from_spec.py --run-date 2024-01-03
-make local-enriched DATE=2024-01-03
+  --vars "{run_date: '2020-01-05', lookback_days: 0}"
+python scripts/run_dims_from_spec.py --run-date 2020-01-05
+make local-enriched DATE=2020-01-05
 ```
 
 ### Phase 2: Medium Batch
@@ -259,7 +259,7 @@ make local-enriched DATE=2024-01-03
 **Example**:
 
 ```bash
-for date in 2024-01-01 2024-01-02 2024-01-03; do
+for date in 2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05; do
   python -m src.runners.base_silver \
     --select "base_silver.*" \
     --vars "{run_date: '${date}', lookback_days: 0}"
@@ -291,14 +291,14 @@ The project includes automated E2E pipeline validation:
 # .github/workflows/pipeline-e2e.yml
 - name: Run E2E Pipeline Check
   run: |
-    for day in 2024-01-01 2024-01-02 2024-01-03; do
+    for day in 2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05; do
       python scripts/run_dims_from_spec.py --run-date "$day"
       python -m src.validation.dims_snapshot --run-date "$day"
     done
     python -m src.runners.base_silver \
       --select "base_silver.*" \
-      --vars "{run_date: '2024-01-03', lookback_days: 2}"
-    make local-enriched DATE=2024-01-03
+      --vars "{run_date: '2020-01-05', lookback_days: 2}"
+    make local-enriched DATE=2020-01-05
 ```
 
 **What This Validates**:
@@ -346,10 +346,10 @@ python -m memory_profiler scripts/run_enriched_all_samples.py
 
 ```bash
 # Check Bronze input
-ls -lh samples/bronze/orders/ingest_dt=2024-01-03/
+ls -lh samples/bronze/orders/ingest_dt=2020-01-05/
 
 # Verify manifest
-cat samples/bronze/orders/ingest_dt=2024-01-03/_MANIFEST.json
+cat samples/bronze/orders/ingest_dt=2020-01-05/_MANIFEST.json
 
 # Check dbt run output
 cat /tmp/dbt_logs/dbt.log
@@ -363,8 +363,8 @@ cat /tmp/dbt_logs/dbt.log
 
 ```bash
 # Verify parent tables loaded for same window
-ls -lh data/silver/base/customers/ingestion_dt=2024-01-03/
-ls -lh data/silver/base/product_catalog/ingestion_dt=2024-01-03/
+ls -lh data/silver/base/customers/ingestion_dt=2020-01-05/
+ls -lh data/silver/base/product_catalog/ingestion_dt=2020-01-05/
 
 # Check dimension snapshots
 ls -lh data/silver/dims/customers/
@@ -381,7 +381,7 @@ cat data/silver/dims/_latest.json
 # Profile Bronze data types
 python scripts/describe_parquet_samples.py \
   --tables orders \
-  --date-range 2024-01-03..2024-01-03
+  --date-range 2020-01-05..2020-01-05
 
 # Check data contract expectations
 cat docs/data/DATA_CONTRACT.md | grep -A 5 "order_date"
@@ -396,7 +396,7 @@ cat docs/data/DATA_CONTRACT.md | grep -A 5 "order_date"
 ```bash
 # Run specific transform with verbose logging
 python -m src.runners.enriched.cart_attribution \
-  --ingest-dt 2024-01-03 \
+  --ingest-dt 2020-01-05 \
   --base-path data/silver/base \
   --output-path data/silver/enriched
 
@@ -412,22 +412,25 @@ python scripts/describe_parquet_samples.py \
 
 The project includes Bronze Parquet samples in `samples/bronze/`:
 - **Tables**: 8 tables (orders, customers, product_catalog, shopping_carts, cart_items, order_items, returns, return_items)
-- **Partitions**: ingest_dt (2020-03-01, 2023-01-01, 2024-01-01..2024-01-03, 2025-10-01), signup_date (2020-03-01, 2023-01-01, 2025-10-01), category (Books, Clothing, Electronics, Home, Toys)
-- **Size**: ~14MB compressed, ~18MB extracted
+- **Partitions**:
+  - `ingest_dt`: 2020-01-01 through 2020-01-05 (5 consecutive days)
+  - `signup_date`: 2019-01-01 through 2020-01-05 (370 partitions - complete customer history)
+  - `category`: Books, Clothing, Electronics, Home, Toys (all 5 categories)
+- **Size**: ~16MB compressed, ~20MB extracted
 - **Rows**: ~194k total rows across 8 tables (see `docs/data/BRONZE_PROFILE_REPORT.md`)
 - **Format**: Hive-partitioned Parquet with manifests
-- **Use Case**: Full local testing without GCS dependencies
+- **Use Case**: Full local testing including dims snapshot generation
 
 ### Refreshing Samples
 
 ```bash
 # Generate new samples from data generator
 # (requires ecom_sales_data_generator repo)
-python generate_samples.py --start-date 2024-01-01 --end-date 2024-01-03
+python generate_samples.py --start-date 2020-01-01 --end-date 2020-01-05
 
 # Or sync from GCS
-gsutil -m rsync -r gs://your-bucket/bronze/orders/ingest_dt=2024-01-03 \
-  samples/bronze/orders/ingest_dt=2024-01-03
+gsutil -m rsync -r gs://your-bucket/bronze/orders/ingest_dt=2020-01-05 \
+  samples/bronze/orders/ingest_dt=2020-01-05
 ```
 
 ## Observability Checks
@@ -441,7 +444,7 @@ gsutil -m rsync -r gs://your-bucket/bronze/orders/ingest_dt=2024-01-03 \
 ls -lh data/metrics/audit/
 
 # View audit summary
-cat data/metrics/audit/run_2024-01-03_*.json | jq .
+cat data/metrics/audit/run_2020-01-05_*.json | jq .
 ```
 
 **Audit Schema** (see [AUDIT_SCHEMA.md](../planning/AUDIT_SCHEMA.md)):

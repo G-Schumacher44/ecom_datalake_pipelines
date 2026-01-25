@@ -124,22 +124,22 @@ make local-demo-fast
 
 # Check validation reports:
 cat docs/validation_reports/SILVER_QUALITY_FULL.md
-cat docs/validation_reports/ENRICHED_QUALITY_2023-01-01.md
+cat docs/validation_reports/ENRICHED_QUALITY_2020-01-05.md
 ```
 
 **Option C: Manual CLI execution** (for testing individual steps):
 ```bash
 # Run in correct order:
-make local-dims DATE=2024-01-03      # 1. Create dimension snapshots
-make local-silver DATE=2024-01-03    # 2. Run Base Silver (needs dims for FK checks)
-make local-enriched DATE=2024-01-03  # 3. Run Enriched transforms
+make local-dims DATE=2020-01-05      # 1. Create dimension snapshots
+make local-silver DATE=2020-01-05    # 2. Run Base Silver (needs dims for FK checks)
+make local-enriched DATE=2020-01-05  # 3. Run Enriched transforms
 ```
 
 **Notes**:
 
 - Base Silver models perform FK validation against dimension snapshots, so dims must be created first
-- `local-demo-fast` uses pre-cooked dims from `samples/dims_samples.zip` and processes 2023-01-01 (has complete Bronze data including returns)
-- For CI parity, 2024-01-03 is used; some enriched tables can be empty with the sample set, and that is expected
+- `local-demo-fast` processes 2020-01-05 with complete Bronze data (370 customer partitions + 5 product categories + 5 days of fact tables)
+- Sample includes complete customer history (2019-01-01 through 2020-01-05) allowing honest dims snapshot generation
 - For testing individual dates, use the manual workflow above
 
 **Validate outputs**:
@@ -160,23 +160,29 @@ The sample archive contains representative Bronze Parquet data for testing and d
 
 - **8 tables**: orders, customers, product_catalog, shopping_carts, cart_items, order_items, returns, return_items
 - **Partitions**:
-  - `ingest_dt`: 2020-03-01, 2023-01-01, 2024-01-01..2024-01-03, 2025-10-01
-  - `signup_date`: 2020-03-01, 2023-01-01, 2025-10-01
-  - `category`: Books, Clothing, Electronics, Home, Toys
+  - `ingest_dt`: 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05 (5 consecutive days)
+  - `signup_date`: 2019-01-01 through 2020-01-05 (370 partitions - complete customer history)
+  - `category`: Books, Clothing, Electronics, Home, Toys (all 5 categories)
 - **Format**: Hive-partitioned Parquet with `_MANIFEST.json` metadata
-- **Size**: ~14MB compressed, ~18MB extracted
+- **Size**: ~16MB compressed, ~20MB extracted
 - **Rows**: ~194k total rows across 8 tables (see `docs/data/BRONZE_PROFILE_REPORT.md`)
-- **Use case**: Full end-to-end pipeline testing without external dependencies
+- **Use case**: Full end-to-end pipeline testing including dims snapshot generation
 
 **Sample data structure**:
 ```
 samples/bronze/
   orders/
-    ingest_dt=2024-01-02/
+    ingest_dt=2020-01-01/
+      part-00000.parquet
+      _MANIFEST.json
+    ingest_dt=2020-01-05/
       part-00000.parquet
       _MANIFEST.json
   customers/
-    signup_date=2023-01-01/
+    signup_date=2019-01-01/
+      part-00000.parquet
+      _MANIFEST.json
+    signup_date=2020-01-05/
       part-00000.parquet
       _MANIFEST.json
   product_catalog/
