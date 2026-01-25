@@ -36,6 +36,8 @@ data/bronze/
 data/metrics/
 data/logs/
 data/silver/
+!samples/dims_samples.zip
+!samples/bronze_samples.zip
 
 # Validation reports (ephemeral during testing)
 docs/validation_reports/*.md

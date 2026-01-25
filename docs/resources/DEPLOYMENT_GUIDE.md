@@ -111,7 +111,23 @@ docker compose up -d --no-build
 3. Click **Trigger DAG** (play button)
 4. Watch the pipeline execute: Dims → Base Silver → Enriched Silver
 
-**Option B: Manual CLI execution** (for testing individual steps):
+**Option B: Fast Local Demo** (recommended for quick validation):
+```bash
+# Single command that runs the complete pipeline with pre-cooked dims
+make local-demo-fast
+
+# Validates:
+# ✅ Silver: 6/6 fact tables (orders, carts, returns, etc.)
+# ✅ Enriched: 10/10 business tables with full data
+# ✅ dbt: 147 data quality tests
+# ✅ All dims-dependent enriched tables produce data
+
+# Check validation reports:
+cat docs/validation_reports/SILVER_QUALITY_FULL.md
+cat docs/validation_reports/ENRICHED_QUALITY_2023-01-01.md
+```
+
+**Option C: Manual CLI execution** (for testing individual steps):
 ```bash
 # Run in correct order:
 make local-dims DATE=2024-01-03      # 1. Create dimension snapshots
@@ -119,7 +135,11 @@ make local-silver DATE=2024-01-03    # 2. Run Base Silver (needs dims for FK che
 make local-enriched DATE=2024-01-03  # 3. Run Enriched transforms
 ```
 
-**Note**: Base Silver models perform FK validation against dimension snapshots, so dims must be created first
+**Notes**:
+
+- Base Silver models perform FK validation against dimension snapshots, so dims must be created first
+- `local-demo-fast` uses pre-cooked dims from `samples/dims_samples.zip` and processes 2023-01-01 (has complete Bronze data including returns)
+- For testing individual dates, use the manual workflow above
 
 **Validate outputs**:
 ```bash
