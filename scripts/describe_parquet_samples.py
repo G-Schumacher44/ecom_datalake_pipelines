@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import warnings
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -1038,4 +1040,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            (
+                "Deprecated: use `ecomlake bronze profile` instead of "
+                "scripts/describe_parquet_samples.py"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
     main()

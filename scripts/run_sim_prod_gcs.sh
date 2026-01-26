@@ -1,4 +1,7 @@
 #!/bin/bash
+if [[ -z "${ECOM_CLI_SUPPRESS_DEPRECATION:-}" ]]; then
+  echo "DEPRECATED: use \`ecomlake pipeline sim-prod-gcs\` instead of scripts/run_sim_prod_gcs.sh" >&2
+fi
 set -euo pipefail
 
 # ==============================================================================

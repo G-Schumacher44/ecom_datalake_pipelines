@@ -17,7 +17,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import warnings
 import zipfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -245,4 +247,13 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            (
+                "Deprecated: use `ecomlake sample package` instead of "
+                "scripts/package_bronze_sample.py"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
     sys.exit(main())

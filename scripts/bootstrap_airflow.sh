@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+if [[ -z "${ECOM_CLI_SUPPRESS_DEPRECATION:-}" ]]; then
+  echo "DEPRECATED: use \`ecomlake airflow bootstrap\` instead of scripts/bootstrap_airflow.sh" >&2
+fi
 set -euo pipefail
 
 mkdir -p airflow/dags airflow/logs airflow/plugins
