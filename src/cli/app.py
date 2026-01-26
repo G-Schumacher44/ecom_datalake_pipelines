@@ -527,7 +527,8 @@ def airflow_log_task(
     dag: str, run_id: str, task_id: str, try_num: int, lines: int
 ) -> None:
     log_path = (
-        f"/opt/airflow/logs/dag_id={dag}/run_id={run_id}/task_id={task_id}/attempt={try_num}.log"
+        f"/opt/airflow/logs/dag_id={dag}/run_id={run_id}/task_id={task_id}/"
+        f"attempt={try_num}.log"
     )
     _run_cmd(
         [
