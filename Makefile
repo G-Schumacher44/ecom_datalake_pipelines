@@ -2,6 +2,10 @@
 # Makefile - Common commands for local development and deployment
 # =============================================================================
 
+ifneq ($(filter-out help,$(MAKECMDGOALS)),)
+$(warning DEPRECATED: Makefile targets are deprecated; use the ecomlake CLI instead.)
+endif
+
 .PHONY: help build up down restart logs shell log-task test lint format type-check clean clean-data version
 .PHONY: dbt-deps dbt-build dbt-test local-demo local-demo-fast local-demo-full local-silver push-image build-versioned push-image-versioned
 .PHONY: strict-mode easy-mode run-sample run-sample-strict run-sample-bq backfill-easy backfill-strict run-dims backfill-dims

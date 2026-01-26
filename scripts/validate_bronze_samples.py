@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Type
@@ -186,4 +188,13 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            (
+                "Deprecated: use `ecomlake bronze validate` instead of "
+                "scripts/validate_bronze_samples.py"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
     raise SystemExit(main())

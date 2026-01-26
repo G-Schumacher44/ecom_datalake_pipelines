@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
+import warnings
 from datetime import date
 from pathlib import Path
 
@@ -54,4 +56,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            (
+                "Deprecated: use `ecomlake dim run` instead of "
+                "scripts/run_dims_from_spec.py"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
     main()
