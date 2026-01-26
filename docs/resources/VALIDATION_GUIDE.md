@@ -80,7 +80,7 @@ Immediately after dimension snapshots are refreshed (and before fact processing)
 ```python
 validate_dims_quality = BashOperator(
     task_id="validate_dims_quality",
-    bash_command="python -m src.validation.dims_snapshot --run-date {{ ds }} ..."
+    bash_command="ecomlake dim validate --run-date {{ ds }} ..."
 )
 ```
 
@@ -108,13 +108,13 @@ After dbt processes Bronze → Silver, this validator checks **Fact Tables Only*
 
 ```bash
 # Run after dbt completes
-python -m src.validation.silver
+ecomlake silver validate
 ```
 
 #### With Custom Paths
 
 ```bash
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --quarantine-path data/silver/base/quarantine \
@@ -124,7 +124,7 @@ python -m src.validation.silver \
 #### In Hard Fail Mode (Stops Pipeline on SLA Breach)
 
 ```bash
-python -m src.validation.silver \
+ecomlake silver validate \
   --enforce-quality
 ```
 
@@ -277,7 +277,7 @@ Configured in `config/config.yml` under:
 validate_enriched_quality = BashOperator(
     task_id="validate_enriched_quality",
     bash_command=(
-        "python -m src.validation.enriched_quality "
+        "ecomlake enriched validate_quality "
         "--enriched-path data/silver/enriched "
         "--ingest-dt {{ ds }} "
         "--run-id {{ run_id }}"
@@ -308,7 +308,7 @@ enriched_silver_group >> validate_enriched_quality >> load_bigquery_group
 
 #### 2. Pydantic Sample Validation (Enhanced)
 
-**Script:** `scripts/validate_bronze_samples.py` (optional enhancement)
+**Script:** `ecomlake bronze validate-samples` (optional enhancement)
 
 ---
 
@@ -486,8 +486,8 @@ python src/validation/silver_quality.py --enforce-quality
 
 ### Validation Scripts
 - `src/validation/silver/__main__.py` - Silver quality validator
-- `scripts/validate_bronze_samples.py` - Bronze Pydantic validation
-- `scripts/describe_parquet_samples.py` - Bronze schema profiling
+- `ecomlake bronze validate-samples` - Bronze Pydantic validation
+- `ecomlake bronze profile` - Bronze schema profiling (legacy script: `scripts/describe_parquet_samples.py`)
 
 ### Validation Reports (Auto-Generated)
 - `docs/validation_reports/SILVER_QUALITY_<run_id>.md` - Silver quality report

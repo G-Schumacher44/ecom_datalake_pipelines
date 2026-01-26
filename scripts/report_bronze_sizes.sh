@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+if [[ -z "${ECOM_CLI_SUPPRESS_DEPRECATION:-}" ]]; then
+  echo "DEPRECATED: use \`ecomlake bucket report\` instead of scripts/report_bronze_sizes.sh" >&2
+fi
 set -euo pipefail
 
 # Generate a Markdown report of bucket/prefix sizes and per-table sizes.

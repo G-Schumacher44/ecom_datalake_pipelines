@@ -467,17 +467,17 @@ print(spec.bronze.base_path)  # /tmp/bronze
 
 ```bash
 # Bronze quality validation with spec
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --spec-path config/specs \
   --partition-date 2025-10-15
 
 # Silver validation with spec
-python -m src.validation.silver \
+ecomlake silver validate \
   --spec-path config/specs \
   --partition-date 2025-10-15
 
 # Enriched validation with spec
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --spec-path config/specs \
   --ingest-dt 2025-10-15
 ```
@@ -486,12 +486,12 @@ python -m src.validation.enriched \
 
 ```bash
 # Dimension snapshot with spec
-python scripts/run_dims_from_spec.py \
+ecomlake dim run \
   --spec-path config/specs \
   --run-date 2025-10-15
 
 # Enriched transforms with spec
-python scripts/run_enriched_all_samples.py \
+ecomlake enriched run \
   --spec-path config/specs \
   --ingest-dt 2025-10-15
 ```
@@ -801,8 +801,8 @@ When adding/removing tables or changing quality thresholds, update:
 python -c "from src.specs import load_spec; spec = load_spec(); print('Spec valid!')"
 
 # Run validation with spec
-make local-silver DATE=2025-10-15
-make local-enriched DATE=2025-10-15
+ecomlake local silver --date 2025-10-15
+ecomlake local enriched --date 2025-10-15
 ```
 
 ### 5. Use Strict Mode in Production

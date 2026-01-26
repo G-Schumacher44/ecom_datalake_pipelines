@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+if [[ -z "${ECOM_CLI_SUPPRESS_DEPRECATION:-}" ]]; then
+  echo "DEPRECATED: use \`ecomlake sample pull\` instead of scripts/pull_bronze_sample.sh" >&2
+fi
 set -euo pipefail
 
 # Pull sample partitions per table for schema discovery.

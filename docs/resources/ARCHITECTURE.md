@@ -497,7 +497,7 @@ spec = load_pipeline_spec("config/specs/base.yml")
 for table in spec.base_silver.tables:
     validate_task = BashOperator(
         task_id=f"validate_{table.name}",
-        bash_command=f"python -m src.validation.silver --tables {table.name}"
+        bash_command=f"ecomlake silver validate --tables {table.name}"
     )
 ```
 

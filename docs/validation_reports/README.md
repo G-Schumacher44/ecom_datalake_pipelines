@@ -45,13 +45,13 @@ Reports are generated automatically by the pipeline. To generate manually:
 
 ```bash
 # Bronze
-python -m src.validation.bronze_quality --partition-date 2025-10-15
+ecomlake bronze validate --partition-date 2025-10-15
 
 # Silver
-python -m src.validation.silver --partition-date 2025-10-15
+ecomlake silver validate --partition-date 2025-10-15
 
 # Enriched
-python -m src.validation.enriched --ingest-dt 2025-10-15
+ecomlake enriched validate --ingest-dt 2025-10-15
 ```
 
 ## Storage

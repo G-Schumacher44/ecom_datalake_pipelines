@@ -4,6 +4,7 @@
 import os
 import subprocess
 import sys
+import warnings
 
 
 def get_git_version():
@@ -81,4 +82,10 @@ def main():
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            "Deprecated: use `ecomlake version` instead of scripts/version.py",
+            UserWarning,
+            stacklevel=2,
+        )
     main()
