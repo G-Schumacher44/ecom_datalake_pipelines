@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-01-26 - CLI Suite Release
+
+### Added
+
+- **Click-based CLI**: `ecomlake` command with organized action-style groups
+- **Command coverage**: Bronze, Silver, Enriched, dims, pipeline, Airflow, dbt, dev, deploy, and local workflows
+- **CLI help**: Expanded, example-rich help output for top-level and groups
+
+### Changed
+
+- **Docs**: Updated README and CLI usage guides to be ecomlake-first
+- **Config precedence**: `ECOM_CONFIG_PATH` supported as default config override
+
+### Deprecated
+
+- **Legacy entrypoints**: Makefile targets and direct script/module entrypoints now emit deprecation warnings
+
+### Fixed
+
+- **Test coverage**: Added targeted unit tests to restore coverage above 60%
+
 ## [1.0.2] - 2026-01-25 - Honest Sample Data
 
 ### Fixed
