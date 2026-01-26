@@ -13,7 +13,7 @@ This runbook covers common failure scenarios and their resolution for the ecom-d
 unzip samples/bronze_samples.zip -d samples/
 
 # 2. Run fast demo (pre-cooked dims + single-day processing)
-make local-demo-fast
+ecomlake local demo-fast
 
 # 3. Verify outputs
 ls data/silver/base/orders/ingestion_dt=2023-01-01
@@ -104,7 +104,7 @@ cat data/bronze/orders/ingest_dt=2025-01-15/_manifest.json
 - dbt models fail with "No files found that match the pattern" errors
 - Foreign key validation failures in Base Silver
 - Missing dimension tables (product_catalog, customer_snapshot)
-- CI/CD pipeline fails on `make local-silver` step
+- CI/CD pipeline fails on `ecomlake local silver` step
 
 ### Diagnosis
 
@@ -117,8 +117,7 @@ ls -la data/silver/dims/customer_snapshot/
 echo $SILVER_DIMS_PATH
 
 # Check dimension snapshot creation
-python -m src.runners.dims.product_catalog --silver-path data/silver/base \
-  --output-path data/silver/dims --env local
+ecomlake dim run --run-date 2024-01-03
 ```
 
 ### Resolution
@@ -128,13 +127,13 @@ python -m src.runners.dims.product_catalog --silver-path data/silver/base \
 2. **Correct execution order**:
    ```bash
    # Step 1: Create dimension snapshots from Bronze
-   make local-dims
+   ecomlake local dims
 
    # Step 2: Run Base Silver (reads dims for FK validation)
-   make local-silver
+   ecomlake local silver
 
    # Step 3: Run Enriched Silver
-   make local-enriched
+   ecomlake local enriched
    ```
 3. **In CI/CD**: Ensure `SILVER_DIMS_PATH` environment variable is set:
    ```yaml
@@ -145,7 +144,7 @@ python -m src.runners.dims.product_catalog --silver-path data/silver/base \
 **Stale dimension snapshots:**
 1. Dimension snapshots are daily snapshots created from Bronze data
 2. If Bronze data changes but dims aren't refreshed, FK validation will fail
-3. Re-run: `make local-dims` to refresh snapshots
+3. Re-run: `ecomlake local dims` to refresh snapshots
 
 **Performance benefit:**
 - Dimension snapshots provide 60% performance improvement
@@ -153,7 +152,7 @@ python -m src.runners.dims.product_catalog --silver-path data/silver/base \
 - Trade-off: Snapshots must be created before Base Silver
 
 ### Prevention
-- Always run `make local-dims` before `make local-silver`
+- Always run `ecomlake local dims` before `ecomlake local silver`
 - In Airflow DAGs, ensure dim snapshot tasks are upstream dependencies
 - Monitor dimension snapshot freshness (should match `ingest_dt`)
 
@@ -185,7 +184,7 @@ print(f'Quarantine rows: {df.height}')
 "
 
 # Check Silver validation report
-python -m src.validation.silver --silver-path data/silver/base --env local
+ecomlake silver validate --silver-path data/silver/base --env local
 ```
 
 ### Resolution
@@ -233,7 +232,7 @@ python -m src.validation.silver --silver-path data/silver/base --env local
 
 ```bash
 # Run enriched validation
-python -m src.validation.enriched --enriched-path data/silver/enriched --env local
+ecomlake enriched validate --enriched-path data/silver/enriched --env local
 
 # Check specific table metrics
 python -c "
@@ -276,7 +275,8 @@ cat data/metrics/enriched_quality_*.json | jq .
 **Missing enriched table:**
 1. Verify Base Silver tables exist
 2. Check runner logs for errors
-3. Run specific runner: `python -m src.runners.enriched.customer`
+3. Advanced: run enriched for a single date, then inspect customer output table
+   `ecomlake enriched run --ingest-dt 2024-01-03`
 
 ### Prevention
 - Set `enriched_ratio_epsilon` for floating-point tolerance
@@ -347,8 +347,8 @@ data/silver/base/quarantine/orders/ingest_dt=2025-01-15/part-0.parquet
 
 **Check Quarantine Size:**
 ```bash
-# Count quarantined records by table
-make quarantine-stats
+# Generate quarantine breakdown (see report)
+ecomlake silver validate --silver-path data/silver/base --quarantine-path data/silver/base/quarantine
 
 # Manual check (local)
 find data/silver/base/quarantine -name "*.parquet" -exec wc -l {} \; | awk '{sum+=$1} END {print sum}'
@@ -377,7 +377,7 @@ df.head(100).write_csv('quarantine_sample.csv')
 **Check Quarantine Rate:**
 ```bash
 # Run Silver validation
-python -m src.validation.silver --silver-path data/silver/base --env local
+ecomlake silver validate --silver-path data/silver/base --env local
 
 # Check metrics output
 cat data/metrics/silver_quality_*.json | jq '.table_metrics[] | select(.table_name=="orders") | .quarantine_pct'
@@ -404,10 +404,10 @@ cat data/metrics/silver_quality_*.json | jq '.table_metrics[] | select(.table_na
 3. **Reprocess:**
    ```bash
    # After fixing upstream, reprocess partition
-   make local-silver DATE=2025-01-15
+   ecomlake local silver --date 2025-01-15
 
    # Verify quarantine reduced
-   python -m src.validation.silver --silver-path data/silver/base --env local
+   ecomlake silver validate --silver-path data/silver/base --env local
    ```
 
 **Recover Quarantined Records:**
@@ -454,7 +454,7 @@ if quarantine_pct > MAX_QUARANTINE_RATE:
 
 ```bash
 # Generate quarantine report
-python scripts/generate_quarantine_report.py --week 2025-W03 --output docs/validation_reports/
+ecomlake silver validate --silver-path data/silver/base --output-report docs/validation_reports/SILVER_QUALITY_2025_W03.md
 
 # Review top reasons
 cat docs/validation_reports/quarantine_summary_2025W03.json | jq

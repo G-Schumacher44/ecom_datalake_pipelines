@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import warnings
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -166,4 +168,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            (
+                "Deprecated: use `ecomlake enriched run` instead of "
+                "scripts/run_enriched_all_samples.py"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
     main()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -236,4 +237,13 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            (
+                "Deprecated: use `ecomlake dim validate` instead of "
+                "python -m src.validation.dims_snapshot"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
     raise SystemExit(main())

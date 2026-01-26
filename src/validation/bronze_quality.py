@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -442,4 +443,13 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            (
+                "Deprecated: use `ecomlake bronze validate` instead of "
+                "python -m src.validation.bronze_quality"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
     raise SystemExit(main())

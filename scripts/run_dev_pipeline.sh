@@ -1,4 +1,7 @@
 #!/bin/bash
+if [[ -z "${ECOM_CLI_SUPPRESS_DEPRECATION:-}" ]]; then
+  echo "DEPRECATED: use \`ecomlake pipeline dev-gcs\` instead of scripts/run_dev_pipeline.sh" >&2
+fi
 set -e  # Exit on error
 
 # ==============================================================================

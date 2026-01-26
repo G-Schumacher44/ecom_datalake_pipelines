@@ -11,6 +11,7 @@ import logging
 import os
 import subprocess
 import sys
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -446,5 +447,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if not os.getenv("ECOM_CLI_SUPPRESS_DEPRECATION"):
+        warnings.warn(
+            (
+                "Deprecated: use `ecomlake silver run` instead of "
+                "python -m src.runners.base_silver"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
     logging.basicConfig(level=logging.INFO)
     main()
