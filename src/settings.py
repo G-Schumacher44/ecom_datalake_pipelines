@@ -437,7 +437,7 @@ def load_settings(
         Validated Settings instance
     """
     if config_path is None:
-        config_path = "config/config.yml"
+        config_path = os.getenv("ECOM_CONFIG_PATH", "config/config.yml")
     return Settings.from_yaml(config_path, strict=strict)
 
 
