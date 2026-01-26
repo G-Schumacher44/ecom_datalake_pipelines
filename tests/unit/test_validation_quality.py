@@ -55,3 +55,11 @@ def test_evaluate_expectations():
     assert any("expect_between_failed" in f for f in failures)
     assert any("expect_in_set_failed" in f for f in failures)
     assert any("unknown_expectation_type" in f for f in failures)
+
+
+def test_split_fk_handles_missing_columns():
+    df = pd.DataFrame({"a": [1, 2]})
+    ref = pd.DataFrame({"b": [1, 2]})
+    kept, dropped = quality.split_fk(df, "missing", ref, "b")
+    assert kept.equals(df)
+    assert dropped.empty
