@@ -30,7 +30,7 @@ htmlcov/
 # Package manager lock files (using conda)
 uv.lock
 constraints.txt
-
+build/*
 docs/local_only/*
 
 logs/
