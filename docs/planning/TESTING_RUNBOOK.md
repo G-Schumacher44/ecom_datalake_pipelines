@@ -24,11 +24,11 @@ Before building Silver transforms, we need to understand:
 - Temporal schema drift across the 6-year dataset
 
 ### Profiling Script
-Location: [scripts/describe_parquet_samples.py](../../../scripts/describe_parquet_samples.py)
+Location: `ecomlake bronze profile` (legacy script: [scripts/describe_parquet_samples.py](../../../scripts/describe_parquet_samples.py))
 
 **Usage**:
 ```bash
-python scripts/describe_parquet_samples.py --output docs/data/BRONZE_PROFILE_REPORT.md
+ecomlake bronze profile --output docs/data/BRONZE_PROFILE_REPORT.md
 ```
 
 ### Sampling Strategy: Stratified Temporal Sampling

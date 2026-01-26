@@ -4,31 +4,35 @@ Generated from local parquet samples in `samples/bronze/`.
 
 ## Sample Scope
 
-- **Ingest dates**: 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03, 2025-10-01
+- **Date range**: 2020-01-01..2020-01-05
 
 ## Overview
 
 - **Tables sampled**: 8
-- **Partitions sampled**: 11
-- **Total sample rows**: 194,325
+- **Partitions sampled**: 10
+- **Total sample rows**: 152,029
 
 ### Per-Table Summary
 
 | Table | Partitions | Sample Rows |
 | --- | --- | --- |
-| cart_items | 6 | 132,693 |
-| customers | 3 | 211 |
-| order_items | 6 | 20,371 |
-| orders | 6 | 4,215 |
+| cart_items | 5 | 102,973 |
+| customers | 5 | 353 |
+| order_items | 5 | 16,079 |
+| orders | 5 | 3,353 |
 | product_catalog | 5 | 3,000 |
-| return_items | 1 | 615 |
-| returns | 1 | 153 |
-| shopping_carts | 6 | 33,067 |
+| return_items | 4 | 163 |
+| returns | 4 | 39 |
+| shopping_carts | 5 | 26,069 |
 
 ### Data Quality Flags
 
-- 📊 **order_items** partition `2023-01-01`: 5,180 rows (+52% above average) (count=1, samples=order_items:2023-01-01)
-- 📊 **orders** partition `2023-01-01`: 1,070 rows (+52% above average) (count=1, samples=orders:2023-01-01)
+- ⚠️ **return_items.return_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=2, samples=return_items:2020-01-02, return_items:2020-01-03)
+- ⚠️ **return_items.order_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=2, samples=return_items:2020-01-02, return_items:2020-01-03)
+- ⚠️ **returns.return_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=2, samples=returns:2020-01-02, returns:2020-01-03)
+- ⚠️ **returns.order_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=2, samples=returns:2020-01-02, returns:2020-01-03)
+- ⚠️ **returns.customer_id**: Only 4 distinct values (expected high cardinality for primary entity ID) (count=2, samples=returns:2020-01-02, returns:2020-01-03)
+- 📊 **returns** partition `2020-01-05`: 16 rows (+64% above average) (count=1, samples=returns:2020-01-05)
 
 ## Schema Drift
 
@@ -40,56 +44,42 @@ _Note: Partitions with all-null values for a column may show `Null` type instead
 
 Shows which partitions were sampled per table (for temporal schema drift detection).
 
-**cart_items** (6 partitions):
-- `2020-03`: 2020-03-01
-- `2023-01`: 2023-01-01
-- `2024-01`: 2024-01-01, 2024-01-02, 2024-01-03
-- `2025-10`: 2025-10-01
+**cart_items** (5 partitions):
+- `2020-01`: 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05
 
-**customers** (3 partitions):
-- `2020-03`: 2020-03-01
-- `2023-01`: 2023-01-01
-- `2025-10`: 2025-10-01
+**customers** (5 partitions):
+- `2020-01`: 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05
 
-**order_items** (6 partitions):
-- `2020-03`: 2020-03-01
-- `2023-01`: 2023-01-01
-- `2024-01`: 2024-01-01, 2024-01-02, 2024-01-03
-- `2025-10`: 2025-10-01
+**order_items** (5 partitions):
+- `2020-01`: 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05
 
-**orders** (6 partitions):
-- `2020-03`: 2020-03-01
-- `2023-01`: 2023-01-01
-- `2024-01`: 2024-01-01, 2024-01-02, 2024-01-03
-- `2025-10`: 2025-10-01
+**orders** (5 partitions):
+- `2020-01`: 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05
 
 **product_catalog** (5 partitions):
 - `non-date`: category=Books, category=Clothing, category=Electronics, category=Home, category=Toys
 
-**return_items** (1 partitions):
-- `2023-01`: 2023-01-01
+**return_items** (4 partitions):
+- `2020-01`: 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05
 
-**returns** (1 partitions):
-- `2023-01`: 2023-01-01
+**returns** (4 partitions):
+- `2020-01`: 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05
 
-**shopping_carts** (6 partitions):
-- `2020-03`: 2020-03-01
-- `2023-01`: 2023-01-01
-- `2024-01`: 2024-01-01, 2024-01-02, 2024-01-03
-- `2025-10`: 2025-10-01
+**shopping_carts** (5 partitions):
+- `2020-01`: 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05
 
 ## Canonical Schema Keys
 
 | Table | Canonical Schema Key | Sample Partitions |
 | --- | --- | --- |
-| cart_items | `cart_item_id:Int64|cart_id:String|product_id:Int64|product_name:String|category:String|added_at:String|quantity:Int64|unit_price:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03 |
-| customers | `customer_id:String|first_name:String|last_name:String|email:String|phone_number:String|signup_date:String|gender:String|age:Float64|is_guest:Boolean|customer_status:String|signup_channel:String|loyalty_tier:String|initial_loyalty_tier:String|email_verified:Boolean|marketing_opt_in:Boolean|mailing_address:String|billing_address:String|loyalty_enrollment_date:String|clv_bucket:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2025-10-01 |
-| order_items | `order_id:String|product_id:Int64|product_name:String|category:String|quantity:Int64|unit_price:Float64|discount_amount:Float64|cost_price:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03 |
-| orders | `order_id:String|total_items:Int64|order_date:String|customer_id:String|email:String|order_channel:String|is_expedited:Boolean|customer_tier:String|gross_total:Float64|net_total:Float64|total_discount_amount:Float64|payment_method:String|shipping_speed:String|shipping_cost:Float64|agent_id:String|actual_shipping_cost:Float64|payment_processing_fee:Float64|shipping_address:String|billing_address:String|clv_bucket:String|is_reactivated:Boolean|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03 |
+| cart_items | `cart_item_id:Int64|cart_id:String|product_id:Int64|product_name:String|category:String|added_at:String|quantity:Int64|unit_price:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05 |
+| customers | `customer_id:String|first_name:String|last_name:String|email:String|phone_number:String|signup_date:String|gender:String|age:Float64|is_guest:Boolean|customer_status:String|signup_channel:String|loyalty_tier:String|initial_loyalty_tier:String|email_verified:Boolean|marketing_opt_in:Boolean|mailing_address:String|billing_address:String|loyalty_enrollment_date:String|clv_bucket:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05 |
+| order_items | `order_id:String|product_id:Int64|product_name:String|category:String|quantity:Int64|unit_price:Float64|discount_amount:Float64|cost_price:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05 |
+| orders | `order_id:String|total_items:Int64|order_date:String|customer_id:String|email:String|order_channel:String|is_expedited:Boolean|customer_tier:String|gross_total:Float64|net_total:Float64|total_discount_amount:Float64|payment_method:String|shipping_speed:String|shipping_cost:Float64|agent_id:String|actual_shipping_cost:Float64|payment_processing_fee:Float64|shipping_address:String|billing_address:String|clv_bucket:String|is_reactivated:Boolean|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05 |
 | product_catalog | `product_id:Int64|product_name:String|category:String|unit_price:Float64|cost_price:Float64|inventory_quantity:Int64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | Books, Clothing, Electronics, Home, Toys |
-| return_items | `return_item_id:Int64|return_id:String|order_id:String|product_id:Int64|product_name:String|category:String|quantity_returned:Int64|unit_price:Float64|cost_price:Float64|refunded_amount:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2023-01-01 |
-| returns | `return_id:String|order_id:String|customer_id:String|email:String|return_date:String|reason:String|return_type:String|refunded_amount:Float64|return_channel:String|agent_id:String|refund_method:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2023-01-01 |
-| shopping_carts | `cart_id:String|customer_id:String|created_at:String|updated_at:String|cart_total:Float64|status:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-03-01, 2023-01-01, 2024-01-01, 2024-01-02, 2024-01-03 |
+| return_items | `return_item_id:Int64|return_id:String|order_id:String|product_id:Int64|product_name:String|category:String|quantity_returned:Int64|unit_price:Float64|cost_price:Float64|refunded_amount:Float64|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05 |
+| returns | `return_id:String|order_id:String|customer_id:String|email:String|return_date:String|reason:String|return_type:String|refunded_amount:Float64|return_channel:String|agent_id:String|refund_method:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05 |
+| shopping_carts | `cart_id:String|customer_id:String|created_at:String|updated_at:String|cart_total:Float64|status:String|batch_id:String|ingestion_ts:String|event_id:String|source_file:String` | 2020-01-01, 2020-01-02, 2020-01-03, 2020-01-04, 2020-01-05 |
 
 ## Column Statistics (Sample Partition)
 
@@ -97,103 +87,103 @@ Showing detailed stats for one representative partition per table.
 
 ### cart_items
 
-**Sample**: `ingest_dt=2020-03-01` (20,023 rows)
+**Sample**: `ingest_dt=2020-01-01` (19,821 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| cart_item_id | Int64 | 0.0% | 20,023 | Range: `211` to `709765`<br>p25=180859.0, p50=354799.0, p75=538992.0, p95=679379.0 |
-| cart_id | String | 0.0% | 4,399 | Top: `CART-11037596` (15), `CART-11044607` (15), `CART-11097168` (15) |
-| product_id | Int64 | 0.0% | 2,996 | Range: `1` to `3000`<br>p25=737.0, p50=1488.0, p75=2256.0, p95=2851.0 |
-| product_name | String | 0.0% | 638 | Top: `Cozy Lamp` (371), `Elegant Table` (331), `Rustic Table` (298) |
-| category | String | 0.0% | 5 | Top: `Home` (4847), `Electronics` (3958), `Books` (3944) |
-| added_at | String | 0.0% | 20,023 | Top: `2020-03-01T13:59:50.717691` (1), `2020-03-01T14:00:38.717691` (1), `2020-03-01T14:04:56.717691` (1) |
+| cart_item_id | Int64 | 0.0% | 19,821 | Range: `79` to `709745`<br>p25=180088.0, p50=350733.0, p75=530500.0, p95=673046.0 |
+| cart_id | String | 0.0% | 4,376 | Top: `CART-10417354` (15), `CART-10418311` (15), `CART-10461508` (15) |
+| product_id | Int64 | 0.0% | 2,998 | Range: `1` to `3000`<br>p25=734.0, p50=1497.0, p75=2263.0, p95=2856.0 |
+| product_name | String | 0.0% | 642 | Top: `Elegant Table` (370), `Cozy Lamp` (336), `Elegant Chair` (297) |
+| category | String | 0.0% | 5 | Top: `Home` (4710), `Electronics` (3961), `Books` (3945) |
+| added_at | String | 0.0% | 19,821 | Top: `2020-01-01T13:11:41.518678` (1), `2020-01-01T13:12:59.518678` (1), `2020-01-01T13:16:56.518678` (1) |
 | quantity | Int64 | 0.0% | 6 | Range: `1` to `6`<br>p25=1.0, p50=2.0, p75=3.0, p95=5.0 |
-| unit_price | Float64 | 0.0% | 2,827 | Range: `5.02` to `249.86`<br>p25=63.56, p50=125.26, p75=188.96, p95=238.2 |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (20023) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T17:07:45+00:00` (20023) |
-| event_id | String | 0.0% | 20,023 | Top: `evt_ee1f47614e81aff0a9c9554bcc96f41419e6729988e35a299b8959a7f7d392b3` (1), `evt_d1aeca8e33677b189763608c34df7e13bdadaf9621f58481c8870be1dc651128` (1), `evt_015661fd07fd85888c04f036a1a926c9656485fb618e9e7cac0b0628e269f281` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/cart_items/ingest_dt=2020-03-01/part-0000.parquet` (20023) |
+| unit_price | Float64 | 0.0% | 2,830 | Range: `5.02` to `249.86`<br>p25=64.35, p50=125.93, p75=188.18, p95=236.82 |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (19821) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:38+00:00` (19821) |
+| event_id | String | 0.0% | 19,821 | Top: `evt_11e0a256a3e93a1358475df0da29683c5369270b2ab195cf0e30649da0361fff` (1), `evt_2e56407d9c3fa10e073de74a6c28f4d7c75a145a1b98a0097edeb95d039a8bd5` (1), `evt_d4926c937dc8d9eac6ec3e7b98a6cb86c6013878773196287b917676f2822318` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/cart_items/ingest_dt=2020-01-01/part-0000.parquet` (19821) |
 
 ### customers
 
-**Sample**: `signup_date=2020-03-01` (65 rows)
+**Sample**: `signup_date=2020-01-01` (68 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| customer_id | String | 0.0% | 65 | Top: `CUST-7702` (1), `CUST-19825` (1), `CUST-22240` (1) |
-| first_name | String | 0.0% | 56 | Top: `Dawn` (3), `Dennis` (2), `David` (2) |
-| last_name | String | 0.0% | 55 | Top: `Williams` (4), `Smith` (4), `Gray` (2) |
-| email | String | 0.0% | 65 | Top: `dennis.vincent@gmail.com` (1), `susan.gray@yahoo.com` (1), `thomas.morales@yahoo.com` (1) |
-| phone_number | String | 0.0% | 65 | Top: `844-271-8939x530` (1), `+1-748-549-9615x410` (1), `001-470-638-4758x31120` (1) |
-| signup_date | String | 0.0% | 1 | Top: `2020-03-01` (65) |
-| gender | String | 0.0% | 3 | Top: `Female` (24), `Unknown` (22), `Male` (19) |
-| age | Float64 | 0.0% | 38 | Range: `18.0` to `70.0`<br>p25=35.0, p50=45.0, p75=60.0, p95=69.0 |
+| customer_id | String | 0.0% | 68 | Top: `CUST-9047` (1), `CUST-11164` (1), `CUST-11420` (1) |
+| first_name | String | 0.0% | 59 | Top: `Lisa` (3), `Christopher` (2), `Charles` (2) |
+| last_name | String | 0.0% | 61 | Top: `Smith` (3), `Moore` (3), `Johnson` (3) |
+| email | String | 0.0% | 68 | Top: `tyler.harvey@gmail.com` (1), `brittany.jenkins@gmail.com` (1), `lisa.thomas@hotmail.com` (1) |
+| phone_number | String | 0.0% | 68 | Top: `4627873451` (1), `001-498-498-5756` (1), `832.575.8251x4341` (1) |
+| signup_date | String | 0.0% | 1 | Top: `2020-01-01` (68) |
+| gender | String | 0.0% | 3 | Top: `Unknown` (26), `Male` (23), `Female` (19) |
+| age | Float64 | 0.0% | 37 | Range: `18.0` to `70.0`<br>p25=29.0, p50=46.0, p75=60.0, p95=68.0 |
 | is_guest | Boolean | 0.0% | 1 | — |
-| customer_status | String | 0.0% | 3 | Top: `Active` (50), `Inactive` (9), `Dormant` (6) |
-| signup_channel | String | 0.0% | 4 | Top: `Website` (39), `email` (15), `Social Media` (7) |
-| loyalty_tier | String | 10.77% | 5 | Top: `Bronze` (26), `Silver` (16), `Gold` (8) |
-| initial_loyalty_tier | String | 10.77% | 5 | Top: `Bronze` (26), `Silver` (16), `Gold` (8) |
+| customer_status | String | 0.0% | 3 | Top: `Active` (42), `Inactive` (15), `Dormant` (11) |
+| signup_channel | String | 0.0% | 4 | Top: `Website` (38), `email` (14), `Phone` (8) |
+| loyalty_tier | String | 5.88% | 5 | Top: `Bronze` (26), `Gold` (17), `Silver` (11) |
+| initial_loyalty_tier | String | 5.88% | 5 | Top: `Bronze` (26), `Gold` (17), `Silver` (11) |
 | email_verified | Boolean | 0.0% | 2 | — |
 | marketing_opt_in | Boolean | 0.0% | 2 | — |
-| mailing_address | String | 0.0% | 65 | Top: `1038 Derek Forest, West Douglaschester, IL 55842` (1), `1544 James Well Suite 568, Lukeshire, AS 13600` (1), `121 Watkins Roads Suite 021, Taraport, AR 05450` (1) |
-| billing_address | String | 0.0% | 65 | Top: `1038 Derek Forest, West Douglaschester, IL 55842` (1), `1544 James Well Suite 568, Lukeshire, AS 13600` (1), `121 Watkins Roads Suite 021, Taraport, AR 05450` (1) |
-| loyalty_enrollment_date | String | 10.77% | 59 | Top: `None` (7), `2021-04-07` (1), `2020-06-29` (1) |
-| clv_bucket | String | 0.0% | 3 | Top: `Low` (33), `Medium` (16), `High` (16) |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (65) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:28+00:00` (65) |
-| event_id | String | 0.0% | 65 | Top: `evt_f4a1e0e3303eefd2feb5396178bf83fc393b63d8bfe9044d4426577b401677ca` (1), `evt_74287e37d699583b80a3fb75f2f19d08d83f45678124f8303d2682039a727320` (1), `evt_1dc3b4f64ee0eff88d6e3bc0f607ead802efd3e514adf07eb8642cc475b091c2` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/customers/signup_date=2020-03-01/part-0000.parquet` (65) |
+| mailing_address | String | 0.0% | 68 | Top: `33704 French Canyon, Lake Whitney, MT 02607` (1), `Unit 0236 Box 9238, DPO AA 77636` (1), `3529 Sherry Junction Suite 695, Michelleburgh, MH 40558` (1) |
+| billing_address | String | 0.0% | 68 | Top: `33704 French Canyon, Lake Whitney, MT 02607` (1), `Unit 0236 Box 9238, DPO AA 77636` (1), `3529 Sherry Junction Suite 695, Michelleburgh, MH 40558` (1) |
+| loyalty_enrollment_date | String | 5.88% | 63 | Top: `None` (4), `2023-11-08` (2), `2024-12-18` (2) |
+| clv_bucket | String | 0.0% | 3 | Top: `Low` (30), `High` (27), `Medium` (11) |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (68) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:28+00:00` (68) |
+| event_id | String | 0.0% | 68 | Top: `evt_d31d1c2c62f307576b26c5a82fb0c699f6d4dd954ee723b93b9ff9eb2a23bd06` (1), `evt_3cace5b260660bd74f706ff96a84e910de9121cd855ba4ebef01d686f90edce6` (1), `evt_8fabf948fddfe3f94725ae8626da497ef0515f064c3b9604e9e961bdf87b8859` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/customers/signup_date=2020-01-01/part-0000.parquet` (68) |
 
 ### order_items
 
-**Sample**: `ingest_dt=2020-03-01` (3,035 rows)
+**Sample**: `ingest_dt=2020-01-01` (3,156 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| order_id | String | 0.0% | 621 | Top: `ORD-01422581` (15), `ORD-01422759` (15), `ORD-01422915` (15) |
-| product_id | Int64 | 0.0% | 1,925 | Range: `1` to `3000`<br>p25=754.0, p50=1491.0, p75=2274.0, p95=2860.0 |
-| product_name | String | 0.0% | 341 | Top: `Cozy Lamp` (58), `Elegant Rug` (55), `Elegant Table` (51) |
-| category | String | 0.0% | 5 | Top: `Home` (738), `Electronics` (611), `Books` (593) |
-| quantity | Int64 | 0.0% | 7 | Range: `1` to `9`<br>p25=1.0, p50=2.0, p75=3.0, p95=5.0 |
-| unit_price | Float64 | 0.0% | 1,864 | Range: `5.02` to `249.86`<br>p25=62.08, p50=125.96, p75=188.57, p95=237.5 |
-| discount_amount | Float64 | 0.0% | 605 | Range: `0.0` to `283.26`<br>p25=0.0, p50=0.0, p75=0.0, p95=59.93 |
-| cost_price | Float64 | 0.0% | 1,806 | Range: `2.22` to `170.41`<br>p25=33.53, p50=68.48, p75=100.23, p95=141.73 |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (3035) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T17:07:57+00:00` (3035) |
-| event_id | String | 0.0% | 3,035 | Top: `evt_b15e82d3857e1dde2db9428fef82ca947f118ba09085ef01b89b185a5a9150c5` (1), `evt_75c8a41a7655ea1399e50c85600595a7ed72a7b47fc5cf667d44646bac7b6968` (1), `evt_2c73f0a0a2fde7b6b63987b3fdc1be21b9436b8ba4bb8d9faef0669d4c1fefcf` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/order_items/ingest_dt=2020-03-01/part-0000.parquet` (3035) |
+| order_id | String | 0.0% | 652 | Top: `ORD-01337420` (15), `ORD-01337427` (15), `ORD-01337518` (15) |
+| product_id | Int64 | 0.0% | 1,944 | Range: `3` to `3000`<br>p25=756.0, p50=1511.0, p75=2253.0, p95=2855.0 |
+| product_name | String | 0.0% | 353 | Top: `Elegant Table` (63), `Modern Table` (47), `Modern Lamp` (46) |
+| category | String | 0.0% | 5 | Top: `Home` (754), `Electronics` (615), `Books` (601) |
+| quantity | Int64 | 0.0% | 6 | Range: `1` to `6`<br>p25=1.0, p50=2.0, p75=3.0, p95=5.0 |
+| unit_price | Float64 | 0.0% | 1,873 | Range: `5.02` to `249.86`<br>p25=64.35, p50=126.99, p75=186.92, p95=237.62 |
+| discount_amount | Float64 | 0.0% | 592 | Range: `0.0` to `295.49`<br>p25=0.0, p50=0.0, p75=0.0, p95=56.66 |
+| cost_price | Float64 | 0.0% | 1,835 | Range: `2.22` to `169.86`<br>p25=34.64, p50=68.58, p75=101.74, p95=141.91 |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (3156) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:50+00:00` (3156) |
+| event_id | String | 0.0% | 3,156 | Top: `evt_e624b098d1e73ed34c2f0ab533dd147fec1a11eb94c4c7d6d7d5dbd52c2c098a` (1), `evt_77e32bf8b876513559665abeb6b03f4bdeaa9ee470fa547e8dd8bbb11d4f3b13` (1), `evt_689c0e3f75d3a533f7873d56d44e33a20ff8f54f6c3bac6ba54a9e6030d701e7` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/order_items/ingest_dt=2020-01-01/part-0000.parquet` (3156) |
 
 ### orders
 
-**Sample**: `ingest_dt=2020-03-01` (621 rows)
+**Sample**: `ingest_dt=2020-01-01` (652 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| order_id | String | 0.0% | 621 | Top: `ORD-01422430` (1), `ORD-01422431` (1), `ORD-01422432` (1) |
-| total_items | Int64 | 0.0% | 14 | Range: `1` to `22`<br>p25=4.0, p50=7.0, p75=10.0, p95=13.0 |
-| order_date | String | 0.0% | 621 | Top: `2020-03-01 00:01:23.094983` (1), `2020-03-01 00:09:10.575202` (1), `2020-03-01 00:11:22.849149` (1) |
-| customer_id | String | 0.0% | 621 | Top: `GUEST-179840` (1), `CUST-57274` (1), `CUST-105882` (1) |
-| email | String | 0.0% | 619 | Top: `susan.harrison@gmail.com` (2), `amy.smith@yahoo.com` (2), `randy92@example.org` (1) |
-| order_channel | String | 0.0% | 5 | Top: `Web` (283), `Phone` (137), `Social Media` (84) |
+| order_id | String | 0.0% | 652 | Top: `ORD-01336885` (1), `ORD-01336886` (1), `ORD-01336887` (1) |
+| total_items | Int64 | 0.0% | 15 | Range: `1` to `22`<br>p25=4.0, p50=7.0, p75=9.0, p95=13.0 |
+| order_date | String | 0.0% | 652 | Top: `2020-01-01 00:01:00.157383` (1), `2020-01-01 00:03:39.862704` (1), `2020-01-01 00:10:23.438977` (1) |
+| customer_id | String | 0.0% | 652 | Top: `CUST-142659` (1), `GUEST-118771` (1), `CUST-90816` (1) |
+| email | String | 0.0% | 652 | Top: `donna.morgan@hotmail.com` (1), `riosjohn@example.org` (1), `morgan.mccarty@yahoo.com` (1) |
+| order_channel | String | 0.0% | 5 | Top: `Web` (297), `Phone` (119), `Social Media` (109) |
 | is_expedited | Boolean | 0.0% | 2 | — |
-| customer_tier | String | 0.0% | 4 | Top: `Platinum` (343), `Gold` (140), `Silver` (122) |
-| gross_total | Float64 | 0.0% | 620 | Range: `11.46` to `9571.19`<br>p25=549.33, p50=1113.79, p75=1771.28, p95=4108.23 |
-| net_total | Float64 | 0.0% | 621 | Range: `9.17` to `8943.47`<br>p25=537.68, p50=1085.31, p75=1747.35, p95=4024.49 |
-| total_discount_amount | Float64 | 0.0% | 371 | Range: `0.0` to `776.61`<br>p25=0.0, p50=14.38, p75=60.79, p95=176.38 |
-| payment_method | String | 0.0% | 33 | Top: `Credit Card` (343), `PayPal` (115), `Apple Pay` (39) |
-| shipping_speed | String | 0.0% | 22 | Top: `Standard` (331), `Two-Day` (136), `Overnight` (75) |
+| customer_tier | String | 0.0% | 4 | Top: `Platinum` (338), `Gold` (183), `Silver` (110) |
+| gross_total | Float64 | 0.0% | 652 | Range: `5.11` to `8132.44`<br>p25=577.46, p50=1036.35, p75=1755.18, p95=4165.6 |
+| net_total | Float64 | 0.0% | 650 | Range: `5.11` to `7801.96`<br>p25=570.82, p50=1017.05, p75=1727.78, p95=4099.3 |
+| total_discount_amount | Float64 | 0.0% | 387 | Range: `0.0` to `433.39`<br>p25=0.0, p50=11.98, p75=55.94, p95=171.39 |
+| payment_method | String | 0.0% | 28 | Top: `Credit Card` (336), `PayPal` (111), `Apple Pay` (70) |
+| shipping_speed | String | 0.0% | 21 | Top: `Standard` (373), `Two-Day` (109), `Overnight` (83) |
 | shipping_cost | Float64 | 0.0% | 3 | Range: `5.0` to `80.0`<br>p25=5.0, p50=5.0, p75=45.0, p95=80.0 |
-| agent_id | String | 3.86% | 22 | Top: `ONLINE` (464), `None` (24), `CSR-0014` (11) |
-| actual_shipping_cost | Float64 | 0.0% | 344 | Range: `3.83` to `76.98`<br>p25=4.27, p50=4.72, p75=38.05, p95=71.91 |
-| payment_processing_fee | Float64 | 0.0% | 593 | Range: `0.23` to `268.3`<br>p25=12.86, p50=25.76, p75=44.38, p95=94.96 |
-| shipping_address | String | 0.0% | 621 | Top: `6106 Brown Roads, Douglasville, MH 82321` (1), `13471 Charles Plains Suite 128, Moorefort, WI 47283` (1), `054 Allen Ramp, Joshuaview, PA 06763` (1) |
-| billing_address | String | 0.0% | 621 | Top: `6106 Brown Roads, Douglasville, MH 82321` (1), `13471 Charles Plains Suite 128, Moorefort, WI 47283` (1), `054 Allen Ramp, Joshuaview, PA 06763` (1) |
-| clv_bucket | String | 0.0% | 22 | Top: `High` (358), `Medium` (131), `Low` (54) |
+| agent_id | String | 5.06% | 22 | Top: `ONLINE` (508), `None` (33), `CSR-0005` (8) |
+| actual_shipping_cost | Float64 | 0.0% | 322 | Range: `3.83` to `76.86`<br>p25=4.23, p50=4.69, p75=36.77, p95=70.66 |
+| payment_processing_fee | Float64 | 0.0% | 619 | Range: `0.1` to `183.97`<br>p25=12.56, p50=24.04, p75=42.81, p95=99.34 |
+| shipping_address | String | 0.0% | 652 | Top: `13834 Connie Pass, South Troytown, KY 36821` (1), `4453 Alexander Creek, Contrerasview, WY 96279` (1), `68537 Johnson Run Suite 591, Bakertown, NJ 40065` (1) |
+| billing_address | String | 0.0% | 652 | Top: `13834 Connie Pass, South Troytown, KY 36821` (1), `4453 Alexander Creek, Contrerasview, WY 96279` (1), `68537 Johnson Run Suite 591, Bakertown, NJ 40065` (1) |
+| clv_bucket | String | 0.0% | 23 | Top: `High` (378), `Medium` (144), `Low` (48) |
 | is_reactivated | Boolean | 0.0% | 1 | — |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (621) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T17:07:57+00:00` (621) |
-| event_id | String | 0.0% | 621 | Top: `evt_1c68f045d72215bd32907a79f803e9d3fbb585ab97277e24a21746915ea67023` (1), `evt_aef33d2865b4e97e4e5ed1c1ece133e731d87c77419e061bda3c5d4d0643add5` (1), `evt_b983f2244bba0b2f28f6c39c2ee6d099b4cec05afd53bb0eaa6cc7013e53c6fe` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/orders/ingest_dt=2020-03-01/part-0000.parquet` (621) |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (652) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:50+00:00` (652) |
+| event_id | String | 0.0% | 652 | Top: `evt_070dff9749542e5cfa52fe766f3662808290815fcd6fdd56632a3f6ec35b597b` (1), `evt_1b260051fd929374f486658bd1881299ef89b68bbe397e652a38ad3918d9c0ad` (1), `evt_618bd82cb464be4be52a56cdbc9923640560b89e9d1e7906ae5591174844ff8d` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/orders/ingest_dt=2020-01-01/part-0000.parquet` (652) |
 
 ### product_catalog
 
@@ -214,64 +204,64 @@ Showing detailed stats for one representative partition per table.
 
 ### return_items
 
-**Sample**: `ingest_dt=2023-01-01` (615 rows)
+**Sample**: `ingest_dt=2020-01-02` (22 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| return_item_id | Int64 | 0.0% | 615 | Range: `262` to `20739`<br>p25=4782.0, p50=10644.0, p75=15721.0, p95=19527.0 |
-| return_id | String | 0.0% | 151 | Top: `RTN-00828082` (14), `RTN-00826048` (12), `RTN-00827804` (11) |
-| order_id | String | 0.0% | 151 | Top: `ORD-03027133` (14), `ORD-03019942` (12), `ORD-03026232` (11) |
-| product_id | Int64 | 0.0% | 567 | Range: `7` to `2999`<br>p25=825.0, p50=1554.0, p75=2340.0, p95=2886.0 |
-| product_name | String | 0.0% | 147 | Top: `Rustic Rug` (14), `Compact Headphones` (14), `Rustic Table` (14) |
-| category | String | 0.0% | 5 | Top: `Home` (149), `Electronics` (144), `Books` (113) |
-| quantity_returned | Int64 | 0.0% | 6 | Range: `1` to `6`<br>p25=1.0, p50=2.0, p75=3.0, p95=5.0 |
-| unit_price | Float64 | 0.0% | 561 | Range: `5.25` to `249.65`<br>p25=59.03, p50=130.07, p75=195.53, p95=239.25 |
-| cost_price | Float64 | 0.0% | 560 | Range: `2.69` to `165.25`<br>p25=33.76, p50=70.17, p75=103.52, p95=140.73 |
-| refunded_amount | Float64 | 0.0% | 596 | Range: `6.26` to `1491.48`<br>p25=93.7, p50=197.41, p75=385.5, p95=758.52 |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T140649` (615) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T22:54:41+00:00` (615) |
-| event_id | String | 0.0% | 615 | Top: `evt_4b43f57680e2d59841752f7dc70152fa6073b596f6495555dea15d551d6b7eff` (1), `evt_093420196d7415768953d8e57e2cfe63465a273280be60605d63ee71467b347d` (1), `evt_51c763a2c4cf16c921033740990a6777d11b5f41564027bed0917efd20fd41cf` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/return_items/ingest_dt=2023-01-01/part-0000.parquet` (615) |
+| return_item_id | Int64 | 0.0% | 22 | Range: `40` to `588`<br>p25=189.0, p50=451.0, p75=583.0, p95=587.0 |
+| return_id | String | 0.0% | 4 | Top: `RTN-00365422` (9), `RTN-00365390` (6), `RTN-00365317` (4) |
+| order_id | String | 0.0% | 4 | Top: `ORD-01337503` (9), `ORD-01337362` (6), `ORD-01337059` (4) |
+| product_id | Int64 | 0.0% | 22 | Range: `111` to `2928`<br>p25=434.0, p50=1908.0, p75=2531.0, p95=2822.0 |
+| product_name | String | 0.0% | 22 | Top: `Colorful Blocks` (1), `  Durable Jacket  ` (1), `Interactive Car` (1) |
+| category | String | 0.0% | 5 | Top: `Toys` (7), `Clothing` (5), `Electronics` (4) |
+| quantity_returned | Int64 | 0.0% | 4 | Range: `1` to `4`<br>p25=1.0, p50=2.0, p75=3.0, p95=4.0 |
+| unit_price | Float64 | 0.0% | 22 | Range: `14.36` to `246.41`<br>p25=61.55, p50=145.29, p75=183.45, p95=224.66 |
+| cost_price | Float64 | 0.0% | 22 | Range: `5.87` to `152.84`<br>p25=33.79, p50=72.46, p75=102.17, p95=149.7 |
+| refunded_amount | Float64 | 0.0% | 22 | Range: `27.28` to `985.64`<br>p25=96.88, p50=177.45, p75=318.75, p95=874.4 |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (22) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:52+00:00` (22) |
+| event_id | String | 0.0% | 22 | Top: `evt_28085a1b8243701fde2cea555dc3779a53c7474481f318930ca15f15bbacb5ef` (1), `evt_5e294c2e13848070d5d7b7186611d5bba460e6652c7c9f0871f5110021a913bf` (1), `evt_2d2281a2cf6152be16824edceb4da725b7c79ba478596c872ea5ca12ba8428ce` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/return_items/ingest_dt=2020-01-02/part-0000.parquet` (22) |
 
 ### returns
 
-**Sample**: `ingest_dt=2023-01-01` (153 rows)
+**Sample**: `ingest_dt=2020-01-02` (4 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| return_id | String | 0.0% | 153 | Top: `RTN-00825054` (1), `RTN-00825110` (1), `RTN-00825244` (1) |
-| order_id | String | 0.0% | 153 | Top: `ORD-03016384` (1), `ORD-03016574` (1), `ORD-03017004` (1) |
-| customer_id | String | 0.0% | 153 | Top: `CUST-106936` (1), `GUEST-114301` (1), `CUST-85405` (1) |
-| email | String | 0.0% | 153 | Top: `ryan.khan@gmail.com` (1), `lesliemartinez@example.org` (1), `martin.walker@yahoo.com` (1) |
-| return_date | String | 0.0% | 1 | Top: `2023-01-01` (153) |
-| reason | String | 0.0% | 27 | Top: `No longer needed` (20), `Found a better price` (19), `Defective` (17) |
-| return_type | String | 0.0% | 6 | Top: `Refund` (137), `refund` (5), `  Refund ` (4) |
-| refunded_amount | Float64 | 0.0% | 152 | Range: `0.0` to `7937.01`<br>p25=301.06, p50=812.15, p75=1476.85, p95=2710.68 |
-| return_channel | String | 0.0% | 18 | Top: `Web` (58), `Phone` (30), `Social Media` (23) |
-| agent_id | String | 4.58% | 18 | Top: `ONLINE` (113), `None` (7), `CSR-0009` (5) |
-| refund_method | String | 0.0% | 5 | Top: `Credit Card` (95), `PayPal` (27), `Apple Pay` (20) |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T140649` (153) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T22:54:41+00:00` (153) |
-| event_id | String | 0.0% | 153 | Top: `evt_c32ba1378ea83d2f12b37130f04982422f9e320a2f937ff3255de649f18accf2` (1), `evt_637cb0e4c7a1f6b82ebb1d75535d6e94b142e963f5a6f562a63133d15aa9998d` (1), `evt_210b9e5f99319344e0f9329705a49fdf33d7e02c3d3411eaee4a9acfd8a43649` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/returns/ingest_dt=2023-01-01/part-0000.parquet` (153) |
+| return_id | String | 0.0% | 4 | Top: `RTN-00365279` (1), `RTN-00365317` (1), `RTN-00365390` (1) |
+| order_id | String | 0.0% | 4 | Top: `ORD-01336921` (1), `ORD-01337059` (1), `ORD-01337362` (1) |
+| customer_id | String | 0.0% | 4 | Top: `CUST-60772` (1), `GUEST-186246` (1), `CUST-162336` (1) |
+| email | String | 0.0% | 4 | Top: `heather.mitchell@gmail.com` (1), `cynthiabryant@example.org` (1), `kristin.murray@hotmail.com` (1) |
+| return_date | String | 0.0% | 1 | Top: `2020-01-02` (4) |
+| reason | String | 0.0% | 3 | Top: `Wrong item` (2), `Product did not match description` (1), `Damaged in transit` (1) |
+| return_type | String | 0.0% | 2 | Top: `  Refund  ` (2), `Refund` (2) |
+| refunded_amount | Float64 | 0.0% | 4 | Range: `680.91` to `3556.01`<br>p25=833.76, p50=865.86, p75=865.86, p95=3556.01 |
+| return_channel | String | 0.0% | 4 | Top: `Phone` (1), `Social Media` (1), `  Ebay ` (1) |
+| agent_id | String | 0.0% | 2 | Top: `ONLINE` (3), `CSR-0019` (1) |
+| refund_method | String | 0.0% | 2 | Top: `Credit Card` (2), `PayPal` (2) |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (4) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:52+00:00` (4) |
+| event_id | String | 0.0% | 4 | Top: `evt_8563513393f58b97ecd65e8fa9333ee14e4289d1b2fe7b52d22de543e494184e` (1), `evt_b6edd01464560db8c51e415f42518a4c3e7f21e31054b3e1a02c6a992c67c614` (1), `evt_e45d3901fcf8bda4edb9af814cc0cf97ed0d8b4d16903572b51a478000456440` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/returns/ingest_dt=2020-01-02/part-0000.parquet` (4) |
 
 ### shopping_carts
 
-**Sample**: `ingest_dt=2020-03-01` (5,089 rows)
+**Sample**: `ingest_dt=2020-01-01` (5,053 rows)
 
 | Column | Type | Null % | Distinct | Stats |
 | --- | --- | --- | --- | --- |
-| cart_id | String | 0.0% | 5,089 | Top: `CART-11017447` (1), `CART-11017476` (1), `CART-11017515` (1) |
-| customer_id | String | 0.0% | 5,089 | Top: `CUST-111247` (1), `GUEST-109600` (1), `CUST-118476` (1) |
-| created_at | String | 0.0% | 5,089 | Top: `2020-03-01T13:24:45.648577` (1), `2020-03-01T13:55:33.717691` (1), `2020-03-01T01:41:30.351686` (1) |
-| updated_at | String | 3.83% | 4,895 | Top: `None` (195), `2020-03-01T13:37:28.648577` (1), `2020-03-01T14:13:28.717691` (1) |
-| cart_total | Float64 | 0.0% | 4,379 | Range: `0.0` to `10782.04`<br>p25=346.74, p50=900.81, p75=1621.7, p95=3321.27 |
-| status | String | 0.0% | 33 | Top: `abandoned` (3323), `emptied` (584), `converted` (532) |
-| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (5089) |
-| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T17:07:42+00:00` (5089) |
-| event_id | String | 0.0% | 5,089 | Top: `evt_6fe812c5617c8dd0f98430c40b4e9613678f1eb8173baf837eeccf5da41e59d6` (1), `evt_9fde26223b1d1845a033744594586c167fc44e921508a0c3a90acaf6ecced20f` (1), `evt_62719919106dace9f47ae6a27b5d6a743bde5edc0cb27b7a07692d8f55daad45` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/shopping_carts/ingest_dt=2020-03-01/part-0000.parquet` (5089) |
+| cart_id | String | 0.0% | 5,053 | Top: `CART-10374276` (1), `CART-10374305` (1), `CART-10374346` (1) |
+| customer_id | String | 0.0% | 5,053 | Top: `CUST-111247` (1), `GUEST-109600` (1), `GUEST-127425` (1) |
+| created_at | String | 0.0% | 5,053 | Top: `2020-01-01T13:09:07.518678` (1), `2020-01-01T13:50:11.546285` (1), `2020-01-01T09:51:50.037233` (1) |
+| updated_at | String | 3.86% | 4,859 | Top: `None` (195), `2020-01-01T13:20:24.518678` (1), `2020-01-01T10:14:38.037233` (1) |
+| cart_total | Float64 | 0.0% | 4,348 | Range: `0.0` to `11021.29`<br>p25=345.69, p50=922.66, p75=1618.05, p95=3342.39 |
+| status | String | 0.0% | 34 | Top: `abandoned` (3241), `converted` (576), `emptied` (573) |
+| batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (5053) |
+| ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:35+00:00` (5053) |
+| event_id | String | 0.0% | 5,053 | Top: `evt_2c75c665c9b09dbaf4ba6b61da836d2d4fe2b26a6bf249cfe886f309c9c0349c` (1), `evt_4295e6d0c02e3b9ce3eaf31030ab41269c43e7ec1331de07c425a33f1c5d82ba` (1), `evt_eff45bca5379f09f49920208722cc3bc1403925b56b34fc086fa0f6d145eb8f2` (1) |
+| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/shopping_carts/ingest_dt=2020-01-01/part-0000.parquet` (5053) |
 <!-- GENERATED META -->
-Last updated (UTC): 2026-01-24T20:59:59Z
-Content hash (SHA-256): c0c61d5e5f60158fc17417d4a4657276ec9f9166569678fb11d96b3ace99cda1
+Last updated (UTC): 2026-01-26T05:39:19Z
+Content hash (SHA-256): e7add49007139f4263a494a6b6917cc59f02aaf15a6b3c4f5eaf7a91ee11e3a5
 <!-- END GENERATED META -->

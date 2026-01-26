@@ -106,7 +106,7 @@ docker compose up -d --no-build
 **Notes**:
 - The compose file defaults to `ecom-datalake-pipeline:latest`. Override with `PIPELINE_TAG`.
 - GitHub releases (tags like `v1.0.0`) automatically build/push to **GHCR** via GitHub Actions.
-  If you need **GCP Artifact Registry**, use `make push-image-versioned PROJECT_ID=...`.
+  If you need **GCP Artifact Registry**, use `ecomlake deploy push-image-versioned PROJECT_ID=...`.
 - Some enriched tables may be empty for a given sample date because the sample archive does not include every table for every day.
 3. Click **Trigger DAG** (play button)
 4. Watch the pipeline execute: Dims → Base Silver → Enriched Silver
@@ -114,7 +114,7 @@ docker compose up -d --no-build
 **Option B: Fast Local Demo** (recommended for quick validation):
 ```bash
 # Single command that runs the complete pipeline with pre-cooked dims
-make local-demo-fast
+ecomlake local demo-fast
 
 # Validates:
 # ✅ Silver: 6/6 fact tables (orders, carts, returns, etc.)
@@ -130,9 +130,9 @@ cat docs/validation_reports/ENRICHED_QUALITY_2020-01-05.md
 **Option C: Manual CLI execution** (for testing individual steps):
 ```bash
 # Run in correct order:
-make local-dims DATE=2020-01-05      # 1. Create dimension snapshots
-make local-silver DATE=2020-01-05    # 2. Run Base Silver (needs dims for FK checks)
-make local-enriched DATE=2020-01-05  # 3. Run Enriched transforms
+ecomlake local dims --date 2020-01-05      # 1. Create dimension snapshots
+ecomlake local silver --date 2020-01-05    # 2. Run Base Silver (needs dims for FK checks)
+ecomlake local enriched --date 2020-01-05  # 3. Run Enriched transforms
 ```
 
 **Notes**:

@@ -37,22 +37,22 @@ The CI workflow validates the pipeline in a single end-to-end job:
 
 ```bash
 for day in 2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05; do
-  python scripts/run_dims_from_spec.py --run-date "$day"
-  python -m src.validation.dims_snapshot --run-date "$day" --run-id "ci_$RUN_ID"
+  ecomlake dim run --run-date "$day"
+  ecomlake dim validate --run-date "$day" --run-id "ci_$RUN_ID"
 done
 
-python -m src.runners.base_silver \
+ecomlake silver run \
   --select "base_silver.*" \
   --vars "{run_date: '2020-01-05', lookback_days: 4}"
 
-python -m src.validation.silver \
+ecomlake silver validate \
   --partition-date 2020-01-05 \
   --lookback-days 4
 
-make dbt-test
-make local-enriched DATE=2020-01-05
+ecomlake dbt test
+ecomlake local enriched --date 2020-01-05
 
-python -m src.validation.enriched --ingest-dt 2020-01-05
+ecomlake enriched validate --ingest-dt 2020-01-05
 python tests/integration/test_gold_logic_duckdb.py
 ```
 
@@ -104,21 +104,21 @@ Understand Bronze data quality before building Silver transforms:
 
 ```bash
 # Basic profile with quality report
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31
 
 # Generate schema JSON map
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --schema-json docs/data/BRONZE_SCHEMA_MAP.json
 
 # Auto-update data contract
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --update-contract docs/resources/DATA_CONTRACT.md
 
 # Generate data dictionary
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --data-dictionary docs/data/DATA_DICTIONARY.md
 ```
@@ -166,7 +166,7 @@ The pipeline implements validation at each layer with distinct quality requireme
 **1. Bronze Validation** (`src/validation/bronze_quality.py`):
 
 ```bash
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2020-01-05 \
   --lookback-days 0 \
@@ -182,7 +182,7 @@ Validates:
 **2. Silver Validation** (`src/validation/silver`):
 
 ```bash
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2020-01-05 \
@@ -201,7 +201,7 @@ Validates:
 **3. Enriched Validation** (`src/validation/enriched`):
 
 ```bash
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --enriched-path data/silver/enriched \
   --ingest-dt 2020-01-05 \
   --output-report docs/validation_reports/enriched_quality.md \
@@ -235,11 +235,11 @@ Validates:
 **Example**:
 
 ```bash
-python -m src.runners.base_silver \
+ecomlake silver run \
   --select "base_silver.*" \
   --vars "{run_date: '2020-01-05', lookback_days: 0}"
-python scripts/run_dims_from_spec.py --run-date 2020-01-05
-make local-enriched DATE=2020-01-05
+ecomlake dim run --run-date 2020-01-05
+ecomlake local enriched --date 2020-01-05
 ```
 
 ### Phase 2: Medium Batch
@@ -260,10 +260,10 @@ make local-enriched DATE=2020-01-05
 
 ```bash
 for date in 2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05; do
-  python -m src.runners.base_silver \
+  ecomlake silver run \
     --select "base_silver.*" \
     --vars "{run_date: '${date}', lookback_days: 0}"
-  make local-enriched DATE=$date
+  ecomlake local enriched --date $date
 done
 ```
 
@@ -292,13 +292,13 @@ The project includes automated E2E pipeline validation:
 - name: Run E2E Pipeline Check
   run: |
     for day in 2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05; do
-      python scripts/run_dims_from_spec.py --run-date "$day"
-      python -m src.validation.dims_snapshot --run-date "$day"
+      ecomlake dim run --run-date "$day"
+      ecomlake dim validate --run-date "$day"
     done
-    python -m src.runners.base_silver \
+    ecomlake silver run \
       --select "base_silver.*" \
       --vars "{run_date: '2020-01-05', lookback_days: 2}"
-    make local-enriched DATE=2020-01-05
+    ecomlake local enriched --date 2020-01-05
 ```
 
 **What This Validates**:
@@ -317,7 +317,7 @@ The project includes automated E2E pipeline validation:
 pytest tests/unit/test_transforms.py::test_cart_attribution -v --durations=10
 
 # Profile memory usage
-python -m memory_profiler scripts/run_enriched_all_samples.py
+mprof run ecomlake enriched run --ingest-dt 2020-01-05
 ```
 
 ### Expected Performance
@@ -379,7 +379,7 @@ cat data/silver/dims/_latest.json
 
 ```bash
 # Profile Bronze data types
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --tables orders \
   --date-range 2020-01-05..2020-01-05
 
@@ -394,14 +394,11 @@ cat docs/data/DATA_CONTRACT.md | grep -A 5 "order_date"
 **Debug**:
 
 ```bash
-# Run specific transform with verbose logging
-python -m src.runners.enriched.cart_attribution \
-  --ingest-dt 2020-01-05 \
-  --base-path data/silver/base \
-  --output-path data/silver/enriched
+# Run enriched for a single date (then inspect specific output table)
+ecomlake enriched run --ingest-dt 2020-01-05
 
 # Check input schemas
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --bronze-path data/silver/base \
   --tables orders,shopping_carts
 ```
