@@ -4,8 +4,15 @@
 
 This project includes comprehensive CLI tools for pipeline execution, data validation, profiling, and infrastructure management. The toolkit supports both local development and production workflows with a focus on automation and self-documenting systems.
 
+**Recommended CLI**: use the Click-based `ecomlake` command. Legacy Makefile targets and direct script/module entrypoints are in deprecation and will emit warnings.
+
+```bash
+# Example
+ecomlake bronze profile --date-range 2025-10-01..2025-10-01
+```
+
 **Quick Navigation**:
-- [Makefile Commands](#-makefile-commands) - Common development tasks
+- [CLI Commands](#-cli-commands) - Common development tasks
 - [Validation Modules](#-validation-modules) - Three-layer quality framework
 - [Bronze Profiling](#-bronze-profiling-describe_parquet_samplespy) - Self-documenting profiling system
 - [Pipeline Scripts](#-pipeline-scripts) - Execution and orchestration
@@ -15,20 +22,22 @@ This project includes comprehensive CLI tools for pipeline execution, data valid
 
 ## Quick Reference
 
-### Core Scripts
+### Core CLI Commands (Recommended)
 
-| Script | Purpose | Key Output |
-|--------|---------|-----------|
-| `describe_parquet_samples.py` | Profile Bronze Parquet samples | Quality report, schema map JSON, data contract updates, data dictionary |
-| `report_bronze_sizes.sh` | Generate bucket size report | Markdown report with table-level storage metrics |
-| `pull_bronze_sample.sh` | Pull sample partitions from GCS | Local Bronze samples for profiling |
-| `bootstrap_airflow.sh` | Initialize Airflow environment | Airflow directories and Docker containers |
-| `run_dev_pipeline.sh` | Run dev pipeline (GCS native) | Full Bronze→Silver→Enriched execution |
-| `run_sim_prod_gcs.sh` | Run sim-prod pipeline (GCS native) | Production simulation against GCS |
-| `run_dims_from_spec.py` | Run dimension snapshots from spec | Customer and product catalog snapshots |
-| `run_enriched_all_samples.py` | Run all enriched transforms | Enriched Silver layer outputs |
-| `validate_bronze_samples.py` | Quick Bronze validation | Validation report for samples |
-| `test_gold_logic_on_duckdb.py` | Test Gold mart logic locally | Local Gold validation |
+| CLI Command | Purpose | Key Output |
+|-------------|---------|-----------|
+| `ecomlake bronze profile` | Profile Bronze Parquet samples | Quality report, schema map JSON, data contract updates, data dictionary |
+| `ecomlake bucket report` | Generate bucket size report | Markdown report with table-level storage metrics |
+| `ecomlake sample pull` | Pull sample partitions from GCS | Local Bronze samples for profiling |
+| `ecomlake airflow bootstrap` | Initialize Airflow environment | Airflow directories and Docker containers |
+| `ecomlake pipeline dev-gcs` | Run dev pipeline (GCS native) | Full Bronze→Silver→Enriched execution |
+| `ecomlake pipeline sim-prod-gcs` | Run sim-prod pipeline (GCS native) | Production simulation against GCS |
+| `ecomlake dim run` | Run dimension snapshots from spec | Customer and product catalog snapshots |
+| `ecomlake enriched run` | Run all enriched transforms | Enriched Silver layer outputs |
+| `ecomlake bronze validate-samples` | Quick Bronze validation | Validation report for samples |
+| `ecomlake silver run` | Run Base Silver (dbt-duckdb) | Base Silver tables + manifests |
+
+**Legacy entrypoints** (deprecated, still supported): scripts in `scripts/` and Makefile targets will emit warnings.
 
 ### Python Modules (Validation)
 
@@ -50,128 +59,128 @@ This project includes comprehensive CLI tools for pipeline execution, data valid
 
 ---
 
-## 📋 Makefile Commands
+## 📋 CLI Commands
 
-The Makefile provides convenient shortcuts for common development tasks. Run `make help` to see all available commands.
+The `ecomlake` CLI provides the supported interface for common development tasks. Run `ecomlake --help` to see all available commands.
 
 ### Environment Control
 
 ```bash
 # Start local Airflow (Webserver: http://localhost:8080)
-make up
+ecomlake airflow up
 
 # Stop Airflow services
-make down
+ecomlake airflow down
 
 # Restart Scheduler & Webserver
-make restart
+ecomlake airflow restart
 
 # Tail Scheduler logs
-make logs
+ecomlake airflow logs
 
 # Tail specific task log
-make log-task DAG=ecom_silver_to_gold_pipeline RUN_ID=manual_20260123 TASK=validate_bronze
+ecomlake airflow log-task --dag ecom_silver_to_gold_pipeline --run-id manual_20260123 --task validate_bronze
 
 # Open Bash in Scheduler container
-make shell
+ecomlake airflow shell
 
 # Wipe local data only (preserves Docker containers)
-make clean-data
+ecomlake airflow clean-data
 
 # Destroy containers, images, volumes AND local data
-make clean
+ecomlake airflow clean
 ```
 
 ### Pipeline Execution (Airflow)
 
 ```bash
 # Trigger Main Pipeline (Soft Mode - warnings only)
-make run-sample DATE=2024-01-03
+ecomlake pipeline run-sample --date 2024-01-03
 
 # Trigger Main Pipeline (Strict Mode - fail on quality issues)
-make run-sample-strict DATE=2024-01-03
+ecomlake pipeline run-sample-strict --date 2024-01-03
 
 # Trigger Main Pipeline + BigQuery Load
-make run-sample-bq DATE=2024-01-03
+ecomlake pipeline run-sample-bq --date 2024-01-03
 
 # Trigger Dimension Refresh Pipeline
-make run-dims DATE=2024-01-03
+ecomlake pipeline run-dims --date 2024-01-03
 
 # Backfill Main Pipeline (Soft Mode)
-make backfill-easy START=2025-10-01 END=2025-10-31
+ecomlake pipeline backfill-easy --start 2025-10-01 --end 2025-10-31
 
 # Backfill Main Pipeline (Strict Mode)
-make backfill-strict START=2025-10-01 END=2025-10-31
+ecomlake pipeline backfill-strict --start 2025-10-01 --end 2025-10-31
 ```
 
 ### Local Development (No Docker)
 
 ```bash
 # Run customer + product catalog dims locally
+ecomlake local dims --date 2024-01-03
 
 # Run customer + product catalog dims locally (Strict)
-make local-dims-strict DATE=2024-01-03
+ecomlake local dims-strict --date 2024-01-03
 
 # Run dbt + Validation locally
+ecomlake local silver --date 2024-01-03
 
 # Run dbt + Validation locally (Strict)
-make local-silver-strict DATE=2024-01-03
+ecomlake local silver-strict --date 2024-01-03
 
 # Run enriched transforms locally
-make local-enriched DATE=2024-01-03
+ecomlake local enriched --date 2024-01-03
 
 # Run enriched transforms locally (Strict)
-make local-enriched-strict DATE=2024-01-03
-make local-dims DATE=2024-01-03
-make local-silver DATE=2024-01-03
+ecomlake local enriched-strict --date 2024-01-03
 ```
 
 ### GCS Pipeline Execution (Native)
 
 ```bash
 # Run Pipeline with GCS (Native, No Docker)
-make run-dev-gcs DATE=2024-01-03
+ecomlake pipeline dev-gcs 2024-01-03
 
 # Simulate prod run against GCS (Native, No Docker)
-make run-sim-prod-gcs DATE=2024-01-03
+ecomlake pipeline sim-prod-gcs 2024-01-03
 
 # Run Pipeline with GCS (Docker + Airflow, dev)
-make run-dev-docker DATE=2024-01-03
+ecomlake pipeline dev-docker 2024-01-03
 
 # Run Pipeline with GCS (Docker + Airflow, prod-sim)
-make run-prod-sim-docker DATE=2024-01-03
+ecomlake pipeline prod-sim-docker 2024-01-03
 ```
 
 ### Development & Testing
 
 ```bash
 # Run Unit Tests (pytest)
-make test
+ecomlake dev test
 
 # Run Unit Tests with coverage report
 pytest tests/unit/ --cov=src --cov-report=term-missing
 
 # Run Linter (ruff)
-make lint
+ecomlake dev lint
 
 # Auto-format Code (ruff format)
-make format
+ecomlake dev format
 
 # Run Type Checker (mypy)
-make type-check
+ecomlake dev type-check
 ```
 
 ### dbt Utilities
 
 ```bash
 # Install dbt packages
-make dbt-deps
+ecomlake dbt deps
 
 # Build all Base Silver models
-make dbt-build
+ecomlake dbt build
 
 # Run dbt data tests
-make dbt-test
+ecomlake dbt test
 ```
 
 ---
@@ -196,26 +205,26 @@ Validates Bronze layer inputs before Silver transformations.
 
 ```bash
 # Validate Bronze partition for specific date
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --lookback-days 0 \
   --output-report docs/validation_reports/BRONZE_QUALITY.md
 
 # Enforce quality gates (fail on issues)
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Validate specific tables only
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --tables orders,customers,product_catalog
 
 # Use spec file for table list
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --spec-path config/specs/base.yml
@@ -264,7 +273,7 @@ Validates Silver layer transformation quality and data integrity.
 
 ```bash
 # Validate Silver transformation for specific partition
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
@@ -272,14 +281,14 @@ python -m src.validation.silver \
   --output-report docs/validation_reports/SILVER_QUALITY.md
 
 # Enforce quality gates (fail on SLA breach)
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Validate with 7-day lookback (for incremental processing)
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
@@ -287,7 +296,7 @@ python -m src.validation.silver \
   --enforce-quality
 
 # Use spec file for table list
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
@@ -339,19 +348,19 @@ Validates Enriched Silver layer business rules and schema consistency.
 
 ```bash
 # Validate Enriched layer for specific partition
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --enriched-path data/silver/enriched \
   --ingest-dt 2024-01-03 \
   --output-report docs/validation_reports/ENRICHED_QUALITY.md
 
 # Enforce quality gates
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --enriched-path data/silver/enriched \
   --ingest-dt 2024-01-03 \
   --enforce-quality
 
 # Validate with custom config
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --config config/config.yml \
   --enriched-path data/silver/enriched \
   --ingest-dt 2024-01-03
@@ -395,17 +404,17 @@ A lightweight quality gate designed to validate dimension snapshots (`customers`
 
 ```bash
 # Validate today's dimension snapshots
-python -m src.validation.dims_snapshot \
+ecomlake dim validate \
   --run-date 2025-10-06 \
   --run-id "manual_run_123"
 
 # Enforce quality gates
-python -m src.validation.dims_snapshot \
+ecomlake dim validate \
   --run-date 2025-10-06 \
   --enforce-quality
 
 # Validate with custom dims path
-python -m src.validation.dims_snapshot \
+ecomlake dim validate \
   --run-date 2025-10-06 \
   --dims-path data/silver/dims
 ```
@@ -446,20 +455,20 @@ The self-documenting profiling script that analyzes Parquet samples and generate
 
 ```bash
 # Profile January 2020 samples (generates quality report)
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-01-31
 
 # Profile specific tables only
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --tables orders,customers,product_catalog \
   --months 2020-01,2020-02
 
 # Profile multiple specific dates
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --ingest-dts 2020-01-15,2020-02-15,2020-03-15
 
 # Profile all samples (stratified sampling recommended)
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --months 2020-03,2023-01,2025-10
 ```
 
@@ -473,7 +482,7 @@ The profiling script generates **four documentation artifacts** from a single ru
 
 ```bash
 # Generate quality report with schema drift detection
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --output docs/data/BRONZE_PROFILE_REPORT.md
 ```
@@ -492,7 +501,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Generate JSON schema map for programmatic use
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --schema-json docs/data/BRONZE_SCHEMA_MAP.json
 ```
@@ -521,7 +530,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Update data contract with observed Bronze types
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --update-contract docs/resources/DATA_CONTRACT.md
 ```
@@ -552,7 +561,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Generate data dictionary with field descriptions
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --data-dictionary docs/data/DATA_DICTIONARY.md
 ```
@@ -568,7 +577,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Generate ALL documentation artifacts in one pass
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --output docs/data/BRONZE_PROFILE_REPORT.md \
   --schema-json docs/data/BRONZE_SCHEMA_MAP.json \
@@ -584,7 +593,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Profile samples from non-default location
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --root /path/to/custom/samples \
   --date-range 2020-01-01..2020-01-31
 ```
@@ -593,7 +602,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Profile more files per partition for better coverage
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --max-files 5 \
   --max-rows 500000
@@ -603,7 +612,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Profile only transactional tables (exclude catalog/returns)
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --tables orders,order_items,customers \
   --date-range 2020-01-01..2020-12-31
 ```
@@ -639,7 +648,7 @@ The profiling script automatically detects and flags:
 
 ## 🚀 Pipeline Scripts
 
-### Sample Extraction: `pull_bronze_sample.sh`
+### Sample Extraction: `ecomlake sample pull`
 
 Pull sample Bronze partitions from GCS for local profiling and development.
 
@@ -647,30 +656,30 @@ Pull sample Bronze partitions from GCS for local profiling and development.
 
 ```bash
 # Pull samples for specific months (default: Jun 2020, Jan 2023, Dec 2025)
-./scripts/pull_bronze_sample.sh
+ecomlake sample pull
 
 # Pull single month
-./scripts/pull_bronze_sample.sh 2020-01
+ecomlake sample pull 2020-01
 
 # Pull multiple months
-./scripts/pull_bronze_sample.sh "2020-01,2020-02,2020-03"
+ecomlake sample pull "2020-01,2020-02,2020-03"
 
 # Pull specific dates
-./scripts/pull_bronze_sample.sh "2020-01-15,2020-02-15"
+ecomlake sample pull "2020-01-15,2020-02-15"
 ```
 
 #### Custom Destination
 
 ```bash
 # Pull to custom directory
-./scripts/pull_bronze_sample.sh 2020-01 /tmp/bronze_samples
+ecomlake sample pull 2020-01 /tmp/bronze_samples
 ```
 
 #### Limit Days Per Month
 
 ```bash
 # Pull only first 3 days of each month (faster sampling)
-MAX_DAYS=3 ./scripts/pull_bronze_sample.sh "2020-01,2020-02"
+MAX_DAYS=3 ecomlake sample pull "2020-01,2020-02"
 ```
 
 #### What Gets Pulled
@@ -681,7 +690,7 @@ Per partition:
 
 ---
 
-### Bucket Size Reporting: `report_bronze_sizes.sh`
+### Bucket Size Reporting: `ecomlake bucket report`
 
 Generate Markdown reports of GCS bucket and per-table storage metrics.
 
@@ -689,13 +698,13 @@ Generate Markdown reports of GCS bucket and per-table storage metrics.
 
 ```bash
 # Generate report using config.yml defaults
-./scripts/report_bronze_sizes.sh
+ecomlake bucket report
 
 # Specify bucket and prefix
-./scripts/report_bronze_sizes.sh acme-analytics-raw ecom/raw
+ecomlake bucket report acme-analytics-raw ecom/raw
 
 # Custom output path
-./scripts/report_bronze_sizes.sh \
+ecomlake bucket report \
   acme-analytics-raw \
   ecom/raw \
   docs/data/BRONZE_SIZES_2026_Q1.md
@@ -727,7 +736,7 @@ Generated: 2026-01-10T15:30:00Z
 
 ---
 
-### Airflow Setup: `bootstrap_airflow.sh`
+### Airflow Setup: `ecomlake airflow bootstrap`
 
 Initialize local Airflow environment with Docker Compose.
 
@@ -735,7 +744,7 @@ Initialize local Airflow environment with Docker Compose.
 
 ```bash
 # Initialize and start Airflow
-./scripts/bootstrap_airflow.sh
+ecomlake airflow bootstrap
 ```
 
 #### What It Does
@@ -753,7 +762,7 @@ Access Airflow UI at `http://localhost:8080`:
 #### Stop Airflow
 
 ```bash
-docker compose down
+ecomlake airflow down
 ```
 
 #### Clean Slate
@@ -762,12 +771,12 @@ docker compose down
 # Remove all Airflow data and restart
 rm -rf airflow/logs/* airflow/plugins/*
 docker compose down -v
-./scripts/bootstrap_airflow.sh
+ecomlake airflow bootstrap
 ```
 
 ---
 
-### Pipeline Execution: `run_dev_pipeline.sh`
+### Pipeline Execution: `ecomlake pipeline dev-gcs`
 
 Run the full pipeline (Bronze → Silver → Enriched) in development mode against GCS buckets, without using Docker/Airflow.
 
@@ -775,7 +784,7 @@ Run the full pipeline (Bronze → Silver → Enriched) in development mode again
 
 ```bash
 # Run for a specific date
-./scripts/run_dev_pipeline.sh 2025-10-04
+ecomlake pipeline dev-gcs 2025-10-04
 ```
 
 **What it does**:
@@ -789,7 +798,7 @@ Run the full pipeline (Bronze → Silver → Enriched) in development mode again
 
 ---
 
-### Production Simulation: `run_sim_prod_gcs.sh`
+### Production Simulation: `ecomlake pipeline sim-prod-gcs`
 
 Simulate a production run against GCS buckets, including "Prod" specific gates and configurations.
 
@@ -797,7 +806,7 @@ Simulate a production run against GCS buckets, including "Prod" specific gates a
 
 ```bash
 # Run simulation for a specific date
-./scripts/run_sim_prod_gcs.sh 2025-10-04
+ecomlake pipeline sim-prod-gcs 2025-10-04
 ```
 
 **What it does**:
@@ -814,10 +823,10 @@ Simulate a production run against GCS buckets, including "Prod" specific gates a
 
 ```bash
 # Step 1: Pull representative samples (stratified temporal sampling)
-./scripts/pull_bronze_sample.sh "2020-03,2023-01,2025-10"
+ecomlake sample pull "2020-03,2023-01,2025-10"
 
 # Step 2: Generate all documentation artifacts
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --months 2020-03,2023-01,2025-10 \
   --output docs/data/BRONZE_PROFILE_REPORT.md \
   --schema-json docs/data/BRONZE_SCHEMA_MAP.json \
@@ -834,34 +843,34 @@ cat docs/data/BRONZE_PROFILE_REPORT.md | grep "⚠️"
 
 ```bash
 # Step 1: Validate Bronze samples
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 2: Run dimension snapshots
-make local-dims DATE=2024-01-03
+ecomlake local dims --date 2024-01-03
 
 # Step 3: Validate dimension snapshots
-python -m src.validation.dims_snapshot \
+ecomlake dim validate \
   --run-date 2024-01-03 \
   --enforce-quality
 
 # Step 4: Run Base Silver transformations
-make local-silver DATE=2024-01-03
+ecomlake local silver --date 2024-01-03
 
 # Step 5: Validate Silver outputs
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 6: Run Enriched transforms
-make local-enriched DATE=2024-01-03
+ecomlake local enriched --date 2024-01-03
 
 # Step 7: Validate Enriched outputs
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --enriched-path data/silver/enriched \
   --ingest-dt 2024-01-03 \
   --enforce-quality
@@ -873,10 +882,10 @@ python -m src.validation.enriched \
 
 ```bash
 # Pull latest month samples
-./scripts/pull_bronze_sample.sh 2026-01
+ecomlake sample pull 2026-01
 
 # Profile and generate new schema map
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --months 2026-01 \
   --schema-json /tmp/BRONZE_SCHEMA_MAP_NEW.json
 
@@ -884,7 +893,7 @@ python scripts/describe_parquet_samples.py \
 diff docs/data/BRONZE_SCHEMA_MAP.json /tmp/BRONZE_SCHEMA_MAP_NEW.json
 
 # If differences found, regenerate full profile
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --months 2026-01 \
   --output docs/data/BRONZE_PROFILE_2026_01.md
 ```
@@ -898,23 +907,23 @@ python scripts/describe_parquet_samples.py \
 set -e  # Exit on first error
 
 # Validate Bronze
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --partition-date ${RUN_DATE} \
   --enforce-quality
 
 # Run transformations
-make local-silver DATE=${RUN_DATE}
+ecomlake local silver --date ${RUN_DATE}
 
 # Validate Silver
-python -m src.validation.silver \
+ecomlake silver validate \
   --partition-date ${RUN_DATE} \
   --enforce-quality
 
 # Run enriched
-make local-enriched DATE=${RUN_DATE}
+ecomlake local enriched --date ${RUN_DATE}
 
 # Validate Enriched
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --ingest-dt ${RUN_DATE} \
   --enforce-quality
 
@@ -927,27 +936,27 @@ echo "✅ All validations passed"
 
 ```bash
 # Step 1: Validate Bronze inputs
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path gs://acme-analytics-raw/ecom/raw \
   --partition-date 2024-01-03 \
   --enforce-quality \
   --run-id airflow_prod_20251015_123456
 
 # Step 2: Run Base Silver (dbt-duckdb)
-make local-silver-strict DATE=2024-01-03
+ecomlake local silver-strict --date 2024-01-03
 
 # Step 3: Validate Silver outputs
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path gs://acme-analytics-raw/ecom/raw \
   --silver-path gs://acme-analytics-silver/base \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 4: Run dimension snapshots
-make local-dims-strict DATE=2024-01-03
+ecomlake local dims-strict --date 2024-01-03
 
 # Step 5: Run enriched transforms
-make local-enriched-strict DATE=2024-01-03
+ecomlake local enriched-strict --date 2024-01-03
 
 # Step 6: Publish to GCS with staging prefix
 # (handled by runners with SILVER_PUBLISH_MODE=staging)
@@ -981,14 +990,14 @@ make local-enriched-strict DATE=2024-01-03
 # Use --enforce-quality in CI/CD, omit for exploratory analysis
 
 # Development (warnings only)
-python -m src.validation.bronze_quality --partition-date 2024-01-03
-python -m src.validation.silver --partition-date 2024-01-03
-python -m src.validation.enriched --ingest-dt 2024-01-03
+ecomlake bronze validate --partition-date 2024-01-03
+ecomlake silver validate --partition-date 2024-01-03
+ecomlake enriched validate --ingest-dt 2024-01-03
 
 # CI/CD (fail on issues)
-python -m src.validation.bronze_quality --partition-date 2024-01-03 --enforce-quality
-python -m src.validation.silver --partition-date 2024-01-03 --enforce-quality
-python -m src.validation.enriched --ingest-dt 2024-01-03 --enforce-quality
+ecomlake bronze validate --partition-date 2024-01-03 --enforce-quality
+ecomlake silver validate --partition-date 2024-01-03 --enforce-quality
+ecomlake enriched validate --ingest-dt 2024-01-03 --enforce-quality
 ```
 
 ### Output Organization
@@ -1063,10 +1072,10 @@ gcloud auth login
 
 ```bash
 # Warning-only mode (exit 0 even on failures)
-python -m src.validation.silver --partition-date 2024-01-03
+ecomlake silver validate --partition-date 2024-01-03
 
 # Enforce mode (exit non-zero on failures)
-python -m src.validation.silver --partition-date 2024-01-03 --enforce-quality
+ecomlake silver validate --partition-date 2024-01-03 --enforce-quality
 ```
 
 ---
@@ -1133,48 +1142,48 @@ After running the profiling and validation scripts:
 
 ```bash
 # Run Pipeline with GCS (Native, No Docker)
-make run-dev-gcs DATE=2024-01-03
+ecomlake pipeline dev-gcs 2024-01-03
 
 # Simulate prod run against GCS (Native, No Docker)
-make run-sim-prod-gcs DATE=2024-01-03
+ecomlake pipeline sim-prod-gcs 2024-01-03
 
 # Run Pipeline with GCS (Docker + Airflow, dev)
-make run-dev-docker DATE=2024-01-03
+ecomlake pipeline dev-docker 2024-01-03
 
 # Run Pipeline with GCS (Docker + Airflow, prod-sim)
-make run-prod-sim-docker DATE=2024-01-03
+ecomlake pipeline prod-sim-docker 2024-01-03
 ```
 
 ### Development & Testing
 
 ```bash
 # Run Unit Tests (pytest)
-make test
+ecomlake dev test
 
 # Run Unit Tests with coverage report
 pytest tests/unit/ --cov=src --cov-report=term-missing
 
 # Run Linter (ruff)
-make lint
+ecomlake dev lint
 
 # Auto-format Code (ruff format)
-make format
+ecomlake dev format
 
 # Run Type Checker (mypy)
-make type-check
+ecomlake dev type-check
 ```
 
 ### dbt Utilities
 
 ```bash
 # Install dbt packages
-make dbt-deps
+ecomlake dbt deps
 
 # Build all Base Silver models
-make dbt-build
+ecomlake dbt build
 
 # Run dbt data tests
-make dbt-test
+ecomlake dbt test
 ```
 
 ---
@@ -1199,26 +1208,26 @@ Validates Bronze layer inputs before Silver transformations.
 
 ```bash
 # Validate Bronze partition for specific date
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --lookback-days 0 \
   --output-report docs/validation_reports/BRONZE_QUALITY.md
 
 # Enforce quality gates (fail on issues)
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Validate specific tables only
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --tables orders,customers,product_catalog
 
 # Use spec file for table list
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --spec-path config/specs/base.yml
@@ -1267,7 +1276,7 @@ Validates Silver layer transformation quality and data integrity.
 
 ```bash
 # Validate Silver transformation for specific partition
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
@@ -1275,14 +1284,14 @@ python -m src.validation.silver \
   --output-report docs/validation_reports/SILVER_QUALITY.md
 
 # Enforce quality gates (fail on SLA breach)
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Validate with 7-day lookback (for incremental processing)
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
@@ -1290,7 +1299,7 @@ python -m src.validation.silver \
   --enforce-quality
 
 # Use spec file for table list
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
@@ -1342,19 +1351,19 @@ Validates Enriched Silver layer business rules and schema consistency.
 
 ```bash
 # Validate Enriched layer for specific partition
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --enriched-path data/silver/enriched \
   --ingest-dt 2024-01-03 \
   --output-report docs/validation_reports/ENRICHED_QUALITY.md
 
 # Enforce quality gates
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --enriched-path data/silver/enriched \
   --ingest-dt 2024-01-03 \
   --enforce-quality
 
 # Validate with custom config
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --config config/config.yml \
   --enriched-path data/silver/enriched \
   --ingest-dt 2024-01-03
@@ -1398,17 +1407,17 @@ A lightweight quality gate designed to validate dimension snapshots (`customers`
 
 ```bash
 # Validate today's dimension snapshots
-python -m src.validation.dims_snapshot \
+ecomlake dim validate \
   --run-date 2025-10-06 \
   --run-id "manual_run_123"
 
 # Enforce quality gates
-python -m src.validation.dims_snapshot \
+ecomlake dim validate \
   --run-date 2025-10-06 \
   --enforce-quality
 
 # Validate with custom dims path
-python -m src.validation.dims_snapshot \
+ecomlake dim validate \
   --run-date 2025-10-06 \
   --dims-path data/silver/dims
 ```
@@ -1449,20 +1458,20 @@ The self-documenting profiling script that analyzes Parquet samples and generate
 
 ```bash
 # Profile January 2020 samples (generates quality report)
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-01-31
 
 # Profile specific tables only
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --tables orders,customers,product_catalog \
   --months 2020-01,2020-02
 
 # Profile multiple specific dates
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --ingest-dts 2020-01-15,2020-02-15,2020-03-15
 
 # Profile all samples (stratified sampling recommended)
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --months 2020-03,2023-01,2025-10
 ```
 
@@ -1476,7 +1485,7 @@ The profiling script generates **four documentation artifacts** from a single ru
 
 ```bash
 # Generate quality report with schema drift detection
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --output docs/data/BRONZE_PROFILE_REPORT.md
 ```
@@ -1495,7 +1504,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Generate JSON schema map for programmatic use
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --schema-json docs/data/BRONZE_SCHEMA_MAP.json
 ```
@@ -1524,7 +1533,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Update data contract with observed Bronze types
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --update-contract docs/resources/DATA_CONTRACT.md
 ```
@@ -1555,7 +1564,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Generate data dictionary with field descriptions
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --data-dictionary docs/data/DATA_DICTIONARY.md
 ```
@@ -1571,7 +1580,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Generate ALL documentation artifacts in one pass
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --output docs/data/BRONZE_PROFILE_REPORT.md \
   --schema-json docs/data/BRONZE_SCHEMA_MAP.json \
@@ -1587,7 +1596,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Profile samples from non-default location
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --root /path/to/custom/samples \
   --date-range 2020-01-01..2020-01-31
 ```
@@ -1596,7 +1605,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Profile more files per partition for better coverage
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --date-range 2020-01-01..2020-12-31 \
   --max-files 5 \
   --max-rows 500000
@@ -1606,7 +1615,7 @@ python scripts/describe_parquet_samples.py \
 
 ```bash
 # Profile only transactional tables (exclude catalog/returns)
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --tables orders,order_items,customers \
   --date-range 2020-01-01..2020-12-31
 ```
@@ -1650,30 +1659,30 @@ Pull sample Bronze partitions from GCS for local profiling and development.
 
 ```bash
 # Pull samples for specific months (default: Jun 2020, Jan 2023, Dec 2025)
-./scripts/pull_bronze_sample.sh
+ecomlake sample pull
 
 # Pull single month
-./scripts/pull_bronze_sample.sh 2020-01
+ecomlake sample pull 2020-01
 
 # Pull multiple months
-./scripts/pull_bronze_sample.sh "2020-01,2020-02,2020-03"
+ecomlake sample pull "2020-01,2020-02,2020-03"
 
 # Pull specific dates
-./scripts/pull_bronze_sample.sh "2020-01-15,2020-02-15"
+ecomlake sample pull "2020-01-15,2020-02-15"
 ```
 
 #### Custom Destination
 
 ```bash
 # Pull to custom directory
-./scripts/pull_bronze_sample.sh 2020-01 /tmp/bronze_samples
+ecomlake sample pull 2020-01 /tmp/bronze_samples
 ```
 
 #### Limit Days Per Month
 
 ```bash
 # Pull only first 3 days of each month (faster sampling)
-MAX_DAYS=3 ./scripts/pull_bronze_sample.sh "2020-01,2020-02"
+MAX_DAYS=3 ecomlake sample pull "2020-01,2020-02"
 ```
 
 #### What Gets Pulled
@@ -1692,13 +1701,13 @@ Generate Markdown reports of GCS bucket and per-table storage metrics.
 
 ```bash
 # Generate report using config.yml defaults
-./scripts/report_bronze_sizes.sh
+ecomlake bucket report
 
 # Specify bucket and prefix
-./scripts/report_bronze_sizes.sh acme-analytics-raw ecom/raw
+ecomlake bucket report acme-analytics-raw ecom/raw
 
 # Custom output path
-./scripts/report_bronze_sizes.sh \
+ecomlake bucket report \
   acme-analytics-raw \
   ecom/raw \
   docs/data/BRONZE_SIZES_2026_Q1.md
@@ -1738,7 +1747,7 @@ Initialize local Airflow environment with Docker Compose.
 
 ```bash
 # Initialize and start Airflow
-./scripts/bootstrap_airflow.sh
+ecomlake airflow bootstrap
 ```
 
 #### What It Does
@@ -1765,7 +1774,7 @@ docker compose down
 # Remove all Airflow data and restart
 rm -rf airflow/logs/* airflow/plugins/*
 docker compose down -v
-./scripts/bootstrap_airflow.sh
+ecomlake airflow bootstrap
 ```
 
 ---
@@ -1778,7 +1787,7 @@ Run the full pipeline (Bronze → Silver → Enriched) in development mode again
 
 ```bash
 # Run for a specific date
-./scripts/run_dev_pipeline.sh 2025-10-04
+ecomlake pipeline dev-gcs 2025-10-04
 ```
 
 **What it does**:
@@ -1800,7 +1809,7 @@ Simulate a production run against GCS buckets, including "Prod" specific gates a
 
 ```bash
 # Run simulation for a specific date
-./scripts/run_sim_prod_gcs.sh 2025-10-04
+ecomlake pipeline sim-prod-gcs 2025-10-04
 ```
 
 **What it does**:
@@ -1817,10 +1826,10 @@ Simulate a production run against GCS buckets, including "Prod" specific gates a
 
 ```bash
 # Step 1: Pull representative samples (stratified temporal sampling)
-./scripts/pull_bronze_sample.sh "2020-03,2023-01,2025-10"
+ecomlake sample pull "2020-03,2023-01,2025-10"
 
 # Step 2: Generate all documentation artifacts
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --months 2020-03,2023-01,2025-10 \
   --output docs/data/BRONZE_PROFILE_REPORT.md \
   --schema-json docs/data/BRONZE_SCHEMA_MAP.json \
@@ -1837,34 +1846,34 @@ cat docs/data/BRONZE_PROFILE_REPORT.md | grep "⚠️"
 
 ```bash
 # Step 1: Validate Bronze samples
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path samples/bronze \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 2: Run dimension snapshots
-make local-dims DATE=2024-01-03
+ecomlake local dims --date 2024-01-03
 
 # Step 3: Validate dimension snapshots
-python -m src.validation.dims_snapshot \
+ecomlake dim validate \
   --run-date 2024-01-03 \
   --enforce-quality
 
 # Step 4: Run Base Silver transformations
-make local-silver DATE=2024-01-03
+ecomlake local silver --date 2024-01-03
 
 # Step 5: Validate Silver outputs
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path samples/bronze \
   --silver-path data/silver/base \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 6: Run Enriched transforms
-make local-enriched DATE=2024-01-03
+ecomlake local enriched --date 2024-01-03
 
 # Step 7: Validate Enriched outputs
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --enriched-path data/silver/enriched \
   --ingest-dt 2024-01-03 \
   --enforce-quality
@@ -1876,10 +1885,10 @@ python -m src.validation.enriched \
 
 ```bash
 # Pull latest month samples
-./scripts/pull_bronze_sample.sh 2026-01
+ecomlake sample pull 2026-01
 
 # Profile and generate new schema map
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --months 2026-01 \
   --schema-json /tmp/BRONZE_SCHEMA_MAP_NEW.json
 
@@ -1887,7 +1896,7 @@ python scripts/describe_parquet_samples.py \
 diff docs/data/BRONZE_SCHEMA_MAP.json /tmp/BRONZE_SCHEMA_MAP_NEW.json
 
 # If differences found, regenerate full profile
-python scripts/describe_parquet_samples.py \
+ecomlake bronze profile \
   --months 2026-01 \
   --output docs/data/BRONZE_PROFILE_2026_01.md
 ```
@@ -1901,23 +1910,23 @@ python scripts/describe_parquet_samples.py \
 set -e  # Exit on first error
 
 # Validate Bronze
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --partition-date ${RUN_DATE} \
   --enforce-quality
 
 # Run transformations
-make local-silver DATE=${RUN_DATE}
+ecomlake local silver --date ${RUN_DATE}
 
 # Validate Silver
-python -m src.validation.silver \
+ecomlake silver validate \
   --partition-date ${RUN_DATE} \
   --enforce-quality
 
 # Run enriched
-make local-enriched DATE=${RUN_DATE}
+ecomlake local enriched --date ${RUN_DATE}
 
 # Validate Enriched
-python -m src.validation.enriched \
+ecomlake enriched validate \
   --ingest-dt ${RUN_DATE} \
   --enforce-quality
 
@@ -1930,27 +1939,27 @@ echo "✅ All validations passed"
 
 ```bash
 # Step 1: Validate Bronze inputs
-python -m src.validation.bronze_quality \
+ecomlake bronze validate \
   --bronze-path gs://acme-analytics-raw/ecom/raw \
   --partition-date 2024-01-03 \
   --enforce-quality \
   --run-id airflow_prod_20251015_123456
 
 # Step 2: Run Base Silver (dbt-duckdb)
-make local-silver-strict DATE=2024-01-03
+ecomlake local silver-strict --date 2024-01-03
 
 # Step 3: Validate Silver outputs
-python -m src.validation.silver \
+ecomlake silver validate \
   --bronze-path gs://acme-analytics-raw/ecom/raw \
   --silver-path gs://acme-analytics-silver/base \
   --partition-date 2024-01-03 \
   --enforce-quality
 
 # Step 4: Run dimension snapshots
-make local-dims-strict DATE=2024-01-03
+ecomlake local dims-strict --date 2024-01-03
 
 # Step 5: Run enriched transforms
-make local-enriched-strict DATE=2024-01-03
+ecomlake local enriched-strict --date 2024-01-03
 
 # Step 6: Publish to GCS with staging prefix
 # (handled by runners with SILVER_PUBLISH_MODE=staging)
@@ -1984,14 +1993,14 @@ make local-enriched-strict DATE=2024-01-03
 # Use --enforce-quality in CI/CD, omit for exploratory analysis
 
 # Development (warnings only)
-python -m src.validation.bronze_quality --partition-date 2024-01-03
-python -m src.validation.silver --partition-date 2024-01-03
-python -m src.validation.enriched --ingest-dt 2024-01-03
+ecomlake bronze validate --partition-date 2024-01-03
+ecomlake silver validate --partition-date 2024-01-03
+ecomlake enriched validate --ingest-dt 2024-01-03
 
 # CI/CD (fail on issues)
-python -m src.validation.bronze_quality --partition-date 2024-01-03 --enforce-quality
-python -m src.validation.silver --partition-date 2024-01-03 --enforce-quality
-python -m src.validation.enriched --ingest-dt 2024-01-03 --enforce-quality
+ecomlake bronze validate --partition-date 2024-01-03 --enforce-quality
+ecomlake silver validate --partition-date 2024-01-03 --enforce-quality
+ecomlake enriched validate --ingest-dt 2024-01-03 --enforce-quality
 ```
 
 ### Output Organization
@@ -2066,10 +2075,10 @@ gcloud auth login
 
 ```bash
 # Warning-only mode (exit 0 even on failures)
-python -m src.validation.silver --partition-date 2024-01-03
+ecomlake silver validate --partition-date 2024-01-03
 
 # Enforce mode (exit non-zero on failures)
-python -m src.validation.silver --partition-date 2024-01-03 --enforce-quality
+ecomlake silver validate --partition-date 2024-01-03 --enforce-quality
 ```
 
 ---

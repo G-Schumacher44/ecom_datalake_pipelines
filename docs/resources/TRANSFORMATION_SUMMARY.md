@@ -1103,10 +1103,10 @@ Bronze → Base Silver → Enriched → Gold
 
 ```bash
 # Base Silver validation
-python -m src.validation.silver --partition-date 2025-10-15
+ecomlake silver validate --partition-date 2025-10-15
 
 # Enriched Silver validation
-python -m src.validation.enriched --ingest-dt 2025-10-15
+ecomlake enriched validate --ingest-dt 2025-10-15
 ```
 
 ---

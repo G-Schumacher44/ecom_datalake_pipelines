@@ -45,7 +45,7 @@ echo $GIT_COMMIT        # a1b2c3d
 echo $GIT_BRANCH        # main
 
 # Or use the version script:
-python scripts/version.py
+ecomlake version
 ```
 
 **Output**:
@@ -66,7 +66,7 @@ Source:     docker
 
 ```bash
 # Build with Git version tags
-make build-versioned
+ecomlake deploy build-versioned
 
 # Output:
 # Git Commit: a1b2c3d
@@ -81,10 +81,10 @@ make build-versioned
 
 ```bash
 # From Git repository (local dev):
-make version
+ecomlake version
 
 # From Docker container:
-docker-compose exec airflow-scheduler python scripts/version.py
+docker-compose exec airflow-scheduler ecomlake version
 ```
 
 ## CI/CD - GitHub Actions
@@ -113,7 +113,7 @@ GitHub Actions creates multiple tags per build:
 
 ```bash
 # Push versioned image to GCP
-make push-image-versioned PROJECT_ID=my-gcp-project
+ecomlake deploy push-image-versioned PROJECT_ID=my-gcp-project
 
 # Creates:
 # us-central1-docker.pkg.dev/my-gcp-project/airflow-images/ecom-datalake-pipeline:main-a1b2c3d
@@ -177,7 +177,7 @@ git push origin v1.0.0
 
 ```bash
 # Deploy tagged version to prod Cloud Composer
-make push-image-versioned PROJECT_ID=my-prod-project
+ecomlake deploy push-image-versioned PROJECT_ID=my-prod-project
 
 gcloud composer environments update prod-env \
   --location us-central1 \
@@ -200,7 +200,7 @@ docker inspect ecom-datalake-pipeline:latest | jq '.[0].Config.Labels'
 
 If version shows `unknown`:
 1. Ensure you're building from a Git repository
-2. Check that build args are passed: `make build-versioned`
+2. Check that build args are passed: `ecomlake deploy build-versioned`
 3. Verify Git is installed in build environment
 
 ### Docker Compose Not Using Versioned Image
@@ -230,7 +230,7 @@ docker-compose build
 1. **Always tag releases** - Use semantic versioning (`v1.0.0`, `v1.0.1`)
 2. **Pin production images** - Deploy specific versions, not `:latest`
 3. **Use `:latest` for dev/staging** - Automatic updates for non-prod
-4. **Check version before deploy** - `make version` or inspect image labels
+4. **Check version before deploy** - `ecomlake version` or inspect image labels
 5. **Keep Git tags clean** - Only tag stable releases, not every commit
 
 ---
