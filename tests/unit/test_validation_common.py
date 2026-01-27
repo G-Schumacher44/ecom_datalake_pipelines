@@ -126,6 +126,23 @@ class TestReadParquetSafe:
         result = read_parquet_safe(tmp_path)
         assert result is None
 
+    def test_fallback_reads_per_file(self, tmp_path: Path, monkeypatch) -> None:
+        df = pl.DataFrame({"col1": [1, 2], "col2": ["a", "b"]})
+        df.write_parquet(tmp_path / "data.parquet")
+
+        original_read = pl.read_parquet
+
+        def fake_read_parquet(source, *args, **kwargs):
+            if isinstance(source, list):
+                raise pl.exceptions.ComputeError("forced")
+            return original_read(source, *args, **kwargs)
+
+        monkeypatch.setattr(pl, "read_parquet", fake_read_parquet)
+
+        result = read_parquet_safe(tmp_path)
+        assert result is not None
+        assert result.height == 2
+
 
 class TestListPartitions:
     def test_lists_partition_values(self, tmp_path: Path) -> None:

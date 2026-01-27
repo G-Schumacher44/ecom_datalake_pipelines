@@ -77,6 +77,7 @@ def test_base_silver_manifest_generation(tmp_path):
     content = json.loads(manifest_file.read_text())
     assert content["total_rows"] == 3
     assert content["file_count"] == 1
+    assert content["files"] == [{"path": "data.parquet", "rows": 3}]
 
 
 def test_extract_spec_path():
