@@ -325,7 +325,7 @@ docker rmi ecom-datalake-pipeline:latest
 export PROJECT_ID="your-gcp-project"
 export REGION="us-central1"
 export IMAGE_NAME="ecom-datalake-pipeline"
-export IMAGE_TAG="v1.0.4"
+export IMAGE_TAG="v1.0.5"
 export ARTIFACT_REPO="airflow-images"
 
 # Create Artifact Registry repository (one-time)
