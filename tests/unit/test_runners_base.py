@@ -100,7 +100,12 @@ def test_base_silver_staging_publish_uses_staging_path(
     monkeypatch.setenv("SILVER_PUBLISH_MODE", "staging")
     monkeypatch.setenv("SILVER_STAGING_PATH", "gs://bucket/silver/base/_staging/test")
     monkeypatch.setenv("RUN_ID", "test")
+    monkeypatch.setenv("BRONZE_SYNC_TABLES", "orders")
     monkeypatch.setattr(sys, "argv", ["base_silver.py", "--select", "stg_orders"])
+
+    table_path = tmp_path / "silver" / "orders" / "ingestion_dt=2020-01-01"
+    table_path.mkdir(parents=True)
+    (table_path / "data.parquet").write_text("stub")
 
     with patch("src.runners.base_silver.gcloud_copy_file") as mock_copy:
         base_silver.main()
@@ -108,5 +113,5 @@ def test_base_silver_staging_publish_uses_staging_path(
     assert mock_gcloud_rsync.call_count == 1
     _, kwargs = mock_gcloud_rsync.call_args
     assert kwargs["delete"] is True
-    assert mock_gcloud_rsync.call_args.args[1].endswith("/_staging/test")
+    assert mock_gcloud_rsync.call_args.args[1].endswith("/_staging/test/orders")
     assert mock_copy.call_count == 1
