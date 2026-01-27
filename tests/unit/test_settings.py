@@ -145,6 +145,15 @@ class TestPipelineConfig:
                 max_quarantine_pct=150.0,
             )
 
+    def test_invalid_publish_mode_rejected(self) -> None:
+        with pytest.raises(ValueError, match="must be one of"):
+            PipelineConfig(
+                project_id="test-project",
+                bronze_bucket="bronze",
+                silver_bucket="silver",
+                silver_publish_mode="invalid_mode",
+            )
+
 
 class TestSettingsFromYaml:
     def test_loads_valid_yaml(self, tmp_path: Path) -> None:

@@ -225,7 +225,7 @@ from airflow.operators.bash import BashOperator
 validate_silver_quality = BashOperator(
     task_id="validate_silver_quality",
     bash_command=(
-        "python src/validation/silver_quality.py "
+        "python -m src.validation.silver "
         "--bronze-path samples/bronze "
         "--silver-path data/silver/base "
         "--quarantine-path data/silver/base/quarantine "
@@ -261,7 +261,7 @@ After Polars creates Enriched Silver outputs, this validator:
 ### Usage
 
 ```bash
-python src/validation/enriched_quality.py \
+python -m src.validation.enriched \
   --enriched-path data/silver/enriched \
   --ingest-dt 2026-01-12 \
   --run-id "20260112_120000"
@@ -425,7 +425,7 @@ If quarantine rate suddenly increases:
 ```bash
 # After modifying dbt models
 dbt run --select stg_ecommerce__orders
-python src/validation/silver_quality.py --run-id <run_id>
+python -m src.validation.silver --run-id <run_id>
 git diff docs/validation_reports/SILVER_QUALITY_<run_id>.md
 ```
 
@@ -459,12 +459,12 @@ for run in runs:
 
 ```bash
 # Development: Warn but don't fail
-python src/validation/silver_quality.py
+python -m src.validation.silver
 ```
 
 ```bash
 # Production: Fail pipeline on SLA breach
-python src/validation/silver_quality.py --enforce-quality
+python -m src.validation.silver --enforce-quality
 ```
 
 ---
@@ -515,6 +515,6 @@ python src/validation/silver_quality.py --enforce-quality
 </p>
 
 <p align="center">
-  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>Last updated: 2026-01-28</sub><br>
   <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
 </p>
