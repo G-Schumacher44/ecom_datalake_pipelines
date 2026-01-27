@@ -144,7 +144,7 @@ ecomlake silver validate \
   "transformation_metadata": {
     "run_id": "20260111_143022",
     "timestamp": "2026-01-11T14:47:15Z",
-    "dbt_project_version": "0.1.0"
+    "dbt_project_version": "1.0.4"
   },
   "table_metrics": [
     {
