@@ -199,6 +199,8 @@ def test_snapshot_dims_stages_to_gcs_when_enabled(tmp_path, monkeypatch):
         patch("src.runners.dims_snapshot._resolve_dims_paths") as mock_paths,
         patch("src.runners.dims_snapshot.subprocess.run") as mock_run,
     ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stderr = ""
         mock_spec_obj = MagicMock()
         mock_table = MagicMock()
         mock_table.name = "product_catalog"
@@ -208,7 +210,7 @@ def test_snapshot_dims_stages_to_gcs_when_enabled(tmp_path, monkeypatch):
 
         mock_paths.return_value = (str(output_dir), "gs://bucket/dims")
 
-        dims_snapshot.snapshot_dims("2020-01-01", silver_base_path="gs://bucket/silver")
+        dims_snapshot.snapshot_dims("2020-01-02", silver_base_path="gs://bucket/silver")
 
     assert mock_run.called
     args = mock_run.call_args.args[0]

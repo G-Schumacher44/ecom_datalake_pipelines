@@ -227,9 +227,7 @@ def promote_enriched_partitions_to_gcs(
     partitions = get_enriched_partitions()
 
     for table, partition_key in partitions.items():
-        staging_dir = (
-            f"{staging_path.rstrip('/')}/{table}/{partition_key}={ingest_dt}"
-        )
+        staging_dir = f"{staging_path.rstrip('/')}/{table}/{partition_key}={ingest_dt}"
         canonical_dir = (
             f"{canonical_path.rstrip('/')}/{table}/{partition_key}={ingest_dt}"
         )
@@ -238,6 +236,7 @@ def promote_enriched_partitions_to_gcs(
             ["gcloud", "storage", "rsync", "-r", staging_dir, canonical_dir],
             check=True,
         )
+
 
 _run_cart_attribution = make_runner_callable(run_cart_attribution)
 _run_cart_attribution_summary = make_runner_callable(run_cart_attribution_summary)

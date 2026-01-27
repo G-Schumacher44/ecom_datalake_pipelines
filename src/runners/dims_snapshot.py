@@ -84,7 +84,8 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
     dims_staging_path = os.getenv("DIMS_STAGING_PATH", "").strip()
     if dims_gcs_path and dims_publish_mode == "staging":
         if not dims_staging_path:
-            dims_staging_path = f"{dims_gcs_path.rstrip('/')}/_staging/{_resolve_run_id()}"
+            run_id = _resolve_run_id()
+            dims_staging_path = f"{dims_gcs_path.rstrip('/')}/_staging/{run_id}"
         dims_gcs_path = dims_staging_path
 
     if silver_base_path is None:
