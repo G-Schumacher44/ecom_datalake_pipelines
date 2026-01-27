@@ -1260,12 +1260,23 @@ def local_enriched_strict(ingest_dt: str | None) -> None:
     name="demo",
     help="Run local end-to-end demo (dims + silver + enriched).",
 )
-@click.option("--date", "demo_date", default="2020-01-05", show_default=True)
-@click.option("--end-date", "demo_end_date", default="2020-01-05", show_default=True)
-@click.option("--lookback", default=4, show_default=True, type=int)
+_DEMO_DEFAULT_DATE = "2020-01-05"
+_DEMO_DEFAULT_END_DATE = "2020-01-05"
+_DEMO_DEFAULT_LOOKBACK = 4
+_DEMO_DEFAULT_DATES = "2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05"
+
+
+@click.option("--date", "demo_date", default=_DEMO_DEFAULT_DATE, show_default=True)
+@click.option(
+    "--end-date",
+    "demo_end_date",
+    default=_DEMO_DEFAULT_END_DATE,
+    show_default=True,
+)
+@click.option("--lookback", default=_DEMO_DEFAULT_LOOKBACK, show_default=True, type=int)
 @click.option(
     "--dates",
-    default="2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05",
+    default=_DEMO_DEFAULT_DATES,
     show_default=True,
     help="Space-separated dates for the dims loop.",
 )
@@ -1400,7 +1411,12 @@ def local_demo_fast(demo_date: str) -> None:
 
 @local.command(name="demo-full", help="Alias for demo.")
 def local_demo_full() -> None:
-    local_demo.callback()
+    local_demo.callback(
+        demo_date=_DEMO_DEFAULT_DATE,
+        demo_end_date=_DEMO_DEFAULT_END_DATE,
+        lookback=_DEMO_DEFAULT_LOOKBACK,
+        dates=_DEMO_DEFAULT_DATES,
+    )
 
 
 @cli.group(
