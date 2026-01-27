@@ -69,7 +69,7 @@ pipeline:
   # ... other dev settings
 ```
 
-Then run: `python src/validation/silver_quality.py --config config/config.dev.yml`
+Then run: `python -m src.validation.silver --config config/config.dev.yml`
 
 **Option 2: Environment Variables**
 
@@ -78,7 +78,7 @@ Keep `config.yml` unchanged, override via env:
 export PIPELINE_ENV=dev
 export GOOGLE_CLOUD_PROJECT=my-dev-project
 export METRICS_BUCKET=ecom-datalake-dev-metrics
-python src/validation/silver_quality.py
+python -m src.validation.silver
 ```
 
 **Dev intent:** Same validation behavior as `local`, but pointing at cloud paths (GCS/BQ) for server-based testing.
@@ -341,7 +341,7 @@ print(f"Metrics path: {config.metrics_base_path}")
 
 Pass explicit path:
 ```bash
-python src/validation/silver_quality.py --config /path/to/config.yml
+python -m src.validation.silver --config /path/to/config.yml
 ```
 
 ### "Env vars not taking effect"
