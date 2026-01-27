@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from datetime import timedelta
 
 from src.settings import RetryConfig, load_settings
 from src.specs import load_spec_safe
+
+logger = logging.getLogger(__name__)
 
 # --- Configuration Helper (Lazy Loading) ---
 
@@ -130,6 +133,92 @@ def sanitize_run_id(run_id: str) -> str:
     return run_id.replace(":", "").replace("+", "").replace(" ", "_")
 
 
+def resolve_run_config(run_id: str | None = None) -> dict[str, str]:
+    """Resolve pipeline paths and configuration for a specific run."""
+    config = SettingsConfig()
+    pl = config.pipeline
+    p_env = config.resolve_pipeline_env()
+
+    run_id_clean = sanitize_run_id(run_id) if run_id else ""
+
+    # Helper to resolve staging path
+    def _resolve_staging(
+        canonical: str,
+        publish_mode_env_key: str,
+        staging_path_env_key: str,
+        config_attr: str,
+    ) -> tuple[str, str, str]:
+        # Get publish mode from env or config
+        # env var priority: ENV_VAR > config.yml > "direct"
+        default_mode = getattr(pl, config_attr, "direct")
+        mode = (os.getenv(publish_mode_env_key) or default_mode).lower()
+
+        staging_path = ""
+        # Only enable staging if mode is 'staging' AND canonical path is GCS
+        if mode == "staging" and canonical.startswith("gs://"):
+            override = os.getenv(staging_path_env_key, "").strip()
+            if override:
+                staging_path = override
+            elif run_id_clean:
+                staging_path = f"{canonical.rstrip('/')}/_staging/{run_id_clean}"
+
+        return mode, staging_path, (staging_path or canonical)
+
+    # Resolve Bronze
+    bronze_path = config.resolve_path(
+        pl.bronze_bucket, pl.bronze_prefix, "BRONZE_BASE_PATH"
+    )
+
+    # Resolve Silver Base
+    silver_path = config.resolve_path(
+        pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
+    )
+    silver_mode, silver_staging, silver_validate = _resolve_staging(
+        silver_path,
+        "SILVER_PUBLISH_MODE",
+        "SILVER_STAGING_PATH",
+        "silver_publish_mode",
+    )
+
+    # Resolve Silver Enriched
+    enriched_path = config.resolve_path(
+        pl.silver_bucket, pl.silver_enriched_prefix, "SILVER_ENRICHED_PATH"
+    )
+    enriched_mode, enriched_staging, enriched_validate = _resolve_staging(
+        enriched_path,
+        "ENRICHED_PUBLISH_MODE",
+        "ENRICHED_STAGING_PATH",
+        "silver_enriched_publish_mode",
+    )
+
+    # Resolve Dims
+    dims_path = resolve_dims_base_path() or "data/silver/dims"
+    dims_mode, dims_staging, dims_validate = _resolve_staging(
+        dims_path, "DIMS_PUBLISH_MODE", "DIMS_STAGING_PATH", "dims_publish_mode"
+    )
+
+    return {
+        "env": p_env,
+        "run_id_clean": run_id_clean,
+        "bucket": pl.silver_bucket,
+        "project_id": pl.project_id,
+        "bq_dataset": pl.bigquery_dataset,
+        "bronze": bronze_path,
+        "silver": silver_path,
+        "silver_staging": silver_staging,
+        "silver_validate": silver_validate,
+        "silver_publish_mode": silver_mode,
+        "enriched": enriched_path,
+        "enriched_staging": enriched_staging,
+        "enriched_validate": enriched_validate,
+        "enriched_publish_mode": enriched_mode,
+        "dims": dims_path,
+        "dims_staging": dims_staging,
+        "dims_validate": dims_validate,
+        "dims_publish_mode": dims_mode,
+    }
+
+
 def promote_staged_prefix(
     staging_path: str,
     canonical_path: str,
@@ -137,15 +226,15 @@ def promote_staged_prefix(
 ) -> None:
     """Promote staged data to canonical GCS prefix after validation."""
     if env not in ("dev", "prod"):
-        print(f"Skipping promote for env: {env}")
+        logger.info(f"Skipping promote for env: {env}")
         return
     if not staging_path:
-        print("Skipping promote: staging path not set")
+        logger.warning("Skipping promote: staging path not set")
         return
     if not staging_path.startswith("gs://") or not canonical_path.startswith("gs://"):
-        print("Skipping promote: non-GCS paths")
+        logger.warning("Skipping promote: non-GCS paths")
         return
-    print(f"Promoting {staging_path} -> {canonical_path}")
+    logger.info(f"Promoting {staging_path} -> {canonical_path}")
     subprocess.run(
         ["gcloud", "storage", "rsync", "-r", staging_path, canonical_path],
         check=True,
