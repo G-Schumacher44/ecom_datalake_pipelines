@@ -18,6 +18,14 @@ logger = get_logger(__name__)
 AIRFLOW_HOME = os.getenv("AIRFLOW_HOME", "/opt/airflow")
 
 
+def _resolve_run_id() -> str:
+    for key in ("RUN_ID", "AIRFLOW_CTX_DAG_RUN_ID", "AIRFLOW_CTX_EXECUTION_DATE"):
+        value = os.getenv(key, "").strip()
+        if value:
+            return value.replace(":", "").replace("+", "").replace(" ", "_")
+    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+
 def _resolve_local_base_path(path: str, fallback: str) -> str:
     if not path:
         path = fallback
@@ -72,6 +80,12 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
         spec.dims.base_path if spec and spec.dims.base_path else "data/silver/dims"
     )
     dims_local_path, dims_gcs_path = _resolve_dims_paths(dims_base_path)
+    dims_publish_mode = os.getenv("DIMS_PUBLISH_MODE", "direct").lower()
+    dims_staging_path = os.getenv("DIMS_STAGING_PATH", "").strip()
+    if dims_gcs_path and dims_publish_mode == "staging":
+        if not dims_staging_path:
+            dims_staging_path = f"{dims_gcs_path.rstrip('/')}/_staging/{_resolve_run_id()}"
+        dims_gcs_path = dims_staging_path
 
     if silver_base_path is None:
         silver_base_path = os.getenv("SILVER_BASE_PATH", "data/silver/base")

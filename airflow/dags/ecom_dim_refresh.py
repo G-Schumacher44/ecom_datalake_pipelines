@@ -19,7 +19,9 @@ from common import (
     get_dim_specs,
     get_dim_table_names,
     get_retry_config,
+    promote_staged_prefix,
     resolve_dims_base_path,
+    sanitize_run_id,
 )
 from src.runners.dims_snapshot import snapshot_dims
 
@@ -31,15 +33,52 @@ def load_config_to_xcom(**kwargs):
     config = SettingsConfig()
     pl = config.pipeline
     p_env = config.resolve_pipeline_env()
+    run_id_raw = kwargs.get("run_id", "")
+    run_id_clean = sanitize_run_id(run_id_raw) if run_id_raw else ""
+    silver_path = config.resolve_path(
+        pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
+    )
+    silver_publish_mode = (
+        os.getenv("SILVER_PUBLISH_MODE") or pl.silver_publish_mode or "direct"
+    ).lower()
+    silver_staging_override = os.getenv("SILVER_STAGING_PATH", "").strip()
+    if silver_publish_mode == "staging" and silver_path.startswith("gs://"):
+        if silver_staging_override:
+            silver_staging = silver_staging_override
+        elif run_id_clean:
+            silver_staging = f"{silver_path.rstrip('/')}/_staging/{run_id_clean}"
+        else:
+            silver_staging = ""
+    else:
+        silver_staging = ""
+    dims_base_path = resolve_dims_base_path() or "data/silver/dims"
+    dims_publish_mode = (
+        os.getenv("DIMS_PUBLISH_MODE") or pl.dims_publish_mode or "direct"
+    ).lower()
+    dims_staging_override = os.getenv("DIMS_STAGING_PATH", "").strip()
+    if dims_publish_mode == "staging" and dims_base_path.startswith("gs://"):
+        if dims_staging_override:
+            dims_staging = dims_staging_override
+        elif run_id_clean:
+            dims_staging = f"{dims_base_path.rstrip('/')}/_staging/{run_id_clean}"
+        else:
+            dims_staging = ""
+    else:
+        dims_staging = ""
 
     return {
         "bronze": config.resolve_path(
             pl.bronze_bucket, pl.bronze_prefix, "BRONZE_BASE_PATH"
         ),
-        "silver": config.resolve_path(
-            pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
-        ),
+        "silver": silver_path,
+        "silver_staging": silver_staging,
+        "silver_publish_mode": silver_publish_mode,
+        "dims": dims_base_path,
+        "dims_staging": dims_staging,
+        "dims_validate": dims_staging or dims_base_path,
+        "dims_publish_mode": dims_publish_mode,
         "env": p_env,
+        "run_id_clean": run_id_clean,
     }
 
 
@@ -69,6 +108,23 @@ def publish_dims_latest(**context) -> None:
     os.makedirs(latest_base, exist_ok=True)
     with open(latest_path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
+
+
+def run_snapshot_dims(
+    run_date: str,
+    silver_base_path: str,
+    dims_publish_mode: str,
+    dims_staging_path: str,
+    run_id_clean: str,
+) -> None:
+    """Run dims snapshot with optional staging configuration."""
+    if run_id_clean:
+        os.environ["RUN_ID"] = run_id_clean
+    if dims_publish_mode:
+        os.environ["DIMS_PUBLISH_MODE"] = dims_publish_mode
+    if dims_staging_path:
+        os.environ["DIMS_STAGING_PATH"] = dims_staging_path
+    snapshot_dims(run_date, silver_base_path)
 
 
 # --- DAG Definition ---
@@ -121,6 +177,9 @@ with DAG(
                     f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
                     f'&& export BRONZE_SYNC_TABLES="{table}" '
                     f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
+                    f"&& export RUN_ID=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['run_id_clean'] }}}}\" "
+                    f"&& export SILVER_PUBLISH_MODE=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver_publish_mode'] }}}}\" "
+                    f"&& export SILVER_STAGING_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver_staging'] }}}}\" "
                     f"&& export DBT_DUCKDB_PATH=\"/tmp/dbt_duckdb/ecom_{table}_{{{{ run_id | replace(':', '') }}}}.duckdb\" "
                     f"&& python -m src.runners.base_silver "
                     f"--select {model} {model}_quarantine"
@@ -132,6 +191,7 @@ with DAG(
         env=COMMON_ENV,
         bash_command=(
             f"cd {AIRFLOW_HOME} && python -m src.validation.dims_snapshot "
+            f"--dims-path {{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['dims_validate'] }}}} "
             f"--run-date {{{{ ds }}}} "
             f"--output-report docs/validation_reports/DIMS_SNAPSHOT_{{{{ run_id | replace(':', '') }}}}.md "
             + (" --enforce-quality" if PIPELINE_ENV == "prod" else "")
@@ -139,10 +199,31 @@ with DAG(
     )
     snapshot_dims_task = PythonOperator(
         task_id="snapshot_dims",
-        python_callable=snapshot_dims,
+        python_callable=run_snapshot_dims,
         op_kwargs={
             "run_date": "{{ ds }}",
             "silver_base_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}",
+            "dims_publish_mode": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['dims_publish_mode'] }}",
+            "dims_staging_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['dims_staging'] }}",
+            "run_id_clean": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['run_id_clean'] }}",
+        },
+    )
+    promote_dims_snapshot = PythonOperator(
+        task_id="promote_dims_snapshot",
+        python_callable=promote_staged_prefix,
+        op_kwargs={
+            "staging_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['dims_staging'] }}",
+            "canonical_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['dims'] }}",
+            "env": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}",
+        },
+    )
+    promote_silver_base = PythonOperator(
+        task_id="promote_silver_base",
+        python_callable=promote_staged_prefix,
+        op_kwargs={
+            "staging_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver_staging'] }}",
+            "canonical_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}",
+            "env": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}",
         },
     )
     publish_dims_latest_task = PythonOperator(
@@ -157,5 +238,7 @@ with DAG(
         >> refresh_dims_group
         >> snapshot_dims_task
         >> validate_dims_snapshot
+        >> promote_silver_base
+        >> promote_dims_snapshot
         >> publish_dims_latest_task
     )
