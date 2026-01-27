@@ -177,7 +177,7 @@ _run_shipping_economics = make_runner_callable(run_shipping_economics)
 
 with DAG(
     dag_id="ecom_silver_to_gold_pipeline",
-    start_date=pendulum.datetime(2024, 1, 1, tz="UTC"),
+    start_date=pendulum.datetime(2018, 12, 31, tz="UTC"),
     schedule=None,
     catchup=False,
     default_args=get_retry_config(),
