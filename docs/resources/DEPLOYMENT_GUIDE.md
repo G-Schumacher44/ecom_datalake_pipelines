@@ -516,6 +516,7 @@ gcloud compute instances describe airflow-vm \
 | `STRICT_FK`              | `false` (local), `true` (prod)  | Enforce FK validation in Silver          |
 | `SILVER_PROFILE_ENABLED` | `false`                         | Generate Silver profiling reports        |
 | `BQ_LOCATION`            | `US`                            | BigQuery dataset location                |
+| `DIMS_SNAPSHOT_ALLOW_BOOTSTRAP` | `false`                  | Backfill-only: bootstrap earliest product_catalog partition |
 
 ### Docker/macOS VirtioFS Issues
 

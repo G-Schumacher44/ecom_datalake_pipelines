@@ -164,6 +164,7 @@ tolerance = settings.pipeline.attribution_tolerance_hours
 GOLD_PIPELINE_ENABLED=true
 BQ_LOAD_ENABLED=true
 SILVER_PUBLISH_MODE=direct|staging
+DIMS_SNAPSHOT_ALLOW_BOOTSTRAP=true  # backfill-only: bootstrap earliest product_catalog partition
 ```
 
 ### Path Overrides (Per-Dev / Dev)
@@ -250,6 +251,7 @@ REPORTS_BASE_PATH=docs/validation_reports # Local reports output
 GOLD_PIPELINE_ENABLED=false              # Enable/disable Gold layer pipeline
 BQ_LOAD_ENABLED=false                    # Enable/disable BigQuery loads
 SILVER_PUBLISH_MODE=direct|staging       # direct=immediate, staging=versioned runs
+DIMS_SNAPSHOT_ALLOW_BOOTSTRAP=false      # backfill-only: bootstrap earliest product_catalog
 ```
 
 **Quality gates**
