@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import json
 from pathlib import Path
 
 import polars as pl
@@ -84,6 +86,27 @@ class TestCollectParquetFiles:
         files = collect_parquet_files(tmp_path)
         assert files == []
 
+    def test_collects_from_gcs_manifest(self, monkeypatch) -> None:
+        manifest = {
+            "files": ["ingest_dt=2020-01-01/part-0000.parquet"],
+        }
+
+        class FakeFS:
+            def exists(self, path: str) -> bool:
+                return path.endswith("/_MANIFEST.json")
+
+            def open(self, path: str, mode: str = "r"):
+                return io.StringIO(json.dumps(manifest))
+
+            def glob(self, pattern: str):
+                raise AssertionError("glob should not be called when manifest exists")
+
+        monkeypatch.setattr(
+            "src.validation.common.get_gcs_filesystem", lambda: FakeFS()
+        )
+
+        files = collect_parquet_files("gs://bucket/table")
+        assert files == ["gs://bucket/table/ingest_dt=2020-01-01/part-0000.parquet"]
 
 class TestCountParquetRows:
     def test_counts_rows_across_files(self, tmp_path: Path) -> None:

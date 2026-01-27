@@ -73,3 +73,24 @@ def test_run_python_helpers_delegate(monkeypatch: pytest.MonkeyPatch):
     app._run_python_module("mod", ["--x"], env_overrides={"B": "2"})
     assert calls[0][0][:2] == [app.sys.executable, "script.py"]
     assert calls[1][0][:3] == [app.sys.executable, "-m", "mod"]
+
+
+def test_demo_full_uses_defaults(monkeypatch: pytest.MonkeyPatch):
+    captured = {}
+
+    def fake_callback(*, demo_date, demo_end_date, lookback, dates):
+        captured["demo_date"] = demo_date
+        captured["demo_end_date"] = demo_end_date
+        captured["lookback"] = lookback
+        captured["dates"] = dates
+
+    monkeypatch.setattr(app.local_demo, "callback", fake_callback)
+
+    app.local_demo_full.callback()
+
+    assert captured == {
+        "demo_date": app._DEMO_DEFAULT_DATE,
+        "demo_end_date": app._DEMO_DEFAULT_END_DATE,
+        "lookback": app._DEMO_DEFAULT_LOOKBACK,
+        "dates": app._DEMO_DEFAULT_DATES,
+    }
