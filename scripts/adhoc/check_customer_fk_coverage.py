@@ -24,9 +24,7 @@ def _load_customer_ids(paths: list[str]) -> pl.DataFrame:
             continue
         if "customer_id" not in frame.columns:
             continue
-        frames.append(
-            frame.select(pl.col("customer_id").cast(pl.Utf8)).drop_nulls()
-        )
+        frames.append(frame.select(pl.col("customer_id").cast(pl.Utf8)).drop_nulls())
     if not frames:
         return pl.DataFrame({"customer_id": []})
     return pl.concat(frames).unique()
@@ -86,9 +84,7 @@ def main() -> int:
         part_dir = base_path / table / f"ingestion_dt={run_date}"
         fact_files.extend(_glob_parquet(part_dir))
 
-    dims_files = _glob_parquet(
-        dims_path / "customers" / f"snapshot_dt={run_date}"
-    )
+    dims_files = _glob_parquet(dims_path / "customers" / f"snapshot_dt={run_date}")
     base_customer_files = _glob_parquet(base_path / "customers")
 
     print(f"Run date: {run_date}")
