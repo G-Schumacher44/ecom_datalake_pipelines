@@ -87,3 +87,26 @@ def test_extract_spec_path():
     assert "--spec-path" not in cleaned
     assert "my/spec.yml" not in cleaned
     assert "model1" in cleaned
+
+
+def test_base_silver_staging_publish_uses_staging_path(
+    mock_dbt_run, mock_ensure_dirs, mock_gcloud_rsync, monkeypatch, tmp_path
+):
+    monkeypatch.setenv("PIPELINE_ENV", "prod")
+    monkeypatch.setenv("BRONZE_BASE_PATH", str(tmp_path / "bronze"))
+    monkeypatch.setenv("SILVER_BASE_PATH", "gs://bucket/silver/base")
+    monkeypatch.setenv("SILVER_EXPORT_BASE_PATH", "gs://bucket/silver/base")
+    monkeypatch.setenv("SILVER_LOCAL_BASE_PATH", str(tmp_path / "silver"))
+    monkeypatch.setenv("SILVER_PUBLISH_MODE", "staging")
+    monkeypatch.setenv("SILVER_STAGING_PATH", "gs://bucket/silver/base/_staging/test")
+    monkeypatch.setenv("RUN_ID", "test")
+    monkeypatch.setattr(sys, "argv", ["base_silver.py", "--select", "stg_orders"])
+
+    with patch("src.runners.base_silver.gcloud_copy_file") as mock_copy:
+        base_silver.main()
+
+    assert mock_gcloud_rsync.call_count == 1
+    _, kwargs = mock_gcloud_rsync.call_args
+    assert kwargs["delete"] is True
+    assert mock_gcloud_rsync.call_args.args[1].endswith("/_staging/test")
+    assert mock_copy.call_count == 1
