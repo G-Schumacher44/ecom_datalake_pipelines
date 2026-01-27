@@ -88,6 +88,13 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
     allow_fallback = pipeline_env in {"local", "dev"} or not str(
         silver_base_path_raw
     ).startswith("gs://")
+    # Explicit opt-in for backfill bootstrap when run_date predates the first
+    # available product_catalog partition (kept off by default for prod).
+    bootstrap_allowed = os.getenv("DIMS_SNAPSHOT_ALLOW_BOOTSTRAP", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
 
     for table in dims_tables:
         df = _load_table(silver_base_path, table)
@@ -148,6 +155,35 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                 else:
                     logger.warning(
                         f"No fallback possible for {table}: "
+                        "source is empty or has no ingestion_dt"
+                    )
+            elif df.is_empty() and bootstrap_allowed:
+                # Backfill bootstrap: if run_date is before the first partition,
+                # use the earliest available data but keep the snapshot date.
+                if "ingestion_dt" in base_df.columns:
+                    stats = base_df.select(
+                        pl.col("ingestion_dt").min().alias("min_dt"),
+                        pl.col("ingestion_dt").max().alias("max_dt"),
+                    ).row(0)
+                    min_dt, max_dt = stats
+                    if min_dt and run_dt < min_dt:
+                        logger.warning(
+                            f"Product catalog empty for {run_date}; "
+                            f"bootstrapping from earliest available partition: {min_dt}",
+                            run_date=run_date,
+                            bootstrap_date=str(min_dt),
+                        )
+                        df = base_df.filter(
+                            pl.col("ingestion_dt") == min_dt
+                        ).with_columns(pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"))
+                    else:
+                        logger.warning(
+                            f"Bootstrap not applied for {table}: "
+                            f"run_date={run_date} min_dt={min_dt} max_dt={max_dt}"
+                        )
+                else:
+                    logger.warning(
+                        f"Bootstrap not possible for {table}: "
                         "source is empty or has no ingestion_dt"
                     )
         else:
