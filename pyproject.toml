@@ -137,8 +137,8 @@ disable = [
 ecomlake = "src.cli.app:cli"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
-where = ["src"]
-include = ["*"]
+where = ["."]
+include = ["src", "src.*"]
