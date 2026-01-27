@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-01-27 - Reliability & Packaging Patch
+
+### Fixed
+
+- **CLI packaging**: Install now exposes the `src` module so `ecomlake` runs after `pip install -e .`
+- **Local demo**: dbt log/target paths consistently set to `/tmp`; demo-full defaults wired correctly
+- **Airflow runs**: `start_date` aligned to the earliest dataset date to prevent empty manual runs
+- **Parquet fallback**: Local fallback reads no longer mis-route to GCS paths
+- **Manifest inventory**: Base Silver `_MANIFEST.json` now includes file listings used by fast validation paths
+- **Mypy checks**: Resolved typing issues in validation tests
+
+### Changed
+
+- **Docs**: Version metadata and changelog link surfaced in README
+
 ## [1.0.3] - 2026-01-26 - CLI Suite Release
 
 ### Added
