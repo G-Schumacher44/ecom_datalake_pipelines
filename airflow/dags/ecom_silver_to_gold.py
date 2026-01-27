@@ -445,8 +445,8 @@ with DAG(
         >> base_silver_group
         >> validate_silver_quality
         >> enriched_silver_group
-        >> validate_enriched_quality
         >> sync_silver_enriched
+        >> validate_enriched_quality
         >> validate_parquet_group
         >> should_load_bigquery
         >> load_bigquery_group

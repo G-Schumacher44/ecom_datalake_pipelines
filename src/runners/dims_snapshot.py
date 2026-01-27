@@ -88,6 +88,9 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
     allow_fallback = pipeline_env in {"local", "dev"} or not str(
         silver_base_path_raw
     ).startswith("gs://")
+    ignore_customer_signup = os.getenv(
+        "DIMS_CUSTOMERS_IGNORE_SIGNUP_DATE", ""
+    ).lower() in {"1", "true", "yes"}
     # Explicit opt-in for backfill bootstrap when run_date predates the first
     # available product_catalog partition (kept off by default for prod).
     bootstrap_allowed = os.getenv("DIMS_SNAPSHOT_ALLOW_BOOTSTRAP", "").lower() in {
@@ -103,9 +106,11 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                 pl.col("signup_date").cast(pl.Date, strict=False).alias("signup_date"),
                 pl.lit(run_dt).cast(pl.Date).alias("as_of_dt"),
             )
-            df = df.filter(
-                pl.col("signup_date").is_not_null() & (pl.col("signup_date") <= run_dt)
-            )
+            if not ignore_customer_signup:
+                df = df.filter(
+                    pl.col("signup_date").is_not_null()
+                    & (pl.col("signup_date") <= run_dt)
+                )
         elif table == "product_catalog":
             # Cast ingestion_dt to Date if it exists
             if "ingestion_dt" in df.columns:
