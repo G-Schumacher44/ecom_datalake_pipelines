@@ -119,7 +119,7 @@ def validate_table(
         )
 
     if row_loss_pct > 1.0:
-        logger.warning(f"{table}: Lost {row_loss_pct:.2%} of rows ({row_loss:,} rows)")
+        logger.warning(f"{table}: Lost {row_loss_pct:.2f}% of rows ({row_loss:,} rows)")
 
     return TableQualityMetrics(
         table=table,

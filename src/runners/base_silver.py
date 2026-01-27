@@ -391,12 +391,32 @@ def main() -> None:
                     "Exporting local silver to staging: %s",
                     staging_base,
                 )
-                gcloud_rsync(str(silver_path), staging_base, delete=True)
-                table_names = (
-                    [table.name for table in spec.silver_base.tables]
-                    if spec
-                    else STANDARD_TABLES
-                )
+                tables_env = os.getenv("BRONZE_SYNC_TABLES", "").strip()
+                if tables_env:
+                    table_names = [
+                        t.strip() for t in tables_env.split(",") if t.strip()
+                    ]
+                elif spec:
+                    table_names = [table.name for table in spec.silver_base.tables]
+                else:
+                    table_names = [
+                        p.name
+                        for p in Path(silver_path).iterdir()
+                        if p.is_dir() and p.name != "quarantine"
+                    ]
+
+                for table in table_names:
+                    source_table = Path(silver_path) / table
+                    dest_table = f"{staging_base.rstrip('/')}/{table}"
+                    if source_table.exists():
+                        generate_manifest(source_table, dest_table)
+                        gcloud_rsync(str(source_table), dest_table, delete=True)
+
+                    q_source = Path(quarantine_path) / table
+                    q_dest = f"{staging_base.rstrip('/')}/quarantine/{table}"
+                    if q_source.exists():
+                        gcloud_rsync(str(q_source), q_dest, delete=True)
+
                 manifest = {
                     "run_id": run_id,
                     "staging_path": staging_base,
