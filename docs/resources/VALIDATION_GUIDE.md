@@ -284,7 +284,7 @@ validate_enriched_quality = BashOperator(
     ),
 )
 
-enriched_silver_group >> validate_enriched_quality >> load_bigquery_group
+enriched_silver_group >> sync_silver_enriched_to_gcs >> validate_enriched_quality >> load_bigquery_group
 ```
 
 ## Gate 1: Bronze Validation (✅ IMPLEMENTED)

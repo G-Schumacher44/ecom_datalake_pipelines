@@ -517,6 +517,7 @@ gcloud compute instances describe airflow-vm \
 | `SILVER_PROFILE_ENABLED` | `false`                         | Generate Silver profiling reports        |
 | `BQ_LOCATION`            | `US`                            | BigQuery dataset location                |
 | `DIMS_SNAPSHOT_ALLOW_BOOTSTRAP` | `false`                  | Backfill-only: bootstrap earliest product_catalog partition |
+| `DIMS_CUSTOMERS_IGNORE_SIGNUP_DATE` | `false`            | Backfill-only: include all customers in snapshot |
 
 ### Docker/macOS VirtioFS Issues
 

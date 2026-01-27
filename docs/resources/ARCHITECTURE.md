@@ -406,8 +406,8 @@ flowchart TD
     D --> E[base_silver_dbt]
     E --> F[validate_silver_quality]
     F --> G[enriched_silver_group<br/>10 parallel tasks]
-    G --> H[validate_enriched_quality]
-    H --> I[sync_to_gcs]
+    G --> H[sync_to_gcs]
+    H --> I[validate_enriched_quality]
     I --> J{should_load_bigquery?}
     J -->|Yes prod| K[load_to_bigquery_group<br/>10 parallel loads]
     J -->|No local| Z1[End]
@@ -418,7 +418,7 @@ flowchart TD
     style A fill:#e1f5ff
     style D fill:#98d8c8
     style F fill:#98d8c8
-    style H fill:#98d8c8
+    style I fill:#98d8c8
     style G fill:#fff4e6
     style K fill:#c8e6c9
     style M fill:#ffd700
