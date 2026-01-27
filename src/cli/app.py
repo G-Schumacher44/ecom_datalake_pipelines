@@ -924,6 +924,7 @@ def dbt_deps() -> None:
     _run_cmd(
         ["dbt", "deps", "--project-dir", ".", "--profiles-dir", "."],
         cwd="dbt_duckdb",
+        env_overrides=_dbt_env(),
     )
 
 
@@ -932,6 +933,7 @@ def dbt_build() -> None:
     _run_cmd(
         ["dbt", "build", "--project-dir", ".", "--profiles-dir", "."],
         cwd="dbt_duckdb",
+        env_overrides=_dbt_env(),
     )
 
 
@@ -940,6 +942,7 @@ def dbt_test() -> None:
     _run_cmd(
         ["dbt", "test", "--project-dir", ".", "--profiles-dir", "."],
         cwd="dbt_duckdb",
+        env_overrides=_dbt_env(),
     )
 
 
@@ -1018,6 +1021,13 @@ def _local_metrics_env() -> dict[str, str]:
     return {
         "LOGS_BASE_PATH": "/tmp/ecom_logs",
         "METRICS_BASE_PATH": "/tmp/ecom_metrics",
+    }
+
+
+def _dbt_env() -> dict[str, str]:
+    return {
+        "DBT_LOG_PATH": "/tmp/dbt_logs",
+        "DBT_TARGET_PATH": "/tmp/dbt_target",
     }
 
 
@@ -1263,6 +1273,7 @@ def local_demo(demo_date: str, demo_end_date: str, lookback: int, dates: str) ->
     _run_cmd(
         ["dbt", "deps", "--project-dir", ".", "--profiles-dir", "."],
         cwd="dbt_duckdb",
+        env_overrides={**_local_env(), **_dbt_env()},
     )
 
     env = {**_local_env(), **_local_metrics_env()}
@@ -1333,6 +1344,7 @@ def local_demo_fast(demo_date: str) -> None:
     _run_cmd(
         ["dbt", "deps", "--project-dir", ".", "--profiles-dir", "."],
         cwd="dbt_duckdb",
+        env_overrides={**_local_env(), **_dbt_env()},
     )
 
     env = {**_local_env(), **_local_metrics_env()}
