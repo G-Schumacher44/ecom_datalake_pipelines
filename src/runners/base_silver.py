@@ -15,8 +15,7 @@ import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pyarrow.parquet as pq
-
+from src.runners.manifest import generate_manifest
 from src.settings import load_settings
 from src.specs import load_spec_safe
 
@@ -165,53 +164,6 @@ def resolve_run_id() -> str:
         if value:
             return value.replace(":", "").replace("+", "").replace(" ", "_")
     return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-
-
-def generate_manifest(local_table_path: Path, remote_table_url: str) -> None:
-    """Generate _MANIFEST.json for each partition in a table (local only)."""
-    if not local_table_path.exists():
-        return
-
-    # Find all partitions (subdirectories)
-    # Assumes Hive partitioning: table/key=value
-    partitions = [p for p in local_table_path.iterdir() if p.is_dir() and "=" in p.name]
-
-    # Also handle unpartitioned tables (root level parquet files)
-    root_files = list(local_table_path.glob("*.parquet"))
-    if root_files:
-        partitions.append(local_table_path)
-
-    for partition_dir in partitions:
-        parquet_files = list(partition_dir.glob("*.parquet"))
-        if not parquet_files:
-            continue
-
-        total_rows = 0
-        files: list[dict[str, object]] = []
-
-        for pfile in parquet_files:
-            try:
-                meta = pq.read_metadata(pfile)
-                relative_path = str(pfile.relative_to(partition_dir))
-                files.append(
-                    {
-                        "path": relative_path,
-                        "rows": meta.num_rows,
-                    }
-                )
-                total_rows += meta.num_rows
-            except Exception as e:
-                logger.warning(f"Failed to read metadata for {pfile}: {e}")
-
-        manifest = {
-            "total_rows": total_rows,
-            "file_count": len(files),
-            "files": files,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-        }
-
-        manifest_path = partition_dir / "_MANIFEST.json"
-        manifest_path.write_text(json.dumps(manifest, indent=2))
 
 
 def run_dbt(
@@ -367,6 +319,25 @@ def main() -> None:
 
     run_dbt(dbt_args=dbt_extra_args)
 
+    # Generate manifests for local output (always)
+    # This ensures manifests exist for local validation and before any GCS sync
+    tables_env = os.getenv("BRONZE_SYNC_TABLES", "").strip()
+    if tables_env:
+        table_names_local = [t.strip() for t in tables_env.split(",") if t.strip()]
+    elif spec:
+        table_names_local = [table.name for table in spec.silver_base.tables]
+    else:
+        table_names_local = [
+            p.name
+            for p in Path(silver_path_effective).iterdir()
+            if p.is_dir() and p.name != "quarantine"
+        ]
+
+    for table in table_names_local:
+        table_path = Path(silver_path_effective) / table
+        if table_path.exists():
+            generate_manifest(table_path)
+
     # Export local silver to GCS
     if is_gcs_path(silver_path_raw):
         export_base = os.getenv("SILVER_EXPORT_BASE_PATH", "").strip()
@@ -409,7 +380,7 @@ def main() -> None:
                     source_table = Path(silver_path) / table
                     dest_table = f"{staging_base.rstrip('/')}/{table}"
                     if source_table.exists():
-                        generate_manifest(source_table, dest_table)
+                        generate_manifest(source_table)
                         gcloud_rsync(str(source_table), dest_table, delete=True)
 
                     q_source = Path(quarantine_path) / table
@@ -447,7 +418,7 @@ def main() -> None:
                         source_table = Path(silver_path) / table
                         dest_table = f"{export_base.rstrip('/')}/{table}"
                         if source_table.exists():
-                            generate_manifest(source_table, dest_table)
+                            generate_manifest(source_table)
                             gcloud_rsync(str(source_table), dest_table, delete=True)
 
                         # Sync Quarantine Table (if exists)
@@ -464,7 +435,7 @@ def main() -> None:
                     for table_dir in Path(silver_path).iterdir():
                         if table_dir.is_dir() and table_dir.name != "quarantine":
                             dest_table = f"{export_base.rstrip('/')}/{table_dir.name}"
-                            generate_manifest(table_dir, dest_table)
+                            generate_manifest(table_dir)
                     gcloud_rsync(str(silver_path), export_base, delete=True)
 
 
