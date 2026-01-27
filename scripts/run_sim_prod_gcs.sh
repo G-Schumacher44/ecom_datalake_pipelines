@@ -31,6 +31,12 @@ export OBSERVABILITY_ENV="${OBSERVABILITY_ENV:-prod}"
 export BQ_LOAD_ENABLED="${BQ_LOAD_ENABLED:-false}"
 export GOLD_PIPELINE_ENABLED="${GOLD_PIPELINE_ENABLED:-false}"
 export SILVER_PUBLISH_MODE="${SILVER_PUBLISH_MODE:-staging}"
+export ENRICHED_PUBLISH_MODE="${ENRICHED_PUBLISH_MODE:-staging}"
+export DIMS_PUBLISH_MODE="${DIMS_PUBLISH_MODE:-staging}"
+export RUN_ID="${RUN_ID}"
+export SILVER_STAGING_PATH="${SILVER_BASE_PATH}/_staging/${RUN_ID}"
+export ENRICHED_STAGING_PATH="${SILVER_ENRICHED_PATH}/_staging/${RUN_ID}"
+export DIMS_STAGING_PATH="${SILVER_DIMS_PATH}/_staging/${RUN_ID}"
 
 export GOOGLE_CLOUD_PROJECT
 export BRONZE_BASE_PATH
@@ -127,7 +133,10 @@ python -m src.validation.silver \
 
 echo ""
 echo "→ Phase 5: Publish Silver Base (staging)"
-# base_silver handles publish when SILVER_PUBLISH_MODE=staging
+if [[ "${SILVER_PUBLISH_MODE}" == "staging" ]]; then
+  echo "→ Promote Base Silver to canonical"
+  gcloud storage rsync -r "${SILVER_STAGING_PATH}" "${SILVER_BASE_PATH}"
+fi
 
 
 echo ""
@@ -185,19 +194,35 @@ python -m src.runners.enriched.shipping_economics \
     --ingest-dt "${INGEST_DATE}"
 
 echo ""
-echo "→ Phase 7: Enriched Quality Validation"
+echo "→ Phase 7: Sync Enriched Silver to GCS"
+if [[ "${ENRICHED_PUBLISH_MODE}" == "staging" ]]; then
+  gcloud storage rsync -r --delete-unmatched-destination-objects \
+      "${SILVER_ENRICHED_LOCAL_PATH}" \
+      "${ENRICHED_STAGING_PATH}"
+else
+  gcloud storage rsync -r --delete-unmatched-destination-objects \
+      "${SILVER_ENRICHED_LOCAL_PATH}" \
+      "${SILVER_ENRICHED_PATH}"
+fi
+
+echo ""
+echo "→ Phase 8: Enriched Quality Validation"
+ENRICHED_VALIDATE_PATH="${SILVER_ENRICHED_PATH}"
+if [[ "${ENRICHED_PUBLISH_MODE}" == "staging" ]]; then
+  ENRICHED_VALIDATE_PATH="${ENRICHED_STAGING_PATH}"
+fi
 python -m src.validation.enriched \
-    --enriched-path "${SILVER_ENRICHED_LOCAL_PATH}" \
+    --enriched-path "${ENRICHED_VALIDATE_PATH}" \
     --run-id "${RUN_ID}" \
     --ingest-dt "${INGEST_DATE}" \
     --output-report "docs/validation_reports/ENRICHED_QUALITY_${RUN_ID}.md" \
     --enforce-quality
 
 echo ""
-echo "→ Phase 8: Sync Enriched Silver to GCS"
-gcloud storage rsync -r --delete-unmatched-destination-objects \
-    "${SILVER_ENRICHED_LOCAL_PATH}" \
-    "${SILVER_ENRICHED_PATH}"
+echo "→ Phase 9: Promote Enriched Silver to canonical"
+if [[ "${ENRICHED_PUBLISH_MODE}" == "staging" ]]; then
+  gcloud storage rsync -r "${ENRICHED_STAGING_PATH}" "${SILVER_ENRICHED_PATH}"
+fi
 
 echo ""
 echo "=========================================="
