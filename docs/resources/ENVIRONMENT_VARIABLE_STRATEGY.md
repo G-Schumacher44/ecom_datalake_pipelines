@@ -165,6 +165,7 @@ GOLD_PIPELINE_ENABLED=true
 BQ_LOAD_ENABLED=true
 SILVER_PUBLISH_MODE=direct|staging
 DIMS_SNAPSHOT_ALLOW_BOOTSTRAP=true  # backfill-only: bootstrap earliest product_catalog partition
+DIMS_CUSTOMERS_IGNORE_SIGNUP_DATE=true  # backfill-only: skip signup_date cutoff
 ```
 
 ### Path Overrides (Per-Dev / Dev)
@@ -252,6 +253,7 @@ GOLD_PIPELINE_ENABLED=false              # Enable/disable Gold layer pipeline
 BQ_LOAD_ENABLED=false                    # Enable/disable BigQuery loads
 SILVER_PUBLISH_MODE=direct|staging       # direct=immediate, staging=versioned runs
 DIMS_SNAPSHOT_ALLOW_BOOTSTRAP=false      # backfill-only: bootstrap earliest product_catalog
+DIMS_CUSTOMERS_IGNORE_SIGNUP_DATE=false  # backfill-only: skip signup_date cutoff
 ```
 
 **Quality gates**
