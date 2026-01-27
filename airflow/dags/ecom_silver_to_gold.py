@@ -28,8 +28,10 @@ from common import (
     get_retry_config,
     get_silver_base_table_names,
     make_runner_callable,
+    promote_staged_prefix,
     resolve_bool,
     resolve_dims_base_path,
+    sanitize_run_id,
 )
 from src.runners.enriched import (
     run_cart_attribution,
@@ -54,20 +56,61 @@ def load_config_to_xcom(**kwargs):
     pl = config.pipeline
     p_env = config.resolve_pipeline_env()
 
+    run_id_raw = kwargs.get("run_id", "")
+    run_id_clean = sanitize_run_id(run_id_raw) if run_id_raw else ""
+    silver_path = config.resolve_path(
+        pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
+    )
+    enriched_path = config.resolve_path(
+        pl.silver_bucket, pl.silver_enriched_prefix, "SILVER_ENRICHED_PATH"
+    )
+    silver_publish_mode = (
+        os.getenv("SILVER_PUBLISH_MODE") or pl.silver_publish_mode or "direct"
+    ).lower()
+    enriched_publish_mode = (
+        os.getenv("ENRICHED_PUBLISH_MODE")
+        or pl.silver_enriched_publish_mode
+        or "direct"
+    ).lower()
+
+    silver_staging_override = os.getenv("SILVER_STAGING_PATH", "").strip()
+    if silver_publish_mode == "staging" and silver_path.startswith("gs://"):
+        if silver_staging_override:
+            silver_staging = silver_staging_override
+        elif run_id_clean:
+            silver_staging = f"{silver_path.rstrip('/')}/_staging/{run_id_clean}"
+        else:
+            silver_staging = ""
+    else:
+        silver_staging = ""
+    enriched_staging_override = os.getenv("ENRICHED_STAGING_PATH", "").strip()
+    if enriched_publish_mode == "staging" and enriched_path.startswith("gs://"):
+        if enriched_staging_override:
+            enriched_staging = enriched_staging_override
+        elif run_id_clean:
+            enriched_staging = f"{enriched_path.rstrip('/')}/_staging/{run_id_clean}"
+        else:
+            enriched_staging = ""
+    else:
+        enriched_staging = ""
+
     return {
         "bronze": config.resolve_path(
             pl.bronze_bucket, pl.bronze_prefix, "BRONZE_BASE_PATH"
         ),
-        "silver": config.resolve_path(
-            pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
-        ),
-        "enriched": config.resolve_path(
-            pl.silver_bucket, pl.silver_enriched_prefix, "SILVER_ENRICHED_PATH"
-        ),
+        "silver": silver_path,
+        "silver_staging": silver_staging,
+        "silver_validate": silver_staging or silver_path,
+        "silver_publish_mode": silver_publish_mode,
+        "enriched": enriched_path,
+        "enriched_staging": enriched_staging,
+        "enriched_validate": enriched_staging or enriched_path,
+        "enriched_publish_mode": enriched_publish_mode,
         "project_id": pl.project_id,
         "bq_dataset": pl.bigquery_dataset,
         "env": p_env,
         "bucket": pl.silver_bucket,
+        "run_id_clean": run_id_clean,
     }
 
 
@@ -160,6 +203,41 @@ def sync_enriched_partitions_to_gcs(
         cmd = ["gcloud", "storage", "rsync", "-r", local_dir, remote_dir]
         subprocess.run(cmd, check=True)
 
+
+def promote_enriched_partitions_to_gcs(
+    staging_path: str,
+    canonical_path: str,
+    env: str,
+    ingest_dt: str,
+    **kwargs,
+) -> None:
+    """Promote only the current ingest_dt partitions from staging to canonical."""
+    if env not in ("dev", "prod"):
+        print(f"Skipping promote for env: {env}")
+        return
+    if not staging_path:
+        print("Skipping promote: staging path not set")
+        return
+    if not staging_path.startswith("gs://") or not canonical_path.startswith("gs://"):
+        print("Skipping promote: non-GCS paths")
+        return
+
+    from src.runners.enriched.shared import get_enriched_partitions
+
+    partitions = get_enriched_partitions()
+
+    for table, partition_key in partitions.items():
+        staging_dir = (
+            f"{staging_path.rstrip('/')}/{table}/{partition_key}={ingest_dt}"
+        )
+        canonical_dir = (
+            f"{canonical_path.rstrip('/')}/{table}/{partition_key}={ingest_dt}"
+        )
+        print(f"Promoting {staging_dir} -> {canonical_dir}")
+        subprocess.run(
+            ["gcloud", "storage", "rsync", "-r", staging_dir, canonical_dir],
+            check=True,
+        )
 
 _run_cart_attribution = make_runner_callable(run_cart_attribution)
 _run_cart_attribution_summary = make_runner_callable(run_cart_attribution_summary)
@@ -278,6 +356,9 @@ with DAG(
             f"export BRONZE_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
             f"&& export SILVER_BASE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
             f"&& export SILVER_ENRICHED_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched'] }}}}\" "
+            f"&& export RUN_ID=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['run_id_clean'] }}}}\" "
+            f"&& export SILVER_PUBLISH_MODE=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver_publish_mode'] }}}}\" "
+            f"&& export SILVER_STAGING_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver_staging'] }}}}\" "
             f'&& DIMS_PATH="${{SILVER_DIMS_PATH:-data/silver/dims}}" '
             f'&& if [[ "$DIMS_PATH" == gs://* ]]; then '
             f'DIMS_PATH="${{SILVER_DIMS_LOCAL_PATH:-{AIRFLOW_HOME}/data/silver/dims}}"; fi '
@@ -297,7 +378,7 @@ with DAG(
         bash_command=(
             f"cd {AIRFLOW_HOME} && "
             f"BRONZE_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bronze'] }}}}\" "
-            f"SILVER_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}}}\" "
+            f"SILVER_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver_validate'] }}}}\" "
             f"&& python -m src.validation.silver "
             f'--bronze-path "$BRONZE_PATH" '
             f'--silver-path "$SILVER_PATH" '
@@ -313,6 +394,15 @@ with DAG(
 
     # 5. Sync Silver Base
     # Removed: sync_silver_base_to_gcs (Handled by base_silver runner)
+    promote_silver_base = PythonOperator(
+        task_id="promote_silver_base",
+        python_callable=promote_staged_prefix,
+        op_kwargs={
+            "staging_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver_staging'] }}",
+            "canonical_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['silver'] }}",
+            "env": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}",
+        },
+    )
 
     # 6. Phase 2: Enriched Silver
     with TaskGroup("enriched_silver") as enriched_silver_group:
@@ -332,7 +422,7 @@ with DAG(
         env=COMMON_ENV,
         bash_command=(
             f"cd {AIRFLOW_HOME} && "
-            f"ENRICHED_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched'] }}}}\" "
+            f"ENRICHED_PATH=\"{{{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched_validate'] }}}}\" "
             "&& python -m src.validation.enriched "
             f'--enriched-path "$ENRICHED_PATH" '
             f"--run-id {{{{ run_id }}}} "
@@ -347,8 +437,19 @@ with DAG(
         task_id="sync_silver_enriched_to_gcs",
         python_callable=sync_enriched_partitions_to_gcs,
         op_kwargs={
-            "enriched_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched'] }}",
+            "enriched_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched_validate'] }}",
             "bucket": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['bucket'] }}",
+            "env": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}",
+            "ingest_dt": "{{ ds }}",
+        },
+    )
+
+    promote_enriched = PythonOperator(
+        task_id="promote_enriched",
+        python_callable=promote_enriched_partitions_to_gcs,
+        op_kwargs={
+            "staging_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched_staging'] }}",
+            "canonical_path": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['enriched'] }}",
             "env": "{{ ti.xcom_pull(task_ids='setup_pipeline_config')['env'] }}",
             "ingest_dt": "{{ ds }}",
         },
@@ -444,9 +545,11 @@ with DAG(
         >> validate_bronze_quality
         >> base_silver_group
         >> validate_silver_quality
+        >> promote_silver_base
         >> enriched_silver_group
         >> sync_silver_enriched
         >> validate_enriched_quality
+        >> promote_enriched
         >> validate_parquet_group
         >> should_load_bigquery
         >> load_bigquery_group

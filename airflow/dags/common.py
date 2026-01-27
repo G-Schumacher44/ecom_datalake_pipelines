@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from datetime import timedelta
 
 from src.settings import RetryConfig, load_settings
@@ -82,6 +83,9 @@ COMMON_ENV = {
     "SILVER_DIMS_PATH": os.getenv("SILVER_DIMS_PATH", ""),
     "SILVER_DIMS_LOCAL_PATH": os.getenv("SILVER_DIMS_LOCAL_PATH", ""),
     "SILVER_QUARANTINE_PATH": os.getenv("SILVER_QUARANTINE_PATH", ""),
+    "SILVER_PUBLISH_MODE": os.getenv("SILVER_PUBLISH_MODE", ""),
+    "ENRICHED_PUBLISH_MODE": os.getenv("ENRICHED_PUBLISH_MODE", ""),
+    "DIMS_PUBLISH_MODE": os.getenv("DIMS_PUBLISH_MODE", ""),
     "METRICS_BUCKET": os.getenv("METRICS_BUCKET", ""),
     "LOGS_BUCKET": os.getenv("LOGS_BUCKET", ""),
     "REPORTS_BUCKET": os.getenv("REPORTS_BUCKET", ""),
@@ -119,6 +123,33 @@ def resolve_dims_base_path() -> str | None:
 
     config = SettingsConfig()
     return os.path.join(config.airflow_home, base_path)
+
+
+def sanitize_run_id(run_id: str) -> str:
+    """Normalize run IDs for filesystem-safe staging paths."""
+    return run_id.replace(":", "").replace("+", "").replace(" ", "_")
+
+
+def promote_staged_prefix(
+    staging_path: str,
+    canonical_path: str,
+    env: str,
+) -> None:
+    """Promote staged data to canonical GCS prefix after validation."""
+    if env not in ("dev", "prod"):
+        print(f"Skipping promote for env: {env}")
+        return
+    if not staging_path:
+        print("Skipping promote: staging path not set")
+        return
+    if not staging_path.startswith("gs://") or not canonical_path.startswith("gs://"):
+        print("Skipping promote: non-GCS paths")
+        return
+    print(f"Promoting {staging_path} -> {canonical_path}")
+    subprocess.run(
+        ["gcloud", "storage", "rsync", "-r", staging_path, canonical_path],
+        check=True,
+    )
 
 
 _resolved_dims_path = resolve_dims_base_path()

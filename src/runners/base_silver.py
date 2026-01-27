@@ -384,7 +384,9 @@ def main() -> None:
             ).lower()
             if publish_mode == "staging":
                 run_id = resolve_run_id()
-                staging_base = f"{export_base.rstrip('/')}/_staging/{run_id}"
+                staging_base = os.getenv("SILVER_STAGING_PATH", "").strip()
+                if not staging_base:
+                    staging_base = f"{export_base.rstrip('/')}/_staging/{run_id}"
                 logger.info(
                     "Exporting local silver to staging: %s",
                     staging_base,
@@ -407,16 +409,9 @@ def main() -> None:
                     manifest_file,
                     f"{staging_base}/_MANIFEST.json",
                 )
-                pointer = {
-                    "run_id": run_id,
-                    "staging_path": staging_base,
-                    "published_at": datetime.now(timezone.utc).isoformat(),
-                }
-                pointer_file = Path("/tmp") / "silver_latest.json"
-                pointer_file.write_text(json.dumps(pointer, indent=2))
-                gcloud_copy_file(
-                    pointer_file,
-                    f"{export_base.rstrip('/')}/_latest.json",
+                logger.info(
+                    "Staged silver publish complete (promotion handled by pipeline).",
+                    extra={"staging_path": staging_base},
                 )
             else:
                 tables_env = os.getenv("BRONZE_SYNC_TABLES", "").strip()
