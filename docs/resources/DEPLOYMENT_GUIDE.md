@@ -325,7 +325,7 @@ docker rmi ecom-datalake-pipeline:latest
 export PROJECT_ID="your-gcp-project"
 export REGION="us-central1"
 export IMAGE_NAME="ecom-datalake-pipeline"
-export IMAGE_TAG="v0.1.0"
+export IMAGE_TAG="v1.0.4"
 export ARTIFACT_REPO="airflow-images"
 
 # Create Artifact Registry repository (one-time)
@@ -516,6 +516,7 @@ gcloud compute instances describe airflow-vm \
 | `STRICT_FK`              | `false` (local), `true` (prod)  | Enforce FK validation in Silver          |
 | `SILVER_PROFILE_ENABLED` | `false`                         | Generate Silver profiling reports        |
 | `BQ_LOCATION`            | `US`                            | BigQuery dataset location                |
+| `DIMS_SNAPSHOT_ALLOW_BOOTSTRAP` | `false`                  | Backfill-only: bootstrap earliest product_catalog partition |
 
 ### Docker/macOS VirtioFS Issues
 

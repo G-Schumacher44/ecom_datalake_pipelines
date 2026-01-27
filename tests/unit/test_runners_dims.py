@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import polars as pl
@@ -83,3 +84,48 @@ def test_publish_dims_latest(tmp_path):
     content = json.loads(latest_file.read_text())
     assert content["run_date"] == "2025-10-01"
     assert content["run_id"] == "run123"
+
+
+def test_snapshot_dims_bootstrap_product_catalog(tmp_path, monkeypatch):
+    source_dir = tmp_path / "source"
+    prod_dir = source_dir / "product_catalog" / "ingestion_dt=2020-01-02"
+    prod_dir.mkdir(parents=True)
+
+    df = pl.DataFrame(
+        {
+            "product_id": ["P1"],
+            "ingestion_dt": ["2020-01-02"],
+        }
+    )
+    df.write_parquet(prod_dir / "data.parquet")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    monkeypatch.setenv("PIPELINE_ENV", "prod")
+    monkeypatch.setenv("DIMS_SNAPSHOT_ALLOW_BOOTSTRAP", "true")
+    monkeypatch.setenv("SILVER_LOCAL_BASE_PATH", str(source_dir))
+
+    with (
+        patch("src.runners.dims_snapshot.load_spec_safe") as mock_spec,
+        patch("src.runners.dims_snapshot._resolve_dims_paths") as mock_paths,
+    ):
+        mock_spec_obj = MagicMock()
+        mock_table = MagicMock()
+        mock_table.name = "product_catalog"
+        mock_spec_obj.dims.tables = [mock_table]
+        mock_spec_obj.dims.base_path = str(output_dir)
+        mock_spec.return_value = mock_spec_obj
+
+        mock_paths.return_value = (str(output_dir), None)
+
+        dims_snapshot.snapshot_dims("2020-01-01", silver_base_path="gs://bucket/silver")
+
+    snap_file = (
+        output_dir / "product_catalog" / "snapshot_dt=2020-01-01" / "data_0.parquet"
+    )
+    assert snap_file.exists()
+
+    snap_df = pl.read_parquet(snap_file)
+    assert snap_df.height == 1
+    assert snap_df.select(pl.col("as_of_dt").first()).item() == date(2020, 1, 1)

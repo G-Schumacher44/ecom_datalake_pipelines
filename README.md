@@ -319,12 +319,15 @@ This repository is part of a larger data engineering portfolio demonstrating end
 <details>
 <summary><strong>🫀 Version & Status</strong></summary>
 
-### Current Version: v1.0.3
+### Current Version: v1.0.4
 
-**Latest Release: [v1.0.3](https://github.com/G-Schumacher44/ecom_datalake_pipelines/releases/tag/v1.0.3)** - CLI Suite Release
+**Latest Release: [v1.0.4](https://github.com/G-Schumacher44/ecom_datalake_pipelines/releases/tag/v1.0.4)** - Reliability & Packaging Patch
+
+**Changelog: [`CHANGELOG.md`](CHANGELOG.md)**
 
 ### Release History
 
+- **v1.0.4** (2026-01-27): Reliability + packaging patch (CLI fixes, dbt log path, Airflow date floor)
 - **v1.0.3** (2026-01-26): CLI suite release (ecomlake command, docs migration, deprecation warnings)
 - **v1.0.2** (2026-01-25): Fixed Bronze sample completeness for honest dims validation
   - Complete 5-day Bronze sample (2020-01-01 through 2020-01-05)

@@ -1,5 +1,5 @@
 name: "ecom_dbt_bigquery"
-version: "0.1.0"
+version: "1.0.4"
 config-version: 2
 
 profile: "ecom_dbt_bigquery"

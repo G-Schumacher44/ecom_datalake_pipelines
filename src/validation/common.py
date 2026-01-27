@@ -281,14 +281,15 @@ def read_parquet_safe(
     def _is_decimal_dtype(dtype: pl.DataType) -> bool:
         return str(dtype).startswith("Decimal")
 
-    parquet_files = [str(p) for p in collect_parquet_files(path)]
+    parquet_files = collect_parquet_files(path)
     if not parquet_files:
         return None
+    parquet_paths = [str(p) for p in parquet_files]
     try:
         # Prefer Polars native reader (use_pyarrow=False)
         # to avoid GCSFile type issues with PyArrow
         return pl.read_parquet(
-            parquet_files,
+            parquet_paths,
             columns=columns,
             n_rows=n_rows,
             memory_map=False,
@@ -323,7 +324,7 @@ def read_parquet_safe(
                     low_memory=True,
                     use_pyarrow=False,
                 )
-            else:
+            elif is_gcs_path(str(parquet_file)):
                 fs = get_gcs_filesystem()
                 with fs.open(parquet_file, "rb") as handle:
                     frame = pl.read_parquet(
@@ -334,6 +335,15 @@ def read_parquet_safe(
                         low_memory=True,
                         use_pyarrow=False,
                     )
+            else:
+                frame = pl.read_parquet(
+                    str(parquet_file),
+                    columns=columns,
+                    n_rows=remaining,
+                    memory_map=False,
+                    low_memory=True,
+                    use_pyarrow=False,
+                )
         except (ArrowInvalid, ArrowTypeError, OSError, ValueError) as exc:
             logger.error(
                 "Failed to read parquet file",

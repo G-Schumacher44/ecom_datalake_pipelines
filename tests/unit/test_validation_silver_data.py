@@ -78,7 +78,9 @@ def test_check_required_columns(tmp_path: Path):
         tmp_path / "orders",
         ["order_id", "total"],
     )
-    assert result["nulls"]["order_id"] == 1
+    nulls = result["nulls"]
+    assert isinstance(nulls, dict)
+    assert nulls["order_id"] == 1
 
 
 def test_check_required_columns_missing_path(tmp_path: Path):

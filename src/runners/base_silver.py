@@ -187,19 +187,26 @@ def generate_manifest(local_table_path: Path, remote_table_url: str) -> None:
             continue
 
         total_rows = 0
-        file_count = 0
+        files: list[dict[str, object]] = []
 
         for pfile in parquet_files:
             try:
                 meta = pq.read_metadata(pfile)
+                relative_path = str(pfile.relative_to(partition_dir))
+                files.append(
+                    {
+                        "path": relative_path,
+                        "rows": meta.num_rows,
+                    }
+                )
                 total_rows += meta.num_rows
-                file_count += 1
             except Exception as e:
                 logger.warning(f"Failed to read metadata for {pfile}: {e}")
 
         manifest = {
             "total_rows": total_rows,
-            "file_count": file_count,
+            "file_count": len(files),
+            "files": files,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 

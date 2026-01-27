@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import json
 from pathlib import Path
 
 import polars as pl
@@ -84,6 +86,28 @@ class TestCollectParquetFiles:
         files = collect_parquet_files(tmp_path)
         assert files == []
 
+    def test_collects_from_gcs_manifest(self, monkeypatch) -> None:
+        manifest = {
+            "files": ["ingest_dt=2020-01-01/part-0000.parquet"],
+        }
+
+        class FakeFS:
+            def exists(self, path: str) -> bool:
+                return path.endswith("/_MANIFEST.json")
+
+            def open(self, path: str, mode: str = "r"):
+                return io.StringIO(json.dumps(manifest))
+
+            def glob(self, pattern: str):
+                raise AssertionError("glob should not be called when manifest exists")
+
+        monkeypatch.setattr(
+            "src.validation.common.get_gcs_filesystem", lambda: FakeFS()
+        )
+
+        files = collect_parquet_files("gs://bucket/table")
+        assert files == ["gs://bucket/table/ingest_dt=2020-01-01/part-0000.parquet"]
+
 
 class TestCountParquetRows:
     def test_counts_rows_across_files(self, tmp_path: Path) -> None:
@@ -125,6 +149,23 @@ class TestReadParquetSafe:
     def test_empty_directory_returns_none(self, tmp_path: Path) -> None:
         result = read_parquet_safe(tmp_path)
         assert result is None
+
+    def test_fallback_reads_per_file(self, tmp_path: Path, monkeypatch) -> None:
+        df = pl.DataFrame({"col1": [1, 2], "col2": ["a", "b"]})
+        df.write_parquet(tmp_path / "data.parquet")
+
+        original_read = pl.read_parquet
+
+        def fake_read_parquet(source, *args, **kwargs):
+            if isinstance(source, list):
+                raise pl.exceptions.ComputeError("forced")
+            return original_read(source, *args, **kwargs)
+
+        monkeypatch.setattr(pl, "read_parquet", fake_read_parquet)
+
+        result = read_parquet_safe(tmp_path)
+        assert result is not None
+        assert result.height == 2
 
 
 class TestListPartitions:
