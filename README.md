@@ -319,14 +319,15 @@ This repository is part of a larger data engineering portfolio demonstrating end
 <details>
 <summary><strong>🫀 Version & Status</strong></summary>
 
-### Current Version: v1.0.4
+### Current Version: v1.0.5
 
-**Latest Release: [v1.0.4](https://github.com/G-Schumacher44/ecom_datalake_pipelines/releases/tag/v1.0.4)** - Reliability & Packaging Patch
+**Latest Release: [v1.0.5](https://github.com/G-Schumacher44/ecom_datalake_pipelines/releases/tag/v1.0.5)** - Validation & Backfill Gates
 
 **Changelog: [`CHANGELOG.md`](CHANGELOG.md)**
 
 ### Release History
 
+- **v1.0.5** (2026-01-27): Validation & backfill gates (enriched post-sync validation, dims backfill controls)
 - **v1.0.4** (2026-01-27): Reliability + packaging patch (CLI fixes, dbt log path, Airflow date floor)
 - **v1.0.3** (2026-01-26): CLI suite release (ecomlake command, docs migration, deprecation warnings)
 - **v1.0.2** (2026-01-25): Fixed Bronze sample completeness for honest dims validation
@@ -635,6 +636,8 @@ ecomlake bronze profile --date-range 2020-01-05..2020-01-05
 ecomlake local dims --date 2020-01-05
 ecomlake local silver --date 2020-01-05
 ecomlake local enriched --date 2020-01-05
+
+# Note: in prod/prod-sim, enriched validation runs post-sync and checks GCS outputs.
 
 # Run full local demo (5-day sample)
 ecomlake local demo

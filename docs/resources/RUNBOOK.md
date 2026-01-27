@@ -231,6 +231,10 @@ ecomlake silver validate --silver-path data/silver/base --env local
 ### Diagnosis
 
 ```bash
+# In prod/prod-sim, validation runs post-sync and reads GCS outputs.
+# Confirm the partition exists before validating.
+gcloud storage ls gs://<silver-bucket>/data/silver/enriched/**/ingest_dt=YYYY-MM-DD/
+
 # Run enriched validation
 ecomlake enriched validate --enriched-path data/silver/enriched --env local
 

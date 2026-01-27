@@ -367,7 +367,7 @@ LIMIT 30;
      "git_commit": os.getenv("GIT_COMMIT", "unknown"),
      "git_branch": os.getenv("GIT_BRANCH", "unknown"),
      "pipeline_version": os.getenv("PIPELINE_VERSION", "unknown"),
-     "dbt_model_version": "1.0.4"
+     "dbt_model_version": "1.0.5"
    }
    ```
 
