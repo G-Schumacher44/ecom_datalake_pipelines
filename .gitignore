@@ -70,5 +70,6 @@ airflow/plugins/__pycache__/
 .vscode/.ropeproject/
 .DS_Store
 .claude/*
+*.egg-info/
 src/*.egg-info/
 .gcloud/*
