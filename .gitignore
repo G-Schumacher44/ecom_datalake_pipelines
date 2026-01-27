@@ -48,6 +48,7 @@ samples/*
 
 # Validation reports (ephemeral during testing)
 docs/validation_reports/*.md
+!docs/validation_reports/README.md
 
 # dbt
 dbt_packages/
