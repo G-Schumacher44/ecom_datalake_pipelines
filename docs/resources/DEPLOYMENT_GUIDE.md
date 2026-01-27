@@ -21,13 +21,13 @@ docker-compose up -d
 ## Limitations & Constraints (Portfolio Scope)
 
 - **DuckDB single-writer**: Base Silver runs as a single dbt task to avoid file locks. In a warehouse-backed prod setup, split into per-model tasks for retries and observability.
-- **GCS sync idempotency**: `gsutil rsync` is not atomic. For production, sync to a staging prefix and publish via manifest or versioned run folder.
+- **GCS sync idempotency**: `gsutil rsync` is not atomic. For production, sync to a staging prefix, validate, then **promote to canonical**.
 - **Batch-only assumptions**: The pipeline expects static Bronze partitions per run. Streaming/async ingestion could introduce FK misses unless you snapshot or pin partitions.
 
 ## Future Improvements
 
 - Replace the DuckDB single-task run with per-model dbt tasks when using BigQuery/Snowflake (better retries and lineage).
-- Add a staging + manifest publish step for GCS syncs to guarantee atomic reads.
+- Add a staging + manifest publish step for GCS syncs, then promote after validation.
 - Introduce enriched-level validation severity (warn vs drop) for nuanced business rules.
 - Document and optionally wire Workload Identity for production-grade auth.
 
@@ -516,6 +516,9 @@ gcloud compute instances describe airflow-vm \
 | `STRICT_FK`              | `false` (local), `true` (prod)  | Enforce FK validation in Silver          |
 | `SILVER_PROFILE_ENABLED` | `false`                         | Generate Silver profiling reports        |
 | `BQ_LOCATION`            | `US`                            | BigQuery dataset location                |
+| `SILVER_PUBLISH_MODE`    | `direct`                        | Base Silver publish mode (direct|staging) |
+| `ENRICHED_PUBLISH_MODE`  | `direct`                        | Enriched publish mode (direct|staging)   |
+| `DIMS_PUBLISH_MODE`      | `direct`                        | Dims publish mode (direct|staging)       |
 | `DIMS_SNAPSHOT_ALLOW_BOOTSTRAP` | `false`                  | Backfill-only: bootstrap earliest product_catalog partition |
 | `DIMS_CUSTOMERS_IGNORE_SIGNUP_DATE` | `false`            | Backfill-only: include all customers in snapshot |
 

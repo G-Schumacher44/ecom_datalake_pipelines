@@ -164,6 +164,8 @@ tolerance = settings.pipeline.attribution_tolerance_hours
 GOLD_PIPELINE_ENABLED=true
 BQ_LOAD_ENABLED=true
 SILVER_PUBLISH_MODE=direct|staging
+ENRICHED_PUBLISH_MODE=direct|staging
+DIMS_PUBLISH_MODE=direct|staging
 DIMS_SNAPSHOT_ALLOW_BOOTSTRAP=true  # backfill-only: bootstrap earliest product_catalog partition
 DIMS_CUSTOMERS_IGNORE_SIGNUP_DATE=true  # backfill-only: skip signup_date cutoff
 ```
@@ -178,6 +180,9 @@ SILVER_DIMS_PATH=data/silver/dims
 SILVER_DIMS_LOCAL_PATH=/opt/airflow/data/silver/dims
 SILVER_GCS_TARGET=gs://your-silver-bucket/silver/base
 SILVER_ENRICHED_GCS_TARGET=gs://your-silver-bucket/silver/enriched
+SILVER_STAGING_PATH=gs://your-silver-bucket/silver/base/_staging/<run_id>
+DIMS_STAGING_PATH=gs://your-silver-bucket/silver/dims/_staging/<run_id>
+ENRICHED_STAGING_PATH=gs://your-silver-bucket/silver/enriched/_staging/<run_id>
 ```
 
 ### Complete Environment Variable List (Current)
@@ -209,6 +214,12 @@ SILVER_DIMS_PATH=data/silver/dims
 SILVER_DIMS_LOCAL_PATH=/opt/airflow/data/silver/dims
 SILVER_GCS_TARGET=gs://bucket/silver/base
 SILVER_ENRICHED_GCS_TARGET=gs://bucket/silver/enriched
+SILVER_STAGING_PATH=gs://bucket/silver/base/_staging/<run_id>
+DIMS_STAGING_PATH=gs://bucket/silver/dims/_staging/<run_id>
+ENRICHED_STAGING_PATH=gs://bucket/silver/enriched/_staging/<run_id>
+SILVER_PUBLISH_MODE=direct|staging
+ENRICHED_PUBLISH_MODE=direct|staging
+DIMS_PUBLISH_MODE=direct|staging
 ```
 
 **GCP / BigQuery**
