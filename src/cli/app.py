@@ -1266,8 +1266,6 @@ _DEMO_DEFAULT_DATES = "2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05"
     name="demo",
     help="Run local end-to-end demo (dims + silver + enriched).",
 )
-
-
 @click.option("--date", "demo_date", default=_DEMO_DEFAULT_DATE, show_default=True)
 @click.option(
     "--end-date",

@@ -108,6 +108,7 @@ class TestCollectParquetFiles:
         files = collect_parquet_files("gs://bucket/table")
         assert files == ["gs://bucket/table/ingest_dt=2020-01-01/part-0000.parquet"]
 
+
 class TestCountParquetRows:
     def test_counts_rows_across_files(self, tmp_path: Path) -> None:
         df1 = pl.DataFrame({"a": [1, 2, 3]})
