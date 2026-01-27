@@ -284,11 +284,12 @@ def read_parquet_safe(
     parquet_files = collect_parquet_files(path)
     if not parquet_files:
         return None
+    parquet_paths = [str(p) for p in parquet_files]
     try:
         # Prefer Polars native reader (use_pyarrow=False)
         # to avoid GCSFile type issues with PyArrow
         return pl.read_parquet(
-            parquet_files,
+            parquet_paths,
             columns=columns,
             n_rows=n_rows,
             memory_map=False,

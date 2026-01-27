@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 
 import pytest
 from pydantic import ValidationError
@@ -21,8 +22,11 @@ def test_customer_record_validates():
     assert record.customer_id == "c_1"
 
 
+CustomerTier = Literal["Bronze", "Silver", "Gold", "Platinum"]
+
+
 @pytest.mark.parametrize("tier", ["Bronze", "Silver", "Gold", "Platinum"])
-def test_customer_record_tier_allowed(tier: str):
+def test_customer_record_tier_allowed(tier: CustomerTier):
     record = schemas.CustomerRecord(
         customer_id="c_2",
         first_name="Grace",
