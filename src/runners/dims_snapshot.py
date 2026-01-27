@@ -169,7 +169,8 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
                     if min_dt and run_dt < min_dt:
                         logger.warning(
                             f"Product catalog empty for {run_date}; "
-                            f"bootstrapping from earliest available partition: {min_dt}",
+                            "bootstrapping from earliest available partition: "
+                            f"{min_dt}",
                             run_date=run_date,
                             bootstrap_date=str(min_dt),
                         )
