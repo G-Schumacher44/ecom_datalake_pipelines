@@ -1256,14 +1256,16 @@ def local_enriched_strict(ingest_dt: str | None) -> None:
     _run_cmd(cmd, env_overrides=env)
 
 
-@local.command(
-    name="demo",
-    help="Run local end-to-end demo (dims + silver + enriched).",
-)
 _DEMO_DEFAULT_DATE = "2020-01-05"
 _DEMO_DEFAULT_END_DATE = "2020-01-05"
 _DEMO_DEFAULT_LOOKBACK = 4
 _DEMO_DEFAULT_DATES = "2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05"
+
+
+@local.command(
+    name="demo",
+    help="Run local end-to-end demo (dims + silver + enriched).",
+)
 
 
 @click.option("--date", "demo_date", default=_DEMO_DEFAULT_DATE, show_default=True)
