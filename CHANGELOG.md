@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-01-27 - Validation & Backfill Gates
+
+### Added
+
+- **Dims backfill flag**: `DIMS_CUSTOMERS_IGNORE_SIGNUP_DATE` to include all customers for backfills
+- **FK coverage helper**: `scripts/adhoc/check_customer_fk_coverage.py`
+
+### Changed
+
+- **Enriched validation order**: Validate enriched outputs after syncing to GCS
+- **Docs**: Updated pipeline flow and validation guidance for post-sync checks
+
 ## [1.0.4] - 2026-01-27 - Reliability & Packaging Patch
 
 ### Fixed
