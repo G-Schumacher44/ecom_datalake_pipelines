@@ -171,3 +171,48 @@ def test_snapshot_dims_bootstrap_product_catalog(tmp_path, monkeypatch):
     snap_df = pl.read_parquet(snap_file)
     assert snap_df.height == 1
     assert snap_df.select(pl.col("as_of_dt").first()).item() == date(2020, 1, 1)
+
+
+def test_snapshot_dims_stages_to_gcs_when_enabled(tmp_path, monkeypatch):
+    source_dir = tmp_path / "source"
+    prod_dir = source_dir / "product_catalog" / "ingestion_dt=2020-01-02"
+    prod_dir.mkdir(parents=True)
+
+    df = pl.DataFrame(
+        {
+            "product_id": ["P1"],
+            "ingestion_dt": ["2020-01-02"],
+        }
+    )
+    df.write_parquet(prod_dir / "data.parquet")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    monkeypatch.setenv("PIPELINE_ENV", "prod")
+    monkeypatch.setenv("DIMS_PUBLISH_MODE", "staging")
+    monkeypatch.setenv("DIMS_STAGING_PATH", "gs://bucket/dims/_staging/test")
+    monkeypatch.setenv("SILVER_LOCAL_BASE_PATH", str(source_dir))
+
+    with (
+        patch("src.runners.dims_snapshot.load_spec_safe") as mock_spec,
+        patch("src.runners.dims_snapshot._resolve_dims_paths") as mock_paths,
+        patch("src.runners.dims_snapshot.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stderr = ""
+        mock_spec_obj = MagicMock()
+        mock_table = MagicMock()
+        mock_table.name = "product_catalog"
+        mock_spec_obj.dims.tables = [mock_table]
+        mock_spec_obj.dims.base_path = str(output_dir)
+        mock_spec.return_value = mock_spec_obj
+
+        mock_paths.return_value = (str(output_dir), "gs://bucket/dims")
+
+        dims_snapshot.snapshot_dims("2020-01-02", silver_base_path="gs://bucket/silver")
+
+    assert mock_run.called
+    args = mock_run.call_args.args[0]
+    assert args[:4] == ["gcloud", "storage", "rsync", "-r"]
+    assert args[-1] == "gs://bucket/dims/_staging/test"

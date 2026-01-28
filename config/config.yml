@@ -9,6 +9,8 @@ pipeline:
   silver_base_prefix: "data/silver/base"
   silver_enriched_prefix: "data/silver/enriched"
   silver_publish_mode: "direct"
+  silver_enriched_publish_mode: "direct"
+  dims_publish_mode: "direct"
 
   # BigQuery Datasets
   bigquery_dataset: "silver"

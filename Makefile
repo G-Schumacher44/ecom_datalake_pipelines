@@ -434,6 +434,7 @@ local-demo:
 		--lookback-days $(DEMO_LOOKBACK) \
 		--tables orders,order_items,shopping_carts,cart_items,returns,return_items \
 		--output-report docs/validation_reports/SILVER_QUALITY_FULL.md
+	@$(MAKE) dbt-test
 	@$(MAKE) local-enriched DATE=$(DEMO_END_DATE)
 
 local-demo-fast:

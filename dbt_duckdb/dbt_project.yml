@@ -11,8 +11,6 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 
 # Store target/logs in /tmp to avoid Docker volume file-locking issues (Errno 35)
-target-path: "{{ env_var('DBT_TARGET_PATH', '/tmp/dbt_target') }}"
-log-path: "{{ env_var('DBT_LOG_PATH', '/tmp/dbt_logs') }}"
 
 # Disable partial parsing to avoid lock contention on manifest.msgpack
 flags:

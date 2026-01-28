@@ -180,6 +180,9 @@ Key overrides:
 - `SILVER_DIMS_LOCAL_PATH` → Local dims snapshot path (used when `SILVER_DIMS_PATH` is gs://)
 - `SILVER_GCS_TARGET` → Overrides silver base GCS sync target
 - `SILVER_ENRICHED_GCS_TARGET` → Overrides silver enriched GCS sync target
+- `SILVER_STAGING_PATH` → Override Base Silver staging prefix (optional)
+- `DIMS_STAGING_PATH` → Override Dims staging prefix (optional)
+- `ENRICHED_STAGING_PATH` → Override Enriched staging prefix (optional)
 
 #### GCP Auth (Secrets)
 
@@ -201,12 +204,14 @@ Key overrides:
 - `BQ_LOAD_ENABLED` → Enable Enriched Silver BigQuery loads (default: `false`)
 - `BRONZE_QA_REQUIRED` → Require Bronze QA phase (default: `true`)
 - `BRONZE_QA_FAIL` → Fail pipeline on Bronze issues (default: `false`)
-- `SILVER_PUBLISH_MODE` → Export mode for Silver (direct or staging) (default: `direct`)
+- `SILVER_PUBLISH_MODE` → Export mode for Base Silver (direct or staging) (default: `direct`)
+- `ENRICHED_PUBLISH_MODE` → Export mode for Enriched Silver (direct or staging) (default: `direct`)
+- `DIMS_PUBLISH_MODE` → Export mode for Dims snapshots (direct or staging) (default: `direct`)
 
 When `SILVER_PUBLISH_MODE=staging`, exports go to:
 - `gs://.../silver/base/_staging/<run_id>/...`
 - `_MANIFEST.json` written under the staging prefix
-- `_latest.json` written at the silver base root to point to the latest staging run
+- Canonical publish happens via **explicit promote** after validation
 - `STRICT_FK` → Enforce FK validation in Silver (default: `false`)
 
 ---
@@ -241,11 +246,15 @@ without changing your laptop defaults.
 - `PIPELINE_ENV=local`
 - local filesystem paths in `.envrc` (e.g. `data/bronze`, `data/silver/*`)
 - `SILVER_PUBLISH_MODE=direct`
+- `ENRICHED_PUBLISH_MODE=direct`
+- `DIMS_PUBLISH_MODE=direct`
 
 **Docker/Airflow (docker-compose defaults):**
 - `PIPELINE_ENV=dev`
 - GCS paths/buckets for Bronze/Silver/Enriched/Dims
 - `SILVER_PUBLISH_MODE=staging`
+- `ENRICHED_PUBLISH_MODE=staging`
+- `DIMS_PUBLISH_MODE=staging`
 
 This keeps local iterations fast while Docker validates staging + manifest flow.
 

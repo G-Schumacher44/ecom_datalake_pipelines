@@ -813,7 +813,7 @@ ecomlake pipeline sim-prod-gcs 2025-10-04
 - Sets `PIPELINE_ENV=prod-sim`
 - Enforces strict quality gates
 - Publishes validation reports to GCS
-- Uses staging prefix pattern for atomic publishes
+- Uses staging prefix pattern with validation + promote for atomic publishes
 
 ---
 
@@ -958,7 +958,7 @@ ecomlake local dims-strict --date 2024-01-03
 # Step 5: Run enriched transforms
 ecomlake local enriched-strict --date 2024-01-03
 
-# Step 6: Publish to GCS with staging prefix
+# Step 6: Publish to GCS with staging + promote
 # (handled by runners with SILVER_PUBLISH_MODE=staging)
 
 # Step 7: Load to BigQuery
@@ -1816,7 +1816,7 @@ ecomlake pipeline sim-prod-gcs 2025-10-04
 - Sets `PIPELINE_ENV=prod-sim`
 - Enforces strict quality gates
 - Publishes validation reports to GCS
-- Uses staging prefix pattern for atomic publishes
+- Uses staging prefix pattern with validation + promote for atomic publishes
 
 ---
 
@@ -1961,7 +1961,7 @@ ecomlake local dims-strict --date 2024-01-03
 # Step 5: Run enriched transforms
 ecomlake local enriched-strict --date 2024-01-03
 
-# Step 6: Publish to GCS with staging prefix
+# Step 6: Publish to GCS with staging + promote
 # (handled by runners with SILVER_PUBLISH_MODE=staging)
 
 # Step 7: Load to BigQuery

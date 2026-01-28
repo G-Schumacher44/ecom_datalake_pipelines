@@ -38,7 +38,7 @@ flowchart TD
     M --> O[Pipeline Execution]
     O --> P[Runners<br/>dbt + Polars]
     O --> Q[Validation Gates<br/>3 layers]
-    O --> R[Publish Logic<br/>staging + _latest]
+    O --> R[Publish Logic<br/>staging + promote]
 
     style A fill:#f9f9f9
     style M fill:#ccffcc

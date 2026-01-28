@@ -384,17 +384,39 @@ def main() -> None:
             ).lower()
             if publish_mode == "staging":
                 run_id = resolve_run_id()
-                staging_base = f"{export_base.rstrip('/')}/_staging/{run_id}"
+                staging_base = os.getenv("SILVER_STAGING_PATH", "").strip()
+                if not staging_base:
+                    staging_base = f"{export_base.rstrip('/')}/_staging/{run_id}"
                 logger.info(
                     "Exporting local silver to staging: %s",
                     staging_base,
                 )
-                gcloud_rsync(str(silver_path), staging_base, delete=True)
-                table_names = (
-                    [table.name for table in spec.silver_base.tables]
-                    if spec
-                    else STANDARD_TABLES
-                )
+                tables_env = os.getenv("BRONZE_SYNC_TABLES", "").strip()
+                if tables_env:
+                    table_names = [
+                        t.strip() for t in tables_env.split(",") if t.strip()
+                    ]
+                elif spec:
+                    table_names = [table.name for table in spec.silver_base.tables]
+                else:
+                    table_names = [
+                        p.name
+                        for p in Path(silver_path).iterdir()
+                        if p.is_dir() and p.name != "quarantine"
+                    ]
+
+                for table in table_names:
+                    source_table = Path(silver_path) / table
+                    dest_table = f"{staging_base.rstrip('/')}/{table}"
+                    if source_table.exists():
+                        generate_manifest(source_table, dest_table)
+                        gcloud_rsync(str(source_table), dest_table, delete=True)
+
+                    q_source = Path(quarantine_path) / table
+                    q_dest = f"{staging_base.rstrip('/')}/quarantine/{table}"
+                    if q_source.exists():
+                        gcloud_rsync(str(q_source), q_dest, delete=True)
+
                 manifest = {
                     "run_id": run_id,
                     "staging_path": staging_base,
@@ -407,16 +429,9 @@ def main() -> None:
                     manifest_file,
                     f"{staging_base}/_MANIFEST.json",
                 )
-                pointer = {
-                    "run_id": run_id,
-                    "staging_path": staging_base,
-                    "published_at": datetime.now(timezone.utc).isoformat(),
-                }
-                pointer_file = Path("/tmp") / "silver_latest.json"
-                pointer_file.write_text(json.dumps(pointer, indent=2))
-                gcloud_copy_file(
-                    pointer_file,
-                    f"{export_base.rstrip('/')}/_latest.json",
+                logger.info(
+                    "Staged silver publish complete (promotion handled by pipeline).",
+                    extra={"staging_path": staging_base},
                 )
             else:
                 tables_env = os.getenv("BRONZE_SYNC_TABLES", "").strip()
