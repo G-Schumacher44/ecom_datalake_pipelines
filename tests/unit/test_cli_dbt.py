@@ -1,8 +1,7 @@
 """Tests for CLI dbt helpers."""
 
 import os
-import shutil
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from src.cli.app import _run_dbt_deps_locked
 
