@@ -6,11 +6,13 @@ import logging
 import os
 from datetime import date, datetime, timedelta
 from functools import wraps
+from pathlib import Path
 from typing import Any, Callable, Dict, Sequence
 
 import polars as pl
 import pyarrow.parquet as pq
 
+from src.runners.manifest import generate_manifest
 from src.settings import PipelineConfig, load_settings
 from src.specs import load_spec_safe
 from src.validation.base_silver_schemas import BASE_SILVER_SCHEMAS
@@ -362,6 +364,9 @@ def write_partitioned_shards(
         chunk = df.filter(pl.col(partition_col) == value)
         output_uri = f"{output_path}/{table}/{partition_col}={value}/"
         write_sharded_parquet(chunk, output_uri, max_rows_per_file)
+
+    # Generate manifest for the table (scans all partitions we just wrote)
+    generate_manifest(Path(output_path) / table)
 
 
 __all__ = [

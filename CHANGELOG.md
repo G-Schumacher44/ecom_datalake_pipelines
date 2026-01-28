@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-01-28 - Staging Promotion & Validation
+
+### Added
+
+- **Staging promotion workflow**: Implemented Silver-to-Gold promotion logic with support for `_staging/` publish paths
+- **Integrated validation gates**: Promotion flow now enforces validation checks before publishing to staging
+- **Cart items manifests**: Added manifest support for `cart_items` in main pipelines and sample datasets
+
+### Fixed
+
+- **dbt dependency management**: Added automated cleanup and lock-file consistency checks for `dbt deps`
+- **Validation logging**: Corrected log formatting and updated unit tests for staging publish paths
+- **Staging tests**: Resolved test suite failures related to promotion flow logic
+
+### Changed
+
+- **Docs**: Major documentation refresh across `ARCHITECTURE.md`, `DEPLOYMENT_GUIDE.md`, and `VALIDATION_GUIDE.md`
+- **Environment config**: Updated `docker.env` examples and `run_sim_prod_gcs.sh` to support staging environment variables
+- **Pipeline settings**: Updated `config/config.yml` with default staging promotion parameters
+
 ## [1.0.5] - 2026-01-27 - Validation & Backfill Gates
 
 ### Added
@@ -295,6 +315,6 @@ See [README.md - Future Enhancements](README.md#-future-enhancements) for the ac
 </p>
 
 <p align="center">
-  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>Last updated: 2026-01-28</sub><br>
   <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
 </p>
