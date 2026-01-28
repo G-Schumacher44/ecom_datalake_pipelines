@@ -622,6 +622,20 @@ gcloud projects get-iam-policy your-project-id \
 2. Verify VPC/firewall rules if running in GCP
 3. Increase timeout in `fsspec` configuration
 
+### Staging Publish Checks (staging mode)
+
+If `SILVER_PUBLISH_MODE`, `ENRICHED_PUBLISH_MODE`, or `DIMS_PUBLISH_MODE` is set to
+`staging`, confirm data lands in the staging prefix before promotion:
+
+```bash
+gsutil ls gs://your-bucket/silver/base/_staging/<run_id>/
+gsutil ls gs://your-bucket/silver/enriched/_staging/<run_id>/
+gsutil ls gs://your-bucket/silver/dims/_staging/<run_id>/
+```
+
+If staging exists but canonical is missing, check the promote task logs (e.g.
+`promote_silver_base`, `promote_enriched`, `promote_dims_snapshot`).
+
 ### Prevention
 - Use Workload Identity in GKE instead of key files
 - Rotate service account keys regularly

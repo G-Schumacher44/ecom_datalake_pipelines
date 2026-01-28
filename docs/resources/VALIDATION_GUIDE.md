@@ -57,6 +57,11 @@ When `PIPELINE_ENV=dev|prod`, reports are written to GCS at:
 Validation reads `gs://` paths directly via `fsspec/gcsfs` in dev/prod.  
 `gcloud storage rsync` is used only for publish/sync steps (not for validation).
 
+**Staging-aware validation:**  
+When a publish mode is set to `staging`, validation targets the staging prefix
+(`.../_staging/<run_id>/`) and **promotion to canonical happens only after the
+validation gate passes**.
+
 ---
 
 ## Gate 1.5: Dimension Quality Validation (✅ IMPLEMENTED)
@@ -231,7 +236,7 @@ validate_silver_quality = BashOperator(
 )
 
 # Set dependencies
-base_silver_group >> validate_silver_quality >> enriched_silver_group
+base_silver_group >> validate_silver_quality >> promote_silver_base >> enriched_silver_group
 ```
 
 ---
@@ -284,7 +289,7 @@ validate_enriched_quality = BashOperator(
     ),
 )
 
-enriched_silver_group >> sync_silver_enriched_to_gcs >> validate_enriched_quality >> load_bigquery_group
+enriched_silver_group >> sync_silver_enriched_to_gcs >> validate_enriched_quality >> promote_enriched >> load_bigquery_group
 ```
 
 ## Gate 1: Bronze Validation (✅ IMPLEMENTED)

@@ -83,8 +83,8 @@ flowchart LR
 
     subgraph GCS["☁️ GCS Publish"]
         GCS1[Staging Prefix<br/>_staging/run_id/]
-        GCS2[Atomic Publish<br/>gcloud storage rsync]
-        GCS3[Manifest + Pointer]
+        GCS2[Validate Staged Data]
+        GCS3[Promote to Canonical]
     end
 
     subgraph BQ["📊 BigQuery Load"]
@@ -330,14 +330,14 @@ flowchart TD
 
 ### 6. Staging Prefix Pattern (GCS Publish)
 
-**Purpose**: Atomic publishes to GCS with rollback capability
+**Purpose**: Validate staged data before publishing to canonical prefixes
 
 **Pattern**:
 ```
 1. Transform locally → data/silver/enriched/
 2. Sync to staging → gs://bucket/enriched/_staging/run_abc123/
 3. Write manifest → gs://bucket/enriched/_staging/run_abc123/_MANIFEST.json
-4. Atomic publish → Update _latest.json pointer
+4. Promote to canonical after validation
 ```
 
 **Benefits**:
@@ -357,8 +357,8 @@ gcloud storage rsync data/silver/base/ gs://bucket/silver/_staging/${RUN_ID}/ --
 # Write manifest
 echo '{"run_id": "...", "tables": [...]}' > _MANIFEST.json
 
-# Atomic publish (update pointer)
-echo '{"latest_run": "run_abc123"}' > gs://bucket/silver/_latest.json
+# Promote staged publish to canonical after validation
+gcloud storage rsync -r gs://bucket/silver/_staging/run_abc123 gs://bucket/silver
 ```
 
 ---
@@ -378,7 +378,9 @@ flowchart TD
     C --> E[snapshot_products]
     D --> F[validate_dims_quality]
     E --> F
-    F --> G[publish_dims_to_gcs]
+    F --> G[promote_silver_base]
+    G --> H[promote_dims_snapshot]
+    H --> I[publish_dims_latest]
 
     style A fill:#e1f5ff
     style B fill:#fff4e6
@@ -390,6 +392,7 @@ flowchart TD
 - Freshness gate skips unnecessary work
 - Parallel customer/product snapshots
 - Lightweight validation (PK integrity only)
+- Staging + promote ensures canonical dims publish after validation
 - Can run independently or triggered by main DAG
 
 ---
@@ -405,10 +408,12 @@ flowchart TD
     C --> D[validate_bronze_quality]
     D --> E[base_silver_dbt]
     E --> F[validate_silver_quality]
-    F --> G[enriched_silver_group<br/>10 parallel tasks]
-    G --> H[sync_to_gcs]
+    F --> F1[promote_silver_base]
+    F1 --> G[enriched_silver_group<br/>10 parallel tasks]
+    G --> H[sync_to_staging]
     H --> I[validate_enriched_quality]
-    I --> J{should_load_bigquery?}
+    I --> I1[promote_enriched]
+    I1 --> J{should_load_bigquery?}
     J -->|Yes prod| K[load_to_bigquery_group<br/>10 parallel loads]
     J -->|No local| Z1[End]
     K --> L{should_run_gold?}
@@ -624,7 +629,7 @@ flowchart TD
 
 ### GCS Publishes
 - **Staging prefix**: Write to temp location
-- **Atomic pointer update**: `_latest.json` swap
+- **Promote to canonical**: rsync staging → canonical after validation
 - **Rollback capable**: Previous runs preserved
 
 ### BigQuery Loads

@@ -1031,6 +1031,39 @@ def _dbt_env() -> dict[str, str]:
     }
 
 
+def _run_dbt_deps_locked() -> None:
+    lock_path = Path("/tmp/ecomlake_dbt_deps.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "w", encoding="utf-8") as lock_file:
+        import fcntl
+
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            packages_dir = Path("dbt_duckdb") / "dbt_packages"
+            if packages_dir.exists():
+                for entry in packages_dir.iterdir():
+                    if (
+                        entry.is_dir()
+                        and entry.name.startswith("dbt_utils ")
+                        and entry.name[len("dbt_utils ") :].isdigit()
+                    ):
+                        shutil.rmtree(entry, ignore_errors=True)
+
+            for entry in Path("dbt_duckdb").iterdir():
+                if entry.is_dir() and entry.name.startswith(
+                    "{{ env_var('DBT_LOG_PATH'"
+                ):
+                    shutil.rmtree(entry, ignore_errors=True)
+
+            _run_cmd(
+                ["dbt", "deps", "--project-dir", ".", "--profiles-dir", "."],
+                cwd="dbt_duckdb",
+                env_overrides={**_local_env(), **_dbt_env()},
+            )
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
 @local.command(name="silver", help="Run local Base Silver + validation.")
 @click.option("--date", default=None, help="Optional run date (YYYY-MM-DD).")
 def local_silver(date: str | None) -> None:
@@ -1281,11 +1314,7 @@ _DEMO_DEFAULT_DATES = "2020-01-01 2020-01-02 2020-01-03 2020-01-04 2020-01-05"
     help="Space-separated dates for the dims loop.",
 )
 def local_demo(demo_date: str, demo_end_date: str, lookback: int, dates: str) -> None:
-    _run_cmd(
-        ["dbt", "deps", "--project-dir", ".", "--profiles-dir", "."],
-        cwd="dbt_duckdb",
-        env_overrides={**_local_env(), **_dbt_env()},
-    )
+    _run_dbt_deps_locked()
 
     env = {**_local_env(), **_local_metrics_env()}
     for day in dates.split():
@@ -1346,17 +1375,19 @@ def local_demo(demo_date: str, demo_end_date: str, lookback: int, dates: str) ->
         env_overrides=env,
     )
 
+    _run_cmd(
+        ["dbt", "test", "--project-dir", ".", "--profiles-dir", "."],
+        cwd="dbt_duckdb",
+        env_overrides={**_local_env(), **_dbt_env()},
+    )
+
     local_enriched.callback(ingest_dt=demo_end_date)
 
 
 @local.command(name="demo-fast", help="Run fast local demo (single-day pipeline).")
 @click.option("--date", "demo_date", default="2020-01-05", show_default=True)
 def local_demo_fast(demo_date: str) -> None:
-    _run_cmd(
-        ["dbt", "deps", "--project-dir", ".", "--profiles-dir", "."],
-        cwd="dbt_duckdb",
-        env_overrides={**_local_env(), **_dbt_env()},
-    )
+    _run_dbt_deps_locked()
 
     env = {**_local_env(), **_local_metrics_env()}
     Path("data/silver/dims").mkdir(parents=True, exist_ok=True)
@@ -1405,6 +1436,7 @@ def local_demo_fast(demo_date: str) -> None:
     _run_cmd(
         ["dbt", "test", "--project-dir", ".", "--profiles-dir", "."],
         cwd="dbt_duckdb",
+        env_overrides={**_local_env(), **_dbt_env()},
     )
     local_enriched.callback(ingest_dt=demo_date)
 

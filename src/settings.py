@@ -125,6 +125,14 @@ class PipelineConfig(BaseModel):
         default="direct",
         description="Silver publish mode: direct or staging",
     )
+    silver_enriched_publish_mode: str = Field(
+        default="direct",
+        description="Enriched publish mode: direct or staging",
+    )
+    dims_publish_mode: str = Field(
+        default="direct",
+        description="Dims publish mode: direct or staging",
+    )
 
     # BigQuery Datasets
     bigquery_dataset: str = "silver"
@@ -267,12 +275,16 @@ class PipelineConfig(BaseModel):
             raise ValueError(f"environment must be one of {allowed}, got '{v}'")
         return v
 
-    @field_validator("silver_publish_mode")
+    @field_validator(
+        "silver_publish_mode",
+        "silver_enriched_publish_mode",
+        "dims_publish_mode",
+    )
     @classmethod
     def silver_publish_mode_is_valid(cls, v: str) -> str:
         allowed = {"direct", "staging"}
         if v not in allowed:
-            raise ValueError(f"silver_publish_mode must be one of {allowed}, got '{v}'")
+            raise ValueError(f"publish_mode must be one of {allowed}, got '{v}'")
         return v
 
     @field_validator("default_ingest_dt")

@@ -227,7 +227,7 @@ ___
 <br>
 
 - **DuckDB single-writer**: Base Silver runs as a single dbt task to avoid file locks. In a warehouse-backed prod setup, split into per-model tasks for retries and observability.
-- **GCS sync idempotency**: `gsutil rsync` is not atomic. For production, sync to a staging prefix and publish via manifest or versioned run folder.
+- **GCS sync idempotency**: `gsutil rsync` is not atomic. For production, sync to a staging prefix, validate, then promote to canonical.
 - **Batch-only assumptions**: The pipeline expects static Bronze partitions per run. Streaming/async ingestion could introduce "ghost" FK misses unless you snapshot or pin partitions.
 
 </details>

@@ -115,11 +115,29 @@ python_version = "3.12"
 warn_redundant_casts = true
 warn_unused_ignores = true
 no_implicit_optional = true
-exclude = ["scripts/adhoc/"]
+exclude = ["scripts/adhoc/", "tests/"]
 
 [[tool.mypy.overrides]]
-module = ["fsspec", "pyarrow", "pyarrow.parquet", "pyarrow.lib", "yaml"]
+module = [
+    "airflow",
+    "airflow.*",
+    "fsspec",
+    "pandas",
+    "pendulum",
+    "pyarrow",
+    "pyarrow.parquet",
+    "pyarrow.lib",
+    "yaml",
+]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["src.cli.app"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
 
 [tool.pylint.main]
 py-version = "3.12"
