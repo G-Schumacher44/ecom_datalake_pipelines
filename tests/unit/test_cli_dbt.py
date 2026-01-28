@@ -35,7 +35,8 @@ def test_run_dbt_deps_locked_logic(mock_rmtree, mock_flock, mock_run_cmd, tmp_pa
         _run_dbt_deps_locked()
 
         # Verify rmtree called for target_pkg and log_dir
-        # We check that it was called at least twice (exact path matching is tricky with PosixPath vs str)
+        # We check that it was called at least twice
+        # (exact path matching is tricky with PosixPath vs str)
         assert mock_rmtree.call_count == 2
 
         # Verify run_cmd called
