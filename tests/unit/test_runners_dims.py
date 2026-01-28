@@ -216,3 +216,34 @@ def test_snapshot_dims_stages_to_gcs_when_enabled(tmp_path, monkeypatch):
     args = mock_run.call_args.args[0]
     assert args[:4] == ["gcloud", "storage", "rsync", "-r"]
     assert args[-1] == "gs://bucket/dims/_staging/test"
+
+
+def test_snapshot_dims_generates_manifest(tmp_path, monkeypatch):
+    source_dir = tmp_path / "source"
+    cust_dir = source_dir / "customers" / "ingestion_dt=2025-10-01"
+    cust_dir.mkdir(parents=True)
+
+    df = pl.DataFrame({"customer_id": ["C1"], "signup_date": ["2025-09-30"]})
+    df.write_parquet(cust_dir / "data.parquet")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    monkeypatch.setenv("AIRFLOW_HOME", str(tmp_path))
+
+    with (
+        patch("src.runners.dims_snapshot.load_spec_safe") as mock_spec,
+        patch("src.runners.dims_snapshot._resolve_dims_paths") as mock_paths,
+        patch("src.runners.dims_snapshot.generate_manifest") as mock_gen,
+    ):
+        mock_spec_obj = MagicMock()
+        mock_table = MagicMock()
+        mock_table.name = "customers"
+        mock_spec_obj.dims.tables = [mock_table]
+        mock_spec_obj.dims.base_path = str(output_dir)
+        mock_spec.return_value = mock_spec_obj
+        mock_paths.return_value = (str(output_dir), None)
+
+        dims_snapshot.snapshot_dims("2025-10-01", silver_base_path=str(source_dir))
+
+        mock_gen.assert_called()

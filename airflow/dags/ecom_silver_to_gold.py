@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 
@@ -21,7 +22,6 @@ from common import (
     AIRFLOW_HOME,
     COMMON_ENV,
     PIPELINE_ENV,
-    SettingsConfig,
     get_dim_specs,
     get_dim_table_names,
     get_enriched_table_names,
@@ -31,7 +31,7 @@ from common import (
     promote_staged_prefix,
     resolve_bool,
     resolve_dims_base_path,
-    sanitize_run_id,
+    resolve_run_config,
 )
 from src.runners.enriched import (
     run_cart_attribution,
@@ -47,71 +47,14 @@ from src.runners.enriched import (
 )
 from src.runners.mock_bq_load import mock_bigquery_load
 
+logger = logging.getLogger(__name__)
+
 # --- Task Callables ---
 
 
 def load_config_to_xcom(**kwargs):
     """Loads configuration and pushes paths to XCom."""
-    config = SettingsConfig()
-    pl = config.pipeline
-    p_env = config.resolve_pipeline_env()
-
-    run_id_raw = kwargs.get("run_id", "")
-    run_id_clean = sanitize_run_id(run_id_raw) if run_id_raw else ""
-    silver_path = config.resolve_path(
-        pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
-    )
-    enriched_path = config.resolve_path(
-        pl.silver_bucket, pl.silver_enriched_prefix, "SILVER_ENRICHED_PATH"
-    )
-    silver_publish_mode = (
-        os.getenv("SILVER_PUBLISH_MODE") or pl.silver_publish_mode or "direct"
-    ).lower()
-    enriched_publish_mode = (
-        os.getenv("ENRICHED_PUBLISH_MODE")
-        or pl.silver_enriched_publish_mode
-        or "direct"
-    ).lower()
-
-    silver_staging_override = os.getenv("SILVER_STAGING_PATH", "").strip()
-    if silver_publish_mode == "staging" and silver_path.startswith("gs://"):
-        if silver_staging_override:
-            silver_staging = silver_staging_override
-        elif run_id_clean:
-            silver_staging = f"{silver_path.rstrip('/')}/_staging/{run_id_clean}"
-        else:
-            silver_staging = ""
-    else:
-        silver_staging = ""
-    enriched_staging_override = os.getenv("ENRICHED_STAGING_PATH", "").strip()
-    if enriched_publish_mode == "staging" and enriched_path.startswith("gs://"):
-        if enriched_staging_override:
-            enriched_staging = enriched_staging_override
-        elif run_id_clean:
-            enriched_staging = f"{enriched_path.rstrip('/')}/_staging/{run_id_clean}"
-        else:
-            enriched_staging = ""
-    else:
-        enriched_staging = ""
-
-    return {
-        "bronze": config.resolve_path(
-            pl.bronze_bucket, pl.bronze_prefix, "BRONZE_BASE_PATH"
-        ),
-        "silver": silver_path,
-        "silver_staging": silver_staging,
-        "silver_validate": silver_staging or silver_path,
-        "silver_publish_mode": silver_publish_mode,
-        "enriched": enriched_path,
-        "enriched_staging": enriched_staging,
-        "enriched_validate": enriched_staging or enriched_path,
-        "enriched_publish_mode": enriched_publish_mode,
-        "project_id": pl.project_id,
-        "bq_dataset": pl.bigquery_dataset,
-        "env": p_env,
-        "bucket": pl.silver_bucket,
-        "run_id_clean": run_id_clean,
-    }
+    return resolve_run_config(kwargs.get("run_id"))
 
 
 def _read_dims_latest_payload(path: str) -> dict | None:
@@ -171,13 +114,13 @@ def sync_enriched_partitions_to_gcs(
 ):
     """Syncs only the relevant partitions for the current run to GCS."""
     if env not in ("dev", "prod"):
-        print(f"Skipping sync for env: {env}")
+        logger.info(f"Skipping sync for env: {env}")
         return
     if not enriched_path.startswith("gs://"):
-        print(f"Skipping sync for non-GCS target: {enriched_path}")
+        logger.info(f"Skipping sync for non-GCS target: {enriched_path}")
         return
     if bucket == "local":
-        print("Skipping sync for local bucket")
+        logger.info("Skipping sync for local bucket")
         return
 
     from src.runners.enriched.shared import get_enriched_partitions
@@ -195,10 +138,10 @@ def sync_enriched_partitions_to_gcs(
         remote_dir = f"{enriched_path.rstrip('/')}/{table}/{partition_key}={ingest_dt}"
 
         if not os.path.exists(local_dir):
-            print(f"Local partition not found, skipping: {local_dir}")
+            logger.warning(f"Local partition not found, skipping: {local_dir}")
             continue
 
-        print(f"Syncing {local_dir} -> {remote_dir}")
+        logger.info(f"Syncing {local_dir} -> {remote_dir}")
         # Construct cmd for gcloud storage rsync
         cmd = ["gcloud", "storage", "rsync", "-r", local_dir, remote_dir]
         subprocess.run(cmd, check=True)
@@ -213,13 +156,13 @@ def promote_enriched_partitions_to_gcs(
 ) -> None:
     """Promote only the current ingest_dt partitions from staging to canonical."""
     if env not in ("dev", "prod"):
-        print(f"Skipping promote for env: {env}")
+        logger.info(f"Skipping promote for env: {env}")
         return
     if not staging_path:
-        print("Skipping promote: staging path not set")
+        logger.warning("Skipping promote: staging path not set")
         return
     if not staging_path.startswith("gs://") or not canonical_path.startswith("gs://"):
-        print("Skipping promote: non-GCS paths")
+        logger.warning("Skipping promote: non-GCS paths")
         return
 
     from src.runners.enriched.shared import get_enriched_partitions
@@ -231,7 +174,7 @@ def promote_enriched_partitions_to_gcs(
         canonical_dir = (
             f"{canonical_path.rstrip('/')}/{table}/{partition_key}={ingest_dt}"
         )
-        print(f"Promoting {staging_dir} -> {canonical_dir}")
+        logger.info(f"Promoting {staging_dir} -> {canonical_dir}")
         subprocess.run(
             ["gcloud", "storage", "rsync", "-r", staging_dir, canonical_dir],
             check=True,

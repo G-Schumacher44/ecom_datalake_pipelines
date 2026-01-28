@@ -319,14 +319,15 @@ This repository is part of a larger data engineering portfolio demonstrating end
 <details>
 <summary><strong>🫀 Version & Status</strong></summary>
 
-### Current Version: v1.0.5
+### Current Version: v1.0.6
 
-**Latest Release: [v1.0.5](https://github.com/G-Schumacher44/ecom_datalake_pipelines/releases/tag/v1.0.5)** - Validation & Backfill Gates
+**Latest Release: [v1.0.6](https://github.com/G-Schumacher44/ecom_datalake_pipelines/releases/tag/v1.0.6)** - Staging Promotion & Validation
 
 **Changelog: [`CHANGELOG.md`](CHANGELOG.md)**
 
 ### Release History
 
+- **v1.0.6** (2026-01-28): Staging promotion & validation workflow (Silver-to-Gold promotion, staging publishes, validation gates)
 - **v1.0.5** (2026-01-27): Validation & backfill gates (enriched post-sync validation, dims backfill controls)
 - **v1.0.4** (2026-01-27): Reliability + packaging patch (CLI fixes, dbt log path, Airflow date floor)
 - **v1.0.3** (2026-01-26): CLI suite release (ecomlake command, docs migration, deprecation warnings)
@@ -830,6 +831,6 @@ ___
 </p>
 
 <p align="center">
-  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>Last updated: 2026-01-28</sub><br>
   <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
 </p>

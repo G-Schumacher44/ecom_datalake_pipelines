@@ -15,13 +15,12 @@ from common import (
     AIRFLOW_HOME,
     COMMON_ENV,
     PIPELINE_ENV,
-    SettingsConfig,
     get_dim_specs,
     get_dim_table_names,
     get_retry_config,
     promote_staged_prefix,
     resolve_dims_base_path,
-    sanitize_run_id,
+    resolve_run_config,
 )
 from src.runners.dims_snapshot import snapshot_dims
 
@@ -30,56 +29,7 @@ from src.runners.dims_snapshot import snapshot_dims
 
 def load_config_to_xcom(**kwargs):
     """Loads configuration and pushes paths to XCom."""
-    config = SettingsConfig()
-    pl = config.pipeline
-    p_env = config.resolve_pipeline_env()
-    run_id_raw = kwargs.get("run_id", "")
-    run_id_clean = sanitize_run_id(run_id_raw) if run_id_raw else ""
-    silver_path = config.resolve_path(
-        pl.silver_bucket, pl.silver_base_prefix, "SILVER_BASE_PATH"
-    )
-    silver_publish_mode = (
-        os.getenv("SILVER_PUBLISH_MODE") or pl.silver_publish_mode or "direct"
-    ).lower()
-    silver_staging_override = os.getenv("SILVER_STAGING_PATH", "").strip()
-    if silver_publish_mode == "staging" and silver_path.startswith("gs://"):
-        if silver_staging_override:
-            silver_staging = silver_staging_override
-        elif run_id_clean:
-            silver_staging = f"{silver_path.rstrip('/')}/_staging/{run_id_clean}"
-        else:
-            silver_staging = ""
-    else:
-        silver_staging = ""
-    dims_base_path = resolve_dims_base_path() or "data/silver/dims"
-    dims_publish_mode = (
-        os.getenv("DIMS_PUBLISH_MODE") or pl.dims_publish_mode or "direct"
-    ).lower()
-    dims_staging_override = os.getenv("DIMS_STAGING_PATH", "").strip()
-    if dims_publish_mode == "staging" and dims_base_path.startswith("gs://"):
-        if dims_staging_override:
-            dims_staging = dims_staging_override
-        elif run_id_clean:
-            dims_staging = f"{dims_base_path.rstrip('/')}/_staging/{run_id_clean}"
-        else:
-            dims_staging = ""
-    else:
-        dims_staging = ""
-
-    return {
-        "bronze": config.resolve_path(
-            pl.bronze_bucket, pl.bronze_prefix, "BRONZE_BASE_PATH"
-        ),
-        "silver": silver_path,
-        "silver_staging": silver_staging,
-        "silver_publish_mode": silver_publish_mode,
-        "dims": dims_base_path,
-        "dims_staging": dims_staging,
-        "dims_validate": dims_staging or dims_base_path,
-        "dims_publish_mode": dims_publish_mode,
-        "env": p_env,
-        "run_id_clean": run_id_clean,
-    }
+    return resolve_run_config(kwargs.get("run_id"))
 
 
 def publish_dims_latest(**context) -> None:

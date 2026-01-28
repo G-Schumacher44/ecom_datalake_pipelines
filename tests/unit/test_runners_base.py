@@ -66,7 +66,7 @@ def test_base_silver_manifest_generation(tmp_path):
     df.write_parquet(table_path / "data.parquet")
 
     # Run manifest generation
-    base_silver.generate_manifest(tmp_path / "orders", "gs://dummy/orders")
+    base_silver.generate_manifest(tmp_path / "orders")
 
     # Verify manifest exists
     manifest_file = table_path / "_MANIFEST.json"
@@ -115,3 +115,21 @@ def test_base_silver_staging_publish_uses_staging_path(
     assert kwargs["delete"] is True
     assert mock_gcloud_rsync.call_args.args[1].endswith("/_staging/test/orders")
     assert mock_copy.call_count == 1
+
+
+def test_base_silver_always_generates_manifest(
+    mock_dbt_run, mock_ensure_dirs, monkeypatch, tmp_path
+):
+    """Test that manifests are generated even for local runs."""
+    monkeypatch.setenv("SILVER_BASE_PATH", str(tmp_path / "silver"))
+    monkeypatch.setattr(sys, "argv", ["base_silver.py", "--select", "stg_orders"])
+
+    # Simulate output directory
+    (tmp_path / "silver" / "orders").mkdir(parents=True)
+
+    with patch("src.runners.base_silver.generate_manifest") as mock_gen:
+        base_silver.main()
+
+        # Check if generate_manifest was called for orders
+        # Note: STANDARD_TABLES includes "orders"
+        mock_gen.assert_any_call(tmp_path / "silver" / "orders")

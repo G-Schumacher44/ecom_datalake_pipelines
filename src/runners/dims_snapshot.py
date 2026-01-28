@@ -11,6 +11,7 @@ from pathlib import Path
 import polars as pl
 
 from src.observability import get_logger
+from src.runners.manifest import generate_manifest
 from src.specs import load_spec_safe
 
 logger = get_logger(__name__)
@@ -217,6 +218,7 @@ def snapshot_dims(run_date: str, silver_base_path: str | None = None) -> None:
             )
 
         _write_snapshot(df, dims_local_path, table, run_date)
+        generate_manifest(Path(dims_local_path) / table)
 
     if dims_gcs_path:
         logger.info("Syncing dims snapshot to GCS", dims_path=dims_gcs_path)
