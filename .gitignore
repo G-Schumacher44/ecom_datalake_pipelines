@@ -72,3 +72,6 @@ airflow/plugins/__pycache__/
 *.egg-info/
 src/*.egg-info/
 .gcloud/*
+google-cloud-sdk/
+gcloud init/
+interview_prep/*
