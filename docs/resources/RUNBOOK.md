@@ -676,6 +676,27 @@ docker inspect airflow-scheduler | jq .[0].Mounts
 2. Ensure `setup.py` or `pyproject.toml` is copied in Dockerfile
 3. Check `.dockerignore` isn't excluding source code
 
+**Airflow warning: "empty cryptography key":**
+1. Generate a Fernet key (one-time) and store it securely.
+2. Set `AIRFLOW__CORE__FERNET_KEY` via env or secret manager.
+3. Recreate containers so Airflow picks it up.
+
+**Production auth guidance (GCP):**
+1. Prefer Workload Identity (no key files) for GKE/Composer.
+2. If Workload Identity is unavailable, use a dedicated service account key.
+3. Mount the key and set `GOOGLE_APPLICATION_CREDENTIALS` via your orchestrator
+   or secret manager (never commit the key).
+
+**BigQuery load error: missing `google_cloud_default` connection:**
+1. Create the connection in Airflow (one-time):
+   ```bash
+   docker-compose exec airflow-scheduler \
+     airflow connections add google_cloud_default \
+     --conn-type google_cloud_platform \
+     --conn-extra '{"extra__google_cloud_platform__project":"<your-project>"}'
+   ```
+2. Or set `AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT` via env/secret manager and recreate.
+
 ---
 
 ## Quick Reference: Validation Exit Codes

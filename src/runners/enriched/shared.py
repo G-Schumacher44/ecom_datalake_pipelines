@@ -306,16 +306,27 @@ def normalize_partition_values(df: pl.DataFrame, partition_col: str) -> pl.DataF
     if dtype is None:
         return df
     if dtype == pl.Date:
-        return df.with_columns(
-            pl.col(partition_col).dt.strftime("%Y-%m-%d").alias(partition_col)
-        )
+        return df
     if dtype == pl.Datetime:
-        return df.with_columns(
+        return df.with_columns(pl.col(partition_col).cast(pl.Date).alias(partition_col))
+    if dtype == pl.Utf8:
+        parsed = df.select(
             pl.col(partition_col)
-            .cast(pl.Date)
-            .dt.strftime("%Y-%m-%d")
-            .alias(partition_col)
+            .str.strptime(pl.Date, "%Y-%m-%d", strict=False)
+            .alias("parsed"),
+            pl.col(partition_col).alias("orig"),
         )
+        invalid = parsed.filter(
+            pl.col("orig").is_not_null() & pl.col("parsed").is_null()
+        ).height
+        has_parsed = parsed.select(pl.col("parsed").drop_nulls()).height > 0
+        if invalid == 0 and has_parsed:
+            return df.with_columns(
+                pl.col(partition_col)
+                .str.strptime(pl.Date, "%Y-%m-%d", strict=False)
+                .alias(partition_col)
+            )
+        return df
     return df.with_columns(pl.col(partition_col).cast(pl.Utf8))
 
 

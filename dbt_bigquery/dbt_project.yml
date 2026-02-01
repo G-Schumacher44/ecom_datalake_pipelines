@@ -17,3 +17,4 @@ models:
     gold_marts:
       +materialized: table
       +tags: ["gold"]
+      +schema: "{{ env_var('BQ_GOLD_DATASET', 'gold_marts') }}"

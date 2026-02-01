@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-02-01 - BQ Load & Gold Marts Reliability
+
+### Added
+
+- **Gold dataset override**: `BQ_GOLD_DATASET` wiring for dbt gold marts output schema
+- **Secrets guidance**: Fernet key and secrets backend notes in env strategy + runbook
+- **Env examples**: Expanded `.env.example` and `.envrc` placeholders for secrets and datasets
+
+### Fixed
+
+- **BQ partition types**: Preserve date partition column types in enriched outputs to satisfy BigQuery partitioning
+- **Gold marts SQL**: Corrected gold model wiring to avoid invalid compiled SQL in baked images
+
+### Changed
+
+- **Airflow env**: Pass `BQ_GOLD_DATASET` into DAG task environments
+
 ## [1.0.6] - 2026-01-28 - Staging Promotion & Validation
 
 ### Added
