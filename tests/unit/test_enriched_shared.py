@@ -2,7 +2,7 @@
 
 import os
 import tempfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import polars as pl
@@ -139,6 +139,42 @@ class TestNormalizePartitionValues:
         df = pl.DataFrame({"order_id": ["A", "B"], "region": ["US", "EU"]})
         result = normalize_partition_values(df, "region")
         assert result["region"].to_list() == ["US", "EU"]
+
+    def test_datetime_column_casts_to_date(self):
+        df = pl.DataFrame(
+            {
+                "order_id": ["A", "B"],
+                "ingest_dt": [
+                    datetime(2024, 1, 1, 8, 30, 0),
+                    datetime(2024, 1, 2, 12, 0, 0),
+                ],
+            }
+        )
+        result = normalize_partition_values(df, "ingest_dt")
+        assert result.schema["ingest_dt"] == pl.Date
+        assert result["ingest_dt"].to_list() == [date(2024, 1, 1), date(2024, 1, 2)]
+
+    def test_utf8_date_strings_parse_when_valid(self):
+        df = pl.DataFrame(
+            {
+                "order_id": ["A", "B"],
+                "ingest_dt": ["2024-01-01", "2024-01-02"],
+            }
+        )
+        result = normalize_partition_values(df, "ingest_dt")
+        assert result.schema["ingest_dt"] == pl.Date
+        assert result["ingest_dt"].to_list() == [date(2024, 1, 1), date(2024, 1, 2)]
+
+    def test_utf8_with_invalid_dates_returns_unchanged(self):
+        df = pl.DataFrame(
+            {
+                "order_id": ["A", "B"],
+                "ingest_dt": ["2024-01-01", "not-a-date"],
+            }
+        )
+        result = normalize_partition_values(df, "ingest_dt")
+        assert result.schema["ingest_dt"] == pl.Utf8
+        assert result["ingest_dt"].to_list() == ["2024-01-01", "not-a-date"]
 
     def test_missing_partition_column_returns_unchanged(self):
         df = pl.DataFrame({"order_id": ["A", "B"]})
