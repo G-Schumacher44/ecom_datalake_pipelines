@@ -132,8 +132,8 @@ class TestNormalizePartitionValues:
             }
         )
         result = normalize_partition_values(df, "ingest_dt")
-        assert result.schema["ingest_dt"] == pl.String
-        assert result["ingest_dt"].to_list() == ["2024-01-01", "2024-01-02"]
+        assert result.schema["ingest_dt"] == pl.Date
+        assert result["ingest_dt"].to_list() == [date(2024, 1, 1), date(2024, 1, 2)]
 
     def test_string_column_unchanged(self):
         df = pl.DataFrame({"order_id": ["A", "B"], "region": ["US", "EU"]})
