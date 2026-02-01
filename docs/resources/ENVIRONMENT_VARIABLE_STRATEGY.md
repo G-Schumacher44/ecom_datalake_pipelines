@@ -71,6 +71,44 @@ if os.getenv("USE_SA_AUTH", "").lower() in {"1", "true", "yes", "on"}:
 **Note:** ADC (`gcloud auth application-default login`) is the default for local/dev
 and does not require `GOOGLE_APPLICATION_CREDENTIALS` unless `USE_SA_AUTH=true`.
 
+#### Airflow Fernet Key (Required for Encrypted Secrets)
+
+Airflow uses a Fernet key to encrypt connections and variables stored in the
+metadata database. Without it, Airflow stores secrets in plaintext and logs a warning.
+
+**Required env var:**
+```bash
+AIRFLOW__CORE__FERNET_KEY=<32-byte base64 key>
+```
+
+**Storage guidance:**
+- Local dev: keep in a git-ignored `docker.env` or shell env.
+- Production: inject from a secrets manager (recommended) or your orchestrator's
+  secret store. Do not commit to git.
+
+**Rotation note:** rotating the Fernet key makes existing encrypted values unreadable.
+Plan to re-save connections/variables if you rotate.
+
+**Airflow secrets backend:** Airflow can load connections/variables from a secrets
+backend (e.g., GCP Secret Manager, HashiCorp Vault, AWS Secrets Manager), which is
+recommended for production.
+
+**Production auth (GCP):** Use Workload Identity (preferred) so no key files are
+needed. If Workload Identity isn’t available, use a dedicated service account
+with a key file mounted into the runtime and `GOOGLE_APPLICATION_CREDENTIALS`
+set via your orchestrator or secret manager.
+
+#### Example Files
+
+- `.env.example`: non-secret placeholders for local/dev.
+- `.envrc`: direnv defaults; reads `.env` if present (never commit secrets).
+
+If you enable a secrets backend locally, set these in `.env` (or shell env) only:
+```bash
+AIRFLOW__SECRETS__BACKEND=airflow.providers.google.cloud.secrets.secret_manager.CloudSecretManagerBackend
+AIRFLOW__SECRETS__BACKEND_KWARGS={"connections_prefix":"airflow-connections","variables_prefix":"airflow-variables"}
+```
+
 #### GCP Authentication Patterns
 
 **Local Development (ADC - Default)**:
