@@ -34,20 +34,20 @@ Gold Marts (dbt-bigquery) - 8 fact tables
 
 **Technology**: dbt-duckdb running on local DuckDB database
 
-**Location**: [dbt_duckdb/models/staging/ecommerce/](../../dbt_duckdb/models/staging/ecommerce/)
+**Location**: [dbt_duckdb/models/base_silver/](../../dbt_duckdb/models/base_silver/)
 
 ### Transformation Pattern
 
 Each Base Silver model follows this pattern:
 
-1. **Source Bronze data** via [sources.yml](../../dbt_duckdb/models/staging/ecommerce/sources.yml)
-2. **Type casting** - String timestamps → proper timestamps, numeric strings → decimals
-3. **Deduplication** - Latest record wins based on `ingestion_dt` + `batch_id`
-4. **Business date derivation** - Extract `order_dt`, `cart_dt`, `product_dt` from timestamps
-5. **Primary key validation** - Flag null or duplicate PKs
-6. **Foreign key validation** - Check FK existence in parent tables
+1. **Source Bronze data** via [sources.yml](../../dbt_duckdb/models/sources.yml)
+2. **Type casting & normalization** - Standardize timestamps, numeric fields, and strings
+3. **Deduplication** - Latest record wins by `ingestion_ts` and `event_id` per primary key
+4. **Business date derivation** - Derive `order_dt`, `created_dt`, `added_dt`, `return_dt`, `signup_dt`
+5. **Primary key validation** - Flag missing or duplicate PKs
+6. **Foreign key validation** - Optional FK checks against dims when enabled (guest IDs may bypass)
 7. **Quarantine split** - Invalid rows → quarantine table with `invalid_reason`
-8. **Add metadata** - Append `ingestion_dt`, `pipeline_run_id`
+8. **Add metadata** - Append `batch_id`, `ingestion_ts`, `ingestion_dt`, `event_id`, `source_file`
 
 ### Base Silver Tables
 
@@ -61,29 +61,47 @@ Each Base Silver model follows this pattern:
 - `customer_id` → `stg_ecommerce__customers`
 
 **Key Transformations**:
-- Parse `order_date` (string) → `order_timestamp` (timestamp)
-- Derive `order_dt` (date) for partitioning
-- Cast `order_total`, `tax_amount`, `shipping_cost` to decimal
-- Validate `order_total >= 0`, `tax_amount >= 0`
-- Deduplicate by `order_id` (latest `ingestion_dt` wins)
+- Normalize identifiers/strings and parse `order_date`, `ingestion_ts`
+- Cast monetary fields (`gross_total`, `net_total`, `total_discount_amount`, shipping costs/fees)
+- Derive `order_dt` from `order_date` (fallback to `ingestion_ts`)
+- Deduplicate by `order_id` using latest `ingestion_ts`/`event_id`
 
 **Quarantine Rules**:
-- `order_id` is null
-- `customer_id` is null
-- `order_date` fails to parse
-- `order_total < 0`
+- Missing/invalid `order_id`, `customer_id`, or `order_date`
+- Missing/negative `gross_total` or `net_total`, or `net_total > gross_total`
+- Negative `total_discount_amount`
+- FK invalid for `customer_id` when strict FK enforcement is enabled (guest IDs exempt)
+- Duplicate `order_id` (keeps most recent)
 
-**Output Schema**:
-```sql
-order_id: string
-customer_id: string
-order_timestamp: timestamp
-order_dt: date
-order_total: decimal(10,2)
-tax_amount: decimal(10,2)
-shipping_cost: decimal(10,2)
-order_status: string
-ingestion_dt: date
+**Output Columns**:
+```
+order_id
+total_items
+order_date
+customer_id
+email
+order_channel
+is_expedited
+customer_tier
+gross_total
+net_total
+total_discount_amount
+payment_method
+shipping_speed
+shipping_cost
+agent_id
+actual_shipping_cost
+payment_processing_fee
+shipping_address
+billing_address
+clv_bucket
+is_reactivated
+batch_id
+ingestion_ts
+ingestion_dt
+event_id
+source_file
+order_dt
 ```
 
 ---
@@ -92,32 +110,39 @@ ingestion_dt: date
 
 **Source**: [bronze.order_items](../../samples/bronze/order_items/)
 
-**Primary Key**: `item_id`
+**Primary Key**: `order_id` + `product_id`
 
 **Foreign Keys**:
 - `order_id` → `stg_ecommerce__orders`
 - `product_id` → `stg_ecommerce__product_catalog`
 
 **Key Transformations**:
-- Cast `quantity`, `unit_price`, `line_total` to numeric
-- Validate `quantity > 0`, `unit_price >= 0`
-- Check `line_total = quantity * unit_price` (within tolerance)
-- Deduplicate by `item_id`
+- Normalize identifiers/strings and cast `quantity`, `unit_price`, `discount_amount`, `cost_price`
+- Derive `order_dt` from the orders dimension or `ingestion_ts`
+- Deduplicate by (`order_id`, `product_id`) using latest `ingestion_ts`/`event_id`
 
 **Quarantine Rules**:
-- `item_id` or `order_id` or `product_id` is null
-- `quantity <= 0`
-- `line_total` calculation mismatch > 1%
+- Missing/invalid `order_id` or `product_id`
+- Non-positive `quantity` or negative pricing fields
+- FK invalid for `order_id` or `product_id` when strict FK enforcement is enabled
+- Duplicate (`order_id`, `product_id`) rows (keeps most recent)
 
-**Output Schema**:
-```sql
-item_id: string
-order_id: string
-product_id: string
-quantity: int
-unit_price: decimal(10,2)
-line_total: decimal(10,2)
-ingestion_dt: date
+**Output Columns**:
+```
+order_id
+product_id
+product_name
+category
+quantity
+unit_price
+discount_amount
+cost_price
+batch_id
+ingestion_ts
+ingestion_dt
+event_id
+source_file
+order_dt
 ```
 
 ---
@@ -129,27 +154,42 @@ ingestion_dt: date
 **Primary Key**: `customer_id`
 
 **Key Transformations**:
-- Parse `signup_date` → `signup_timestamp` → `signup_dt`
-- Clean `email` (lowercase, trim)
-- Cast `tier_id`, `region_id` to int
-- Deduplicate by `customer_id` (latest signup wins)
+- Normalize identifiers/strings (including lowercase email)
+- Parse `signup_date` and derive `signup_dt`
+- Cast profile fields (age, booleans) and deduplicate by `customer_id`
 
 **Quarantine Rules**:
-- `customer_id` is null
-- `email` is null or invalid format
-- `signup_date` fails to parse
+- Missing/invalid `customer_id` or `signup_date`
+- Invalid email format
+- Duplicate `customer_id` (keeps most recent)
 
-**Output Schema**:
-```sql
-customer_id: string
-email: string
-first_name: string
-last_name: string
-signup_timestamp: timestamp
-signup_dt: date
-tier_id: int
-region_id: int
-ingestion_dt: date
+**Output Columns**:
+```
+customer_id
+email
+signup_date
+first_name
+last_name
+phone_number
+gender
+age
+is_guest
+customer_status
+signup_channel
+loyalty_tier
+initial_loyalty_tier
+email_verified
+marketing_opt_in
+mailing_address
+billing_address
+loyalty_enrollment_date
+clv_bucket
+batch_id
+ingestion_ts
+ingestion_dt
+event_id
+source_file
+signup_dt
 ```
 
 **Note**: Partitioned by `signup_dt` (not `ingestion_dt`)
@@ -163,27 +203,29 @@ ingestion_dt: date
 **Primary Key**: `product_id`
 
 **Key Transformations**:
-- Cast `price`, `cost`, `weight` to decimal
-- Validate `price > 0`, `cost >= 0`
-- Calculate `gross_margin = (price - cost) / price`
-- Clean `category`, `subcategory` (trim, lowercase)
+- Normalize identifiers/strings and cast `unit_price`, `cost_price`, `inventory_quantity`
+- Validate `product_id` and pricing fields
 
 **Quarantine Rules**:
-- `product_id` is null
-- `price <= 0`
-- `category` is null
+- Missing/invalid `product_id` or `product_name`
+- Missing/negative `unit_price`
+- Negative `cost_price` or `inventory_quantity`
+- `unit_price < cost_price` when both present
+- Duplicate `product_id` (keeps most recent)
 
-**Output Schema**:
-```sql
-product_id: string
-product_name: string
-category: string
-subcategory: string
-price: decimal(10,2)
-cost: decimal(10,2)
-weight: decimal(8,2)
-gross_margin: decimal(5,4)
-ingestion_dt: date
+**Output Columns**:
+```
+product_id
+product_name
+category
+unit_price
+cost_price
+inventory_quantity
+batch_id
+ingestion_ts
+event_id
+source_file
+ingestion_dt
 ```
 
 **Note**: Reference data - partitioned by `category` in Bronze, by `ingestion_dt` in Silver
@@ -200,26 +242,30 @@ ingestion_dt: date
 - `customer_id` → `stg_ecommerce__customers`
 
 **Key Transformations**:
-- Parse `cart_created_at` → `cart_timestamp` → `cart_dt`
-- Parse `last_updated_at` → `last_updated_timestamp`
-- Cast `cart_value` to decimal
-- Validate `cart_value >= 0`
+- Parse `created_at`/`updated_at` and derive `created_dt`
+- Cast `cart_total` and normalize status fields
+- Deduplicate by `cart_id` using latest `ingestion_ts`/`event_id`
 
 **Quarantine Rules**:
-- `cart_id` or `customer_id` is null
-- `cart_created_at` fails to parse
-- `cart_value < 0`
+- Missing/invalid `cart_id`, `customer_id`, or `created_at`
+- `cart_total < 0` or `updated_at < created_at`
+- FK invalid for `customer_id` when strict FK enforcement is enabled (guest IDs exempt)
+- Duplicate `cart_id` (keeps most recent)
 
-**Output Schema**:
-```sql
-cart_id: string
-customer_id: string
-cart_timestamp: timestamp
-cart_dt: date
-last_updated_timestamp: timestamp
-cart_value: decimal(10,2)
-cart_status: string
-ingestion_dt: date
+**Output Columns**:
+```
+cart_id
+customer_id
+created_at
+updated_at
+cart_total
+status
+batch_id
+ingestion_ts
+ingestion_dt
+event_id
+source_file
+created_dt
 ```
 
 ---
@@ -235,21 +281,32 @@ ingestion_dt: date
 - `product_id` → `stg_ecommerce__product_catalog`
 
 **Key Transformations**:
-- Cast `quantity`, `unit_price` to numeric
-- Validate `quantity > 0`, `unit_price >= 0`
+- Normalize identifiers/strings and cast `quantity`, `unit_price`
+- Parse `added_at` and derive `added_dt`
+- Deduplicate by (`cart_id`, `product_id`, `added_at`) using latest `ingestion_ts`/`event_id`
 
 **Quarantine Rules**:
-- `cart_item_id`, `cart_id`, or `product_id` is null
-- `quantity <= 0`
+- Missing/invalid `cart_item_id`, `cart_id`, or `product_id`
+- Non-positive `quantity` or negative `unit_price`
+- FK invalid for `cart_id` or `product_id` when strict FK enforcement is enabled
+- Duplicate cart item lines (keeps most recent)
 
-**Output Schema**:
-```sql
-cart_item_id: string
-cart_id: string
-product_id: string
-quantity: int
-unit_price: decimal(10,2)
-ingestion_dt: date
+**Output Columns**:
+```
+cart_item_id
+cart_id
+product_id
+product_name
+category
+added_at
+quantity
+unit_price
+batch_id
+ingestion_ts
+ingestion_dt
+event_id
+source_file
+added_dt
 ```
 
 ---
@@ -264,24 +321,35 @@ ingestion_dt: date
 - `order_id` → `stg_ecommerce__orders`
 
 **Key Transformations**:
-- Parse `return_date` → `return_timestamp` → `return_dt`
-- Cast `refund_amount` to decimal
-- Validate `refund_amount >= 0`
+- Parse `return_date` and derive `return_dt`
+- Cast `refunded_amount` and normalize reason/channel fields
+- Deduplicate by `return_id` using latest `ingestion_ts`/`event_id`
 
 **Quarantine Rules**:
-- `return_id` or `order_id` is null
-- `return_date` fails to parse
-- `refund_amount < 0`
+- Missing/invalid `return_id`, `order_id`, or `customer_id`
+- Invalid `return_date` or negative `refunded_amount`
+- FK invalid for `order_id` or `customer_id` when strict FK enforcement is enabled (guest IDs exempt)
+- Duplicate `return_id` (keeps most recent)
 
-**Output Schema**:
-```sql
-return_id: string
-order_id: string
-return_timestamp: timestamp
-return_dt: date
-refund_amount: decimal(10,2)
-return_reason: string
-ingestion_dt: date
+**Output Columns**:
+```
+return_id
+order_id
+customer_id
+email
+return_date
+reason
+return_type
+refunded_amount
+return_channel
+agent_id
+refund_method
+batch_id
+ingestion_ts
+ingestion_dt
+event_id
+source_file
+return_dt
 ```
 
 **Note**: Can have zero rows per partition (returns are optional)
@@ -299,21 +367,33 @@ ingestion_dt: date
 - `product_id` → `stg_ecommerce__product_catalog`
 
 **Key Transformations**:
-- Cast `quantity_returned`, `refund_per_item` to numeric
-- Validate `quantity_returned > 0`, `refund_per_item >= 0`
+- Normalize identifiers/strings and cast `quantity_returned`, `unit_price`, `cost_price`, `refunded_amount`
+- Derive `return_dt` and deduplicate by `return_item_id`
 
 **Quarantine Rules**:
-- `return_item_id`, `return_id`, or `product_id` is null
-- `quantity_returned <= 0`
+- Missing/invalid `return_item_id`, `return_id`, `order_id`, or `product_id`
+- Non-positive `quantity_returned` or negative pricing fields
+- FK invalid for `return_id`, `order_id`, or `product_id` when strict FK enforcement is enabled
+- Duplicate `return_item_id` (keeps most recent)
 
-**Output Schema**:
-```sql
-return_item_id: string
-return_id: string
-product_id: string
-quantity_returned: int
-refund_per_item: decimal(10,2)
-ingestion_dt: date
+**Output Columns**:
+```
+return_item_id
+return_id
+order_id
+product_id
+product_name
+category
+quantity_returned
+unit_price
+cost_price
+refunded_amount
+batch_id
+ingestion_ts
+ingestion_dt
+event_id
+source_file
+return_dt
 ```
 
 ---
@@ -323,7 +403,7 @@ ingestion_dt: date
 | Table | Bronze Source | PK | FKs | Partition Key | Allow Empty |
 |-------|---------------|----|----|---------------|-------------|
 | `stg_ecommerce__orders` | `orders` | `order_id` | `customer_id` | `ingestion_dt` | No |
-| `stg_ecommerce__order_items` | `order_items` | `item_id` | `order_id`, `product_id` | `ingestion_dt` | No |
+| `stg_ecommerce__order_items` | `order_items` | `order_id` + `product_id` | `order_id`, `product_id` | `ingestion_dt` | No |
 | `stg_ecommerce__customers` | `customers` | `customer_id` | None | `signup_dt` | No |
 | `stg_ecommerce__product_catalog` | `product_catalog` | `product_id` | None | `ingestion_dt` | No |
 | `stg_ecommerce__shopping_carts` | `shopping_carts` | `cart_id` | `customer_id` | `ingestion_dt` | No |
@@ -339,17 +419,17 @@ ingestion_dt: date
 
 **Why**: 60% reduction in Bronze reads, faster DAG execution, prevents stale dimension joins.
 
-**Technology**: dbt-duckdb with custom snapshot runner
+**Technology**: Python snapshot runner (Polars)
 
 **Location**: [src/runners/dims_snapshot.py](../../src/runners/dims_snapshot.py)
 
 ### Snapshot Pattern
 
-1. **Freshness gate** - Check `_latest.json` pointer
-2. **Read Base Silver** - Load today's partition from `stg_ecommerce__customers` or `stg_ecommerce__product_catalog`
-3. **Write snapshot** - Create `snapshot_dt=YYYY-MM-DD/snapshot.parquet`
-4. **Update pointer** - Write `_latest.json` with current snapshot date
-5. **Validate** - Run PK integrity checks
+1. **Read Base Silver** - Load base tables from `SILVER_BASE_PATH`
+2. **Filter & annotate** - Filter by run date and add `as_of_dt`
+3. **Write snapshot** - Create `snapshot_dt=YYYY-MM-DD/data_0.parquet`
+4. **Generate manifest** - Write `_MANIFEST.json` per snapshot partition
+5. **Publish latest (optional)** - Write `_latest.json` via `publish_dims_latest`
 
 ### Dimension Tables
 
@@ -363,12 +443,12 @@ ingestion_dt: date
 ```
 data/silver/dims/customers/
   snapshot_dt=2025-10-15/
-    snapshot.parquet
+    data_0.parquet
     _MANIFEST.json
   snapshot_dt=2025-10-16/
     snapshot.parquet
     _MANIFEST.json
-  _latest.json  # {"customers": "2025-10-16"}
+  _latest.json  # {"run_date": "2025-10-16", "run_id": "...", "published_at": "..."}
 ```
 
 **Schema**: Same as `stg_ecommerce__customers` plus `snapshot_dt`
@@ -385,9 +465,9 @@ data/silver/dims/customers/
 ```
 data/silver/dims/product_catalog/
   snapshot_dt=2025-10-15/
-    snapshot.parquet
+    data_0.parquet
     _MANIFEST.json
-  _latest.json  # {"product_catalog": "2025-10-15"}
+  _latest.json  # {"run_date": "2025-10-15", "run_id": "...", "published_at": "..."}
 ```
 
 **Schema**: Same as `stg_ecommerce__product_catalog` plus `snapshot_dt`
@@ -410,19 +490,19 @@ data/silver/dims/product_catalog/
 
 Each enriched transform follows this pattern:
 
-1. **Lazy load** Base Silver tables via `pl.scan_parquet()`
+1. **Lazy load** Base Silver/dims tables via `pl.scan_parquet()`
 2. **Apply business logic** using Polars expressions
 3. **Compute metrics** (aggregations, window functions, joins)
-4. **Validate results** (sanity checks, semantic checks)
-5. **Write output** partitioned Parquet with manifest
+4. **Add lineage** - Append `ingest_dt` for partitioning
+5. **Write output** partitioned Parquet with `_MANIFEST.json`
 
 ### Enriched Transforms
 
 #### 1. `int_attributed_purchases`
 
-**Transform**: [src/transforms/attributed_purchases.py](../../src/transforms/attributed_purchases.py)
+**Transform**: [src/transforms/cart_attribution.py](../../src/transforms/cart_attribution.py)
 
-**Runner**: [src/runners/enriched/attributed_purchases.py](../../src/runners/enriched/attributed_purchases.py)
+**Runner**: [src/runners/enriched/commerce.py](../../src/runners/enriched/commerce.py)
 
 **Inputs**:
 - `shopping_carts` (Base Silver)
@@ -430,30 +510,30 @@ Each enriched transform follows this pattern:
 
 **Business Logic**:
 
-Links each order to its most recent cart session within a configurable attribution window (default: 48 hours). Enables analysis of cart recovery patterns and channel attribution.
+Links each order to its most recent cart session within a configurable attribution window (default: 48 hours). Produces order-level cart recovery signals.
 
 **Key Calculations**:
-- `time_since_cart_created` - Hours between cart creation and order placement
-- `attributed_cart_id` - Most recent cart within attribution window
-- `attribution_confidence` - High/Medium/Low based on time gap
+- `is_recovered` - True if a cart was matched within the attribution window
+- `order_dt` - Date derived from `order_date` (added in runner)
 
 **Partition Key**: `order_dt`
 
-**Output Schema**:
+**Output Columns**:
 ```
-order_id: string
-customer_id: string
-order_dt: date
-attributed_cart_id: string (nullable)
-time_since_cart_created: float (nullable)
-attribution_confidence: string
-ingestion_dt: date
+order_id
+customer_id
+order_date
+order_dt
+cart_id
+created_at
+cart_total
+order_channel
+is_recovered
+ingest_dt
 ```
 
-**Validation**:
-- All orders have non-null `order_id`, `customer_id`
-- `time_since_cart_created` <= 48 hours (if attributed)
-- `attribution_confidence` in {High, Medium, Low, None}
+**Notes**:
+- Output retains most order/cart fields from the join; columns above are the key attribution fields.
 
 ---
 
@@ -461,7 +541,7 @@ ingestion_dt: date
 
 **Transform**: [src/transforms/cart_attribution.py](../../src/transforms/cart_attribution.py)
 
-**Runner**: [src/runners/enriched/cart_attribution.py](../../src/runners/enriched/cart_attribution.py)
+**Runner**: [src/runners/enriched/commerce.py](../../src/runners/enriched/commerce.py)
 
 **Inputs**:
 - `shopping_carts` (Base Silver)
@@ -473,31 +553,36 @@ ingestion_dt: date
 Cart-level conversion/abandonment analysis. Flags abandoned carts, calculates lost value, and measures time-to-purchase for converted carts.
 
 **Key Calculations**:
-- `cart_status` - 'converted', 'abandoned', 'active'
+- `cart_status` - `converted`, `abandoned`, or `empty`
 - `time_to_purchase_hours` - Hours from cart creation to order (if converted)
 - `abandoned_value` - Cart value if abandoned
-- `item_count` - Number of items in cart
+- `item_count` / `category_count` - Item and category counts per cart
 
 **Partition Key**: `cart_dt`
 
-**Output Schema**:
+**Output Columns**:
 ```
-cart_id: string
-customer_id: string
-cart_dt: date
-cart_status: string
-order_id: string (nullable)
-time_to_purchase_hours: float (nullable)
-cart_value: decimal(10,2)
-abandoned_value: decimal(10,2) (nullable)
-item_count: int
-ingestion_dt: date
+cart_id
+customer_id
+created_at
+updated_at
+cart_dt
+cart_value
+item_count
+category_count
+cart_status
+time_to_purchase_hours
+order_id
+order_date
+order_channel
+abandoned_value
+ingest_dt
 ```
 
 **Semantic Checks**:
-- `cart_status = 'converted'` → `order_id` must be non-null
-- `cart_status = 'abandoned'` → `order_id` must be null
-- `cart_status = 'abandoned'` → `abandoned_value` must equal `cart_value`
+- `cart_status = 'converted'` → `order_id` is non-null
+- `cart_status = 'abandoned'` → `order_id` is null
+- `cart_status = 'abandoned'` → `abandoned_value = cart_value`
 - `time_to_purchase_hours >= 0`
 
 ---
@@ -506,7 +591,7 @@ ingestion_dt: date
 
 **Transform**: [src/transforms/product_performance.py](../../src/transforms/product_performance.py)
 
-**Runner**: [src/runners/enriched/product_performance.py](../../src/runners/enriched/product_performance.py)
+**Runner**: [src/runners/enriched/commerce.py](../../src/runners/enriched/commerce.py)
 
 **Inputs**:
 - `product_catalog` (Dimension snapshot)
@@ -521,37 +606,42 @@ Product-level profitability, return rate, and cart intent signals per business d
 **Key Calculations**:
 - `units_sold` - Total quantity ordered
 - `units_returned` - Total quantity returned
-- `return_rate` - `units_returned / units_sold`
-- `gross_revenue` - Total revenue before returns
-- `net_revenue` - Revenue after returns
-- `gross_margin` - `(price - cost) / price`
-- `net_margin` - Margin after returns
-- `cart_to_order_rate` - Conversion rate from cart adds to purchases
-- `units_in_carts` - Total quantity in active carts
+- `units_in_carts` - Total quantity in carts
+- `gross_revenue` / `net_revenue` - Revenue before/after refunds
+- `gross_profit` / `net_margin` - Profit before/after refunds
+- `return_rate` - `units_returned / units_sold` (capped if configured)
+- `cart_to_order_rate` - `units_sold / effective_units_in_carts` (capped if configured)
+- `margin_pct` - `net_margin / gross_revenue`
 
 **Partition Key**: `product_dt`
 
-**Output Schema**:
+**Output Columns**:
 ```
-product_id: string
-product_dt: date
-units_sold: int
-units_returned: int
-return_rate: decimal(5,4)
-gross_revenue: decimal(12,2)
-net_revenue: decimal(12,2)
-gross_margin: decimal(5,4)
-net_margin: decimal(5,4)
-cart_to_order_rate: decimal(5,4)
-units_in_carts: int
-ingestion_dt: date
+product_id
+product_name
+category
+product_dt
+units_sold
+units_returned
+units_in_carts
+gross_revenue
+net_revenue
+gross_margin
+gross_profit
+net_margin
+refunded_amount
+return_rate
+cart_to_order_rate
+margin_pct
+catalog_unit_price
+catalog_cost_price
+inventory_quantity
+ingest_dt
 ```
 
 **Semantic Checks**:
-- `return_rate <= 1.0`
-- `cart_to_order_rate <= 1.0`
-- `net_margin <= gross_margin`
-- `units_returned <= units_sold * 2.0` (tolerance for data errors)
+- `return_rate <= 1.0` (when capped)
+- `cart_to_order_rate <= 1.0` (when capped)
 
 ---
 
@@ -559,7 +649,7 @@ ingestion_dt: date
 
 **Transform**: [src/transforms/sales_velocity.py](../../src/transforms/sales_velocity.py)
 
-**Runner**: [src/runners/enriched/sales_velocity.py](../../src/runners/enriched/sales_velocity.py)
+**Runner**: [src/runners/enriched/commerce.py](../../src/runners/enriched/commerce.py)
 
 **Inputs**:
 - `orders` (Base Silver)
@@ -567,40 +657,38 @@ ingestion_dt: date
 
 **Business Logic**:
 
-Rolling 7-day demand velocity and trend signals for inventory planning.
+Rolling daily demand velocity with trend signals for inventory planning.
 
 **Key Calculations**:
-- `units_sold_7d` - Units sold in trailing 7 days
-- `avg_daily_velocity` - Average units per day over 7-day window
-- `velocity_trend` - 'Accelerating', 'Stable', 'Declining'
-- `revenue_7d` - Revenue in trailing 7 days
+- `daily_quantity` - Units sold per product per day
+- `velocity_avg` - Rolling mean over `window_days` (default 7)
+- `trend_signal` - `UP`, `DOWN`, or `STABLE` vs rolling mean
 
 **Partition Key**: `order_dt`
 
-**Lookback**: Requires 7 days of historical data (controlled by `enriched_lookback_days`)
+**Lookback**: Rolling windows benefit from `enriched_lookback_days` when backfilling.
 
-**Output Schema**:
+**Output Columns**:
 ```
-product_id: string
-order_dt: date
-units_sold_7d: int
-avg_daily_velocity: decimal(8,2)
-velocity_trend: string
-revenue_7d: decimal(12,2)
-ingestion_dt: date
+product_id
+order_dt
+daily_quantity
+velocity_avg
+trend_signal
+ingest_dt
 ```
 
 **Validation**:
-- `units_sold_7d >= 0`
-- `velocity_trend` in {'Accelerating', 'Stable', 'Declining'}
+- `daily_quantity >= 0`
+- `trend_signal` in {`UP`, `DOWN`, `STABLE`}
 
 ---
 
 #### 5. `int_customer_retention_signals`
 
-**Transform**: [src/transforms/customer_retention.py](../../src/transforms/customer_retention.py)
+**Transform**: [src/transforms/churn_detection.py](../../src/transforms/churn_detection.py)
 
-**Runner**: [src/runners/enriched/customer_retention.py](../../src/runners/enriched/customer_retention.py)
+**Runner**: [src/runners/enriched/customer.py](../../src/runners/enriched/customer.py)
 
 **Inputs**:
 - `customers` (Dimension snapshot)
@@ -608,40 +696,38 @@ ingestion_dt: date
 
 **Business Logic**:
 
-Churn risk flags and engagement scores based on recency of last order.
+Churn risk flags based on recency and single-purchase behavior.
 
 **Key Calculations**:
-- `days_since_last_order` - Days since most recent order
-- `churn_risk_30d` - Boolean flag if > 30 days since last order
-- `churn_risk_90d` - Boolean flag if > 90 days since last order
-- `order_count_lifetime` - Total orders to date
-- `engagement_score` - 1-5 score based on recency and frequency
+- `days_since_first_buy` / `days_since_last_buy` - Based on reference date
+- `is_in_danger_zone` - Single-purchase customers within lookback window
+- `needs_bronze_nudge` - Bronze tier customers inactive beyond threshold
 
 **Partition Key**: `ingest_dt`
 
-**Output Schema**:
+**Output Columns**:
 ```
-customer_id: string
-ingest_dt: date
-days_since_last_order: int (nullable)
-churn_risk_30d: boolean
-churn_risk_90d: boolean
-order_count_lifetime: int
-engagement_score: int
-ingestion_dt: date
+customer_id
+first_purchase_date
+last_purchase_date
+total_orders
+days_since_first_buy
+days_since_last_buy
+is_in_danger_zone
+needs_bronze_nudge
+ingest_dt
 ```
 
-**Validation**:
-- `engagement_score` in {1, 2, 3, 4, 5}
-- `churn_risk_90d = true` → `churn_risk_30d = true`
+**Notes**:
+- Output retains customer attributes from the dimension snapshot.
 
 ---
 
 #### 6. `int_customer_lifetime_value`
 
-**Transform**: [src/transforms/customer_ltv.py](../../src/transforms/customer_ltv.py)
+**Transform**: [src/transforms/customer_lifetime_value.py](../../src/transforms/customer_lifetime_value.py)
 
-**Runner**: [src/runners/enriched/customer_ltv.py](../../src/runners/enriched/customer_ltv.py)
+**Runner**: [src/runners/enriched/customer.py](../../src/runners/enriched/customer.py)
 
 **Inputs**:
 - `customers` (Dimension snapshot)
@@ -653,31 +739,35 @@ ingestion_dt: date
 CLV calculation with segment bucketing for marketing and finance.
 
 **Key Calculations**:
-- `total_spent` - Lifetime gross revenue
+- `total_spent` - Lifetime net revenue
 - `total_refunded` - Lifetime refund amount
 - `net_clv` - `total_spent - total_refunded`
-- `clv_bucket` - 'High', 'Medium', 'Low' based on thresholds
-- `order_count` - Lifetime order count
-- `avg_order_value` - `total_spent / order_count`
+- `customer_segment` - `churned`, `one-timer`, `whale`, `regular`
+- `predicted_clv_bucket` / `actual_clv_bucket` - Bucketed CLV
+- `order_count` / `avg_order_value` - Lifetime order metrics
 
 **Partition Key**: `ingest_dt`
 
-**Output Schema**:
+**Output Columns**:
 ```
-customer_id: string
-ingest_dt: date
-total_spent: decimal(12,2)
-total_refunded: decimal(12,2)
-net_clv: decimal(12,2)
-clv_bucket: string
-order_count: int
-avg_order_value: decimal(10,2)
-ingestion_dt: date
+customer_id
+total_spent
+total_refunded
+net_clv
+order_count
+return_count
+avg_order_value
+first_order_date
+last_order_date
+days_since_last_order
+customer_segment
+predicted_clv_bucket
+actual_clv_bucket
+ingest_dt
 ```
 
 **Semantic Checks**:
-- `net_clv = total_spent - total_refunded` (within $0.01 tolerance)
-- `clv_bucket` in {'High', 'Medium', 'Low'}
+- `net_clv = total_spent - total_refunded` (within tolerance)
 
 ---
 
@@ -685,7 +775,7 @@ ingestion_dt: date
 
 **Transform**: [src/transforms/regional_financials.py](../../src/transforms/regional_financials.py)
 
-**Runner**: [src/runners/enriched/regional_financials.py](../../src/runners/enriched/regional_financials.py)
+**Runner**: [src/runners/enriched/finance.py](../../src/runners/enriched/finance.py)
 
 **Inputs**:
 - `orders` (Base Silver)
@@ -693,28 +783,32 @@ ingestion_dt: date
 
 **Business Logic**:
 
-Regional revenue rollups for finance and ops reporting.
+Regional enrichment for finance and ops reporting.
 
 **Key Calculations**:
-- `gross_revenue` - Total order revenue by region
-- `order_count` - Number of orders by region
-- `avg_order_value` - Average order size by region
+- `region` - From customer region or inferred from address
+- `tax_rate` / `tax_amount` - Currently set to 0.0 and computed from `gross_total`
+- `net_revenue` - `gross_total - tax_amount`
 
 **Partition Key**: `order_dt`
 
-**Output Schema**:
+**Output Columns**:
 ```
-region_id: int
-order_dt: date
-gross_revenue: decimal(12,2)
-order_count: int
-avg_order_value: decimal(10,2)
-ingestion_dt: date
+order_id
+customer_id
+order_date
+order_dt
+order_channel
+region
+gross_total
+tax_rate
+tax_amount
+net_revenue
+ingest_dt
 ```
 
-**Validation**:
-- `gross_revenue >= 0`
-- `order_count > 0`
+**Notes**:
+- Output retains the full order record with added region/tax fields.
 
 ---
 
@@ -722,7 +816,7 @@ ingestion_dt: date
 
 **Transform**: [src/transforms/shipping_economics.py](../../src/transforms/shipping_economics.py)
 
-**Runner**: [src/runners/enriched/shipping_economics.py](../../src/runners/enriched/shipping_economics.py)
+**Runner**: [src/runners/enriched/finance.py](../../src/runners/enriched/finance.py)
 
 **Inputs**:
 - `orders` (Base Silver)
@@ -739,15 +833,18 @@ Shipping margin and cost efficiency per order.
 
 **Partition Key**: `order_dt`
 
-**Output Schema**:
+**Output Columns**:
 ```
-order_id: string
-order_dt: date
-shipping_cost: decimal(10,2)
-actual_shipping_cost: decimal(10,2)
-shipping_margin: decimal(10,2)
-shipping_margin_pct: decimal(5,4)
-ingestion_dt: date
+order_id
+order_dt
+shipping_speed
+shipping_cost
+actual_shipping_cost
+shipping_margin
+shipping_margin_pct
+is_expedited
+order_channel
+ingest_dt
 ```
 
 **Semantic Checks**:
@@ -760,7 +857,7 @@ ingestion_dt: date
 
 **Transform**: [src/transforms/inventory_risk.py](../../src/transforms/inventory_risk.py)
 
-**Runner**: [src/runners/enriched/inventory_risk.py](../../src/runners/enriched/inventory_risk.py)
+**Runner**: [src/runners/enriched/commerce.py](../../src/runners/enriched/commerce.py)
 
 **Inputs**:
 - `product_catalog` (Dimension snapshot)
@@ -769,40 +866,45 @@ ingestion_dt: date
 
 **Business Logic**:
 
-Risk tiers and locked capital from inventory utilization.
+Risk tiers and locked capital from inventory utilization and returns.
 
 **Key Calculations**:
-- `units_available` - On-hand inventory
-- `units_sold_30d` - Sales velocity
-- `inventory_turnover_ratio` - `units_sold_30d / units_available`
-- `risk_tier` - 'High', 'Medium', 'Low' based on turnover
-- `locked_capital` - `units_available * cost`
+- `utilization_ratio` - `sales_volume / inventory_quantity`
+- `return_signal` - `return_volume / sales_volume`
+- `locked_capital` - `cost_price * inventory_quantity`
+- `attention_score` - Clipped sum of utilization and return signals
+- `risk_tier` - `HIGH`, `MODERATE`, `HEALTHY`
 
 **Partition Key**: `ingest_dt`
 
-**Output Schema**:
+**Output Columns**:
 ```
-product_id: string
-ingest_dt: date
-units_available: int
-units_sold_30d: int
-inventory_turnover_ratio: decimal(5,2)
-risk_tier: string
-locked_capital: decimal(12,2)
-ingestion_dt: date
+product_id
+inventory_quantity
+sales_volume
+return_volume
+utilization_ratio
+return_signal
+locked_capital
+attention_score
+risk_tier
+ingest_dt
 ```
 
 **Validation**:
-- `risk_tier` in {'High', 'Medium', 'Low'}
+- `risk_tier` in {`HIGH`, `MODERATE`, `HEALTHY`}
 - `locked_capital >= 0`
+
+**Notes**:
+- Output retains product attributes from the catalog snapshot.
 
 ---
 
 #### 10. `int_daily_business_metrics`
 
-**Transform**: [src/transforms/daily_metrics.py](../../src/transforms/daily_metrics.py)
+**Transform**: [src/transforms/daily_business_metrics.py](../../src/transforms/daily_business_metrics.py)
 
-**Runner**: [src/runners/enriched/daily_metrics.py](../../src/runners/enriched/daily_metrics.py)
+**Runner**: [src/runners/enriched/ops.py](../../src/runners/enriched/ops.py)
 
 **Inputs**:
 - `orders` (Base Silver)
@@ -816,25 +918,37 @@ Daily KPI rollup for executive dashboards.
 **Key Calculations**:
 - `orders_count` - Total orders
 - `gross_revenue` - Total order revenue
+- `net_revenue` - Total net revenue
+- `avg_order_value` - `net_revenue / orders_count`
 - `returns_count` - Total returns
 - `refund_total` - Total refund amount
 - `return_rate` - `returns_count / orders_count`
 - `carts_created` - Total carts created
 - `cart_conversion_rate` - `orders_count / carts_created`
+- `orders_7d_avg` / `revenue_7d_avg` - Rolling 7-day averages
+- `revenue_30d_avg` / `revenue_30d_std` - Rolling 30-day stats
+- `revenue_anomaly_flag` - `HIGH`, `LOW`, `NORMAL`
 
 **Partition Key**: `date`
 
-**Output Schema**:
+**Output Columns**:
 ```
-date: date
-orders_count: int
-gross_revenue: decimal(12,2)
-returns_count: int
-refund_total: decimal(12,2)
-return_rate: decimal(5,4)
-carts_created: int
-cart_conversion_rate: decimal(5,4)
-ingestion_dt: date
+date
+orders_count
+gross_revenue
+net_revenue
+avg_order_value
+carts_created
+cart_conversion_rate
+returns_count
+return_rate
+refund_total
+orders_7d_avg
+revenue_7d_avg
+revenue_30d_avg
+revenue_30d_std
+revenue_anomaly_flag
+ingest_dt
 ```
 
 **Semantic Checks**:
@@ -847,16 +961,16 @@ ingestion_dt: date
 
 | Transform | Partition Key | Inputs | Business Domain |
 |-----------|---------------|--------|-----------------|
-| `int_attributed_purchases` | `order_dt` | carts, orders | Commerce |
-| `int_cart_attribution` | `cart_dt` | carts, cart_items, orders | Commerce |
-| `int_product_performance` | `product_dt` | products, order_items, return_items, cart_items | Commerce |
+| `int_attributed_purchases` | `order_dt` | shopping_carts, orders | Commerce |
+| `int_cart_attribution` | `cart_dt` | shopping_carts, cart_items, orders | Commerce |
+| `int_product_performance` | `product_dt` | product_catalog, order_items, return_items, cart_items | Commerce |
 | `int_sales_velocity` | `order_dt` | orders, order_items | Commerce |
 | `int_customer_retention_signals` | `ingest_dt` | customers, orders | Customer |
 | `int_customer_lifetime_value` | `ingest_dt` | customers, orders, returns | Customer |
 | `int_regional_financials` | `order_dt` | orders, customers | Finance & Ops |
 | `int_shipping_economics` | `order_dt` | orders | Finance & Ops |
-| `int_inventory_risk` | `ingest_dt` | products, order_items, return_items | Finance & Ops |
-| `int_daily_business_metrics` | `date` | orders, returns, carts | Executive |
+| `int_inventory_risk` | `ingest_dt` | product_catalog, order_items, return_items | Finance & Ops |
+| `int_daily_business_metrics` | `date` | orders, returns, shopping_carts | Executive |
 
 ---
 
@@ -868,7 +982,7 @@ ingestion_dt: date
 
 **Technology**: dbt-bigquery running on BigQuery warehouse
 
-**Location**: [dbt_bigquery/models/marts/](../../dbt_bigquery/models/marts/)
+**Location**: [dbt_bigquery/models/gold_marts/](../../dbt_bigquery/models/gold_marts/)
 
 ### Mart Pattern
 
@@ -888,19 +1002,16 @@ Each Gold mart follows this pattern:
 - `int_regional_financials` (Enriched Silver)
 - `int_shipping_economics` (Enriched Silver)
 
-**Grain**: Daily revenue by region
+**Grain**: Daily revenue by order channel
 
 **Key Metrics**:
-- Gross revenue
-- Net revenue (after returns)
-- Shipping P&L
-- Average order value
+- `gross_revenue`
+- `net_revenue`
+- `shipping_revenue`
+- `shipping_cost`
+- `shipping_margin`
 
-**Partition**: `order_dt`
-
-**Cluster**: `region_id`
-
-**Business Use**: Finance dashboards, regional performance tracking
+**Business Use**: Finance dashboards, order-channel performance tracking
 
 ---
 
@@ -911,15 +1022,14 @@ Each Gold mart follows this pattern:
 - `int_cart_attribution` (Enriched Silver)
 - `int_customer_retention_signals` (Enriched Silver)
 
-**Grain**: Daily attribution metrics
+**Grain**: Daily attribution metrics by channel
 
 **Key Metrics**:
-- Cart recovery rate
-- Abandonment value
-- Average time-to-purchase
-- At-risk customer count
-
-**Partition**: `date`
+- `recovered_orders` / `total_orders`
+- `abandoned_carts` / `converted_carts`
+- `avg_time_to_purchase_hours`
+- `abandoned_value`
+- `at_risk_customers` / `total_customers`
 
 **Business Use**: Marketing campaign analysis, funnel optimization
 
@@ -935,14 +1045,10 @@ Each Gold mart follows this pattern:
 **Grain**: Daily product operations metrics
 
 **Key Metrics**:
-- Velocity trends
-- Inventory risk tiers
-- Margin and return KPIs
-- Stock-out predictions
-
-**Partition**: `date`
-
-**Cluster**: `product_id`
+- `sales_velocity_7d` (avg of `velocity_avg`)
+- `trend_signal`
+- `inventory_quantity` / `inventory_risk_tier`
+- `gross_profit`, `net_margin`, `return_rate`
 
 **Business Use**: Inventory planning, pricing strategy
 
@@ -953,14 +1059,12 @@ Each Gold mart follows this pattern:
 **Sources**:
 - `int_cart_attribution` (Enriched Silver)
 
-**Grain**: Daily cart abandonment vs conversion trends
+**Grain**: Daily cart abandonment vs conversion by channel
 
 **Key Metrics**:
-- Abandonment rate by channel
-- Lost cart value
-- Average items per abandoned cart
-
-**Partition**: `cart_dt`
+- `abandoned_carts`, `converted_carts`, `conversion_rate`
+- `abandoned_value`
+- `avg_time_to_purchase_hours`
 
 **Business Use**: Remarketing campaigns, checkout optimization
 
@@ -974,14 +1078,10 @@ Each Gold mart follows this pattern:
 **Grain**: Daily profitability by product
 
 **Key Metrics**:
-- Gross margin %
-- Net margin %
-- Return rate
-- Units sold vs returned
-
-**Partition**: `product_dt`
-
-**Cluster**: `product_id`
+- `units_sold`, `units_returned`
+- `gross_revenue`, `net_revenue`
+- `gross_profit`, `net_margin`
+- `return_rate`, `margin_pct`
 
 **Business Use**: Product line optimization, pricing decisions
 
@@ -992,14 +1092,13 @@ Each Gold mart follows this pattern:
 **Sources**:
 - `int_customer_lifetime_value` (Enriched Silver)
 
-**Grain**: Daily customer segments by CLV bucket
+**Grain**: Customer segment + CLV bucket combinations
 
 **Key Metrics**:
-- Average CLV by segment
-- Customer count by bucket
-- Average order value by segment
-
-**Partition**: `ingest_dt`
+- `customer_count`
+- `avg_net_clv`
+- `avg_order_value`
+- `avg_total_spent`
 
 **Business Use**: Customer segmentation, loyalty programs
 
@@ -1013,11 +1112,10 @@ Each Gold mart follows this pattern:
 **Grain**: Daily executive KPI rollup
 
 **Key Metrics**:
-- Orders, revenue, returns
-- Cart conversion rate
-- Return rate
-
-**Partition**: `date`
+- `orders_count`, `gross_revenue`, `net_revenue`, `avg_order_value`
+- `carts_created`, `cart_conversion_rate`
+- `returns_count`, `return_rate`, `refund_total`
+- Rolling revenue stats and `revenue_anomaly_flag`
 
 **Business Use**: Executive dashboards, daily reporting
 
@@ -1031,11 +1129,9 @@ Each Gold mart follows this pattern:
 **Grain**: Daily shipping metrics by speed/channel
 
 **Key Metrics**:
-- Shipping margin %
-- Cost per shipment
-- Margin by shipping method
-
-**Partition**: `order_dt`
+- `orders`
+- `shipping_revenue`, `shipping_cost`, `shipping_margin`
+- `shipping_margin_pct`
 
 **Business Use**: Logistics optimization, carrier negotiations
 
@@ -1043,16 +1139,16 @@ Each Gold mart follows this pattern:
 
 ### Gold Marts Summary
 
-| Mart | Enriched Sources | Partition | Business Domain |
+| Mart | Enriched Sources | Grain Key | Business Domain |
 |------|------------------|-----------|-----------------|
-| `fct_finance_revenue` | regional_financials, shipping_economics | `order_dt` | Finance |
-| `fct_marketing_attribution` | attributed_purchases, cart_attribution, retention_signals | `date` | Marketing |
-| `fct_sales_operations` | sales_velocity, inventory_risk, product_performance | `date` | Sales Ops |
-| `fct_cart_abandonment` | cart_attribution | `cart_dt` | Commerce |
-| `fct_product_profitability` | product_performance | `product_dt` | Product |
-| `fct_customer_segments` | customer_lifetime_value | `ingest_dt` | Customer |
-| `fct_daily_dashboard` | daily_business_metrics | `date` | Executive |
-| `fct_shipping_analysis` | shipping_economics | `order_dt` | Logistics |
+| `fct_finance_revenue` | regional_financials, shipping_economics | `order_date` | Finance |
+| `fct_marketing_attribution` | attributed_purchases, cart_attribution, retention_signals | `metric_date` | Marketing |
+| `fct_sales_operations` | sales_velocity, inventory_risk, product_performance | `order_date` | Sales Ops |
+| `fct_cart_abandonment` | cart_attribution | `cart_date` | Commerce |
+| `fct_product_profitability` | product_performance | `product_date` | Product |
+| `fct_customer_segments` | customer_lifetime_value | `customer_segment + predicted_clv_bucket + actual_clv_bucket` | Customer |
+| `fct_daily_dashboard` | daily_business_metrics | `metric_date` | Executive |
+| `fct_shipping_analysis` | shipping_economics | `order_date` | Logistics |
 
 ---
 
@@ -1087,7 +1183,7 @@ Bronze → Base Silver → Enriched → Gold
 
 1. Identify Enriched Silver sources
 2. Define aggregation grain and KPIs
-3. Create dbt model in [dbt_bigquery/models/marts/](../../dbt_bigquery/models/marts/)
+3. Create dbt model in [dbt_bigquery/models/gold_marts/](../../dbt_bigquery/models/gold_marts/)
 4. Add partitioning/clustering strategy
 5. Update this document with mart details
 
@@ -1121,7 +1217,7 @@ ecomlake enriched validate --ingest-dt 2025-10-15
 
 ---
 
-**Last Updated**: 2026-01-23
+**Last Updated**: 2026-02-04
 **Base Silver Tables**: 8 (dbt-duckdb)
 **Dimension Snapshots**: 2 (customers, products)
 **Enriched Transforms**: 10 (Polars)
@@ -1136,6 +1232,6 @@ ecomlake enriched validate --ingest-dt 2025-10-15
 </p>
 
 <p align="center">
-  <sub>Last updated: 2026-01-24</sub><br>
+  <sub>Last updated: 2026-02-04</sub><br>
   <sub>✨ Transform the data. Tell the story. Build the future. ✨</sub>
 </p>
