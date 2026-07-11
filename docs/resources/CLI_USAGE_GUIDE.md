@@ -701,11 +701,11 @@ Generate Markdown reports of GCS bucket and per-table storage metrics.
 ecomlake bucket report
 
 # Specify bucket and prefix
-ecomlake bucket report gcs-automation-project-raw ecom/raw
+ecomlake bucket report acme-analytics-raw ecom/raw
 
 # Custom output path
 ecomlake bucket report \
-  gcs-automation-project-raw \
+  acme-analytics-raw \
   ecom/raw \
   docs/data/BRONZE_SIZES_2026_Q1.md
 ```
@@ -719,9 +719,9 @@ Generated: 2026-01-10T15:30:00Z
 
 ## Totals
 
-- Bucket: `gs://gcs-automation-project-raw`
+- Bucket: `gs://acme-analytics-raw`
   - Total: 14.01 GiB
-- Prefix: `gs://gcs-automation-project-raw/ecom/raw`
+- Prefix: `gs://acme-analytics-raw/ecom/raw`
   - Total: 14.01 GiB
 
 ## Per-Table Sizes
@@ -937,7 +937,7 @@ echo "✅ All validations passed"
 ```bash
 # Step 1: Validate Bronze inputs
 ecomlake bronze validate \
-  --bronze-path gs://gcs-automation-project-raw/ecom/raw \
+  --bronze-path gs://acme-analytics-raw/ecom/raw \
   --partition-date 2024-01-03 \
   --enforce-quality \
   --run-id airflow_prod_20251015_123456
@@ -947,8 +947,8 @@ ecomlake local silver-strict --date 2024-01-03
 
 # Step 3: Validate Silver outputs
 ecomlake silver validate \
-  --bronze-path gs://gcs-automation-project-raw/ecom/raw \
-  --silver-path gs://gcs-automation-project-silver/base \
+  --bronze-path gs://acme-analytics-raw/ecom/raw \
+  --silver-path gs://acme-analytics-silver/base \
   --partition-date 2024-01-03 \
   --enforce-quality
 
@@ -1704,11 +1704,11 @@ Generate Markdown reports of GCS bucket and per-table storage metrics.
 ecomlake bucket report
 
 # Specify bucket and prefix
-ecomlake bucket report gcs-automation-project-raw ecom/raw
+ecomlake bucket report acme-analytics-raw ecom/raw
 
 # Custom output path
 ecomlake bucket report \
-  gcs-automation-project-raw \
+  acme-analytics-raw \
   ecom/raw \
   docs/data/BRONZE_SIZES_2026_Q1.md
 ```
@@ -1722,9 +1722,9 @@ Generated: 2026-01-10T15:30:00Z
 
 ## Totals
 
-- Bucket: `gs://gcs-automation-project-raw`
+- Bucket: `gs://acme-analytics-raw`
   - Total: 14.01 GiB
-- Prefix: `gs://gcs-automation-project-raw/ecom/raw`
+- Prefix: `gs://acme-analytics-raw/ecom/raw`
   - Total: 14.01 GiB
 
 ## Per-Table Sizes
@@ -1940,7 +1940,7 @@ echo "✅ All validations passed"
 ```bash
 # Step 1: Validate Bronze inputs
 ecomlake bronze validate \
-  --bronze-path gs://gcs-automation-project-raw/ecom/raw \
+  --bronze-path gs://acme-analytics-raw/ecom/raw \
   --partition-date 2024-01-03 \
   --enforce-quality \
   --run-id airflow_prod_20251015_123456
@@ -1950,8 +1950,8 @@ ecomlake local silver-strict --date 2024-01-03
 
 # Step 3: Validate Silver outputs
 ecomlake silver validate \
-  --bronze-path gs://gcs-automation-project-raw/ecom/raw \
-  --silver-path gs://gcs-automation-project-silver/base \
+  --bronze-path gs://acme-analytics-raw/ecom/raw \
+  --silver-path gs://acme-analytics-silver/base \
   --partition-date 2024-01-03 \
   --enforce-quality
 

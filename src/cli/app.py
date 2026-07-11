@@ -441,7 +441,7 @@ def sample_package(ctx: click.Context) -> None:
             ecomlake bucket report
 
           Custom report:
-            ecomlake bucket report gcs-automation-project-raw ecom/raw \\
+            ecomlake bucket report acme-analytics-raw ecom/raw \\
               docs/data/BRONZE_SIZES.md
         """
     ),
