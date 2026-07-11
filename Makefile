@@ -66,8 +66,8 @@ help:
 	@echo "  make run-dev-docker    Run Pipeline with GCS (Docker + Airflow, dev)"
 	@echo "  make run-prod-sim-docker Run Pipeline with GCS (Docker + Airflow, prod-sim)"
 	@echo "      Required: DATE=YYYY-MM-DD"
-	@echo "      Uses: gs://gcs-automation-project-raw (Bronze)"
-	@echo "            gs://gcs-automation-project-silver (Silver)"
+	@echo "      Uses: gs://acme-analytics-raw (Bronze)"
+	@echo "            gs://acme-analytics-silver (Silver)"
 	@echo ""
 	@echo "Development & Testing:"
 	@echo "  make test            Run Unit Tests (pytest)"
@@ -269,8 +269,8 @@ endif
 	@echo "=========================================="
 	@echo "Running Dev Pipeline with GCS (Native)"
 	@echo "Date: $(DATE)"
-	@echo "Bronze: gs://gcs-automation-project-raw/data/bronze"
-	@echo "Silver: gs://gcs-automation-project-silver/data/silver"
+	@echo "Bronze: gs://acme-analytics-raw/data/bronze"
+	@echo "Silver: gs://acme-analytics-silver/data/silver"
 	@echo "=========================================="
 	@./scripts/run_dev_pipeline.sh $(DATE)
 
@@ -283,9 +283,9 @@ endif
 	@echo "=========================================="
 	@echo "Running Simulated Prod Pipeline (GCS)"
 	@echo "Date: $(DATE)"
-	@echo "Bronze: gs://gcs-automation-project-raw/ecom/raw"
-	@echo "Silver: gs://gcs-automation-project-silver/data/silver/base"
-	@echo "Enriched: gs://gcs-automation-project-silver/data/silver/enriched"
+	@echo "Bronze: gs://acme-analytics-raw/ecom/raw"
+	@echo "Silver: gs://acme-analytics-silver/data/silver/base"
+	@echo "Enriched: gs://acme-analytics-silver/data/silver/enriched"
 	@echo "=========================================="
 	@./scripts/run_sim_prod_gcs.sh $(DATE)
 
@@ -293,8 +293,8 @@ endif
 dev-mode:
 	@echo "Starting Airflow in DEV mode..."
 	@echo "  - Environment: dev"
-	@echo "  - Bronze: gs://gcs-automation-project-raw"
-	@echo "  - Silver: gs://gcs-automation-project-silver"
+	@echo "  - Bronze: gs://acme-analytics-raw"
+	@echo "  - Silver: gs://acme-analytics-silver"
 	@echo "  - BigQuery: DISABLED"
 	@echo "  - Gold: DISABLED"
 	PIPELINE_ENV=dev \
@@ -326,8 +326,8 @@ endif
 prod-sim-mode:
 	@echo "Starting Airflow in PROD-SIM mode..."
 	@echo "  - Environment: prod"
-	@echo "  - Bronze: gs://gcs-automation-project-raw"
-	@echo "  - Silver: gs://gcs-automation-project-silver"
+	@echo "  - Bronze: gs://acme-analytics-raw"
+	@echo "  - Silver: gs://acme-analytics-silver"
 	@echo "  - BigQuery: DISABLED"
 	@echo "  - Gold: DISABLED"
 	PIPELINE_ENV=prod \

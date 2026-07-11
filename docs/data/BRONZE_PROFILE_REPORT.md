@@ -102,7 +102,7 @@ Showing detailed stats for one representative partition per table.
 | batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (19821) |
 | ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:38+00:00` (19821) |
 | event_id | String | 0.0% | 19,821 | Top: `evt_11e0a256a3e93a1358475df0da29683c5369270b2ab195cf0e30649da0361fff` (1), `evt_2e56407d9c3fa10e073de74a6c28f4d7c75a145a1b98a0097edeb95d039a8bd5` (1), `evt_d4926c937dc8d9eac6ec3e7b98a6cb86c6013878773196287b917676f2822318` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/cart_items/ingest_dt=2020-01-01/part-0000.parquet` (19821) |
+| source_file | String | 0.0% | 1 | Top: `gs://acme-analytics-raw/ecom/raw/cart_items/ingest_dt=2020-01-01/part-0000.parquet` (19821) |
 
 ### customers
 
@@ -132,7 +132,7 @@ Showing detailed stats for one representative partition per table.
 | batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (68) |
 | ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:28+00:00` (68) |
 | event_id | String | 0.0% | 68 | Top: `evt_d31d1c2c62f307576b26c5a82fb0c699f6d4dd954ee723b93b9ff9eb2a23bd06` (1), `evt_3cace5b260660bd74f706ff96a84e910de9121cd855ba4ebef01d686f90edce6` (1), `evt_8fabf948fddfe3f94725ae8626da497ef0515f064c3b9604e9e961bdf87b8859` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/customers/signup_date=2020-01-01/part-0000.parquet` (68) |
+| source_file | String | 0.0% | 1 | Top: `gs://acme-analytics-raw/ecom/raw/customers/signup_date=2020-01-01/part-0000.parquet` (68) |
 
 ### order_items
 
@@ -151,7 +151,7 @@ Showing detailed stats for one representative partition per table.
 | batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (3156) |
 | ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:50+00:00` (3156) |
 | event_id | String | 0.0% | 3,156 | Top: `evt_e624b098d1e73ed34c2f0ab533dd147fec1a11eb94c4c7d6d7d5dbd52c2c098a` (1), `evt_77e32bf8b876513559665abeb6b03f4bdeaa9ee470fa547e8dd8bbb11d4f3b13` (1), `evt_689c0e3f75d3a533f7873d56d44e33a20ff8f54f6c3bac6ba54a9e6030d701e7` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/order_items/ingest_dt=2020-01-01/part-0000.parquet` (3156) |
+| source_file | String | 0.0% | 1 | Top: `gs://acme-analytics-raw/ecom/raw/order_items/ingest_dt=2020-01-01/part-0000.parquet` (3156) |
 
 ### orders
 
@@ -183,7 +183,7 @@ Showing detailed stats for one representative partition per table.
 | batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (652) |
 | ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:50+00:00` (652) |
 | event_id | String | 0.0% | 652 | Top: `evt_070dff9749542e5cfa52fe766f3662808290815fcd6fdd56632a3f6ec35b597b` (1), `evt_1b260051fd929374f486658bd1881299ef89b68bbe397e652a38ad3918d9c0ad` (1), `evt_618bd82cb464be4be52a56cdbc9923640560b89e9d1e7906ae5591174844ff8d` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/orders/ingest_dt=2020-01-01/part-0000.parquet` (652) |
+| source_file | String | 0.0% | 1 | Top: `gs://acme-analytics-raw/ecom/raw/orders/ingest_dt=2020-01-01/part-0000.parquet` (652) |
 
 ### product_catalog
 
@@ -200,7 +200,7 @@ Showing detailed stats for one representative partition per table.
 | batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (598) |
 | ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:34+00:00` (598) |
 | event_id | String | 0.0% | 598 | Top: `evt_38bd8d51c5f4ad7c74f65ab8dfcf4d49ec54765ec7c05ecef3dae6b3b212a590` (1), `evt_62220d5155bb967bebe9dcbf358d96fee0fdc9ac7efc3429ab0e17506bdaf048` (1), `evt_e237c63d597aa9e870d2b749432e384ad8e93526f2e1d53aaa0053792a87e9ce` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/product_catalog/category=Books/part-0000.parquet` (598) |
+| source_file | String | 0.0% | 1 | Top: `gs://acme-analytics-raw/ecom/raw/product_catalog/category=Books/part-0000.parquet` (598) |
 
 ### return_items
 
@@ -221,7 +221,7 @@ Showing detailed stats for one representative partition per table.
 | batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (22) |
 | ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:52+00:00` (22) |
 | event_id | String | 0.0% | 22 | Top: `evt_28085a1b8243701fde2cea555dc3779a53c7474481f318930ca15f15bbacb5ef` (1), `evt_5e294c2e13848070d5d7b7186611d5bba460e6652c7c9f0871f5110021a913bf` (1), `evt_2d2281a2cf6152be16824edceb4da725b7c79ba478596c872ea5ca12ba8428ce` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/return_items/ingest_dt=2020-01-02/part-0000.parquet` (22) |
+| source_file | String | 0.0% | 1 | Top: `gs://acme-analytics-raw/ecom/raw/return_items/ingest_dt=2020-01-02/part-0000.parquet` (22) |
 
 ### returns
 
@@ -243,7 +243,7 @@ Showing detailed stats for one representative partition per table.
 | batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (4) |
 | ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:52+00:00` (4) |
 | event_id | String | 0.0% | 4 | Top: `evt_8563513393f58b97ecd65e8fa9333ee14e4289d1b2fe7b52d22de543e494184e` (1), `evt_b6edd01464560db8c51e415f42518a4c3e7f21e31054b3e1a02c6a992c67c614` (1), `evt_e45d3901fcf8bda4edb9af814cc0cf97ed0d8b4d16903572b51a478000456440` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/returns/ingest_dt=2020-01-02/part-0000.parquet` (4) |
+| source_file | String | 0.0% | 1 | Top: `gs://acme-analytics-raw/ecom/raw/returns/ingest_dt=2020-01-02/part-0000.parquet` (4) |
 
 ### shopping_carts
 
@@ -260,7 +260,7 @@ Showing detailed stats for one representative partition per table.
 | batch_id | String | 0.0% | 1 | Top: `backlog-20260111T104546` (5053) |
 | ingestion_ts | String | 0.0% | 1 | Top: `2026-01-11T16:48:35+00:00` (5053) |
 | event_id | String | 0.0% | 5,053 | Top: `evt_2c75c665c9b09dbaf4ba6b61da836d2d4fe2b26a6bf249cfe886f309c9c0349c` (1), `evt_4295e6d0c02e3b9ce3eaf31030ab41269c43e7ec1331de07c425a33f1c5d82ba` (1), `evt_eff45bca5379f09f49920208722cc3bc1403925b56b34fc086fa0f6d145eb8f2` (1) |
-| source_file | String | 0.0% | 1 | Top: `gs://gcs-automation-project-raw/ecom/raw/shopping_carts/ingest_dt=2020-01-01/part-0000.parquet` (5053) |
+| source_file | String | 0.0% | 1 | Top: `gs://acme-analytics-raw/ecom/raw/shopping_carts/ingest_dt=2020-01-01/part-0000.parquet` (5053) |
 <!-- GENERATED META -->
 Last updated (UTC): 2026-01-26T05:39:19Z
 Content hash (SHA-256): e7add49007139f4263a494a6b6917cc59f02aaf15a6b3c4f5eaf7a91ee11e3a5

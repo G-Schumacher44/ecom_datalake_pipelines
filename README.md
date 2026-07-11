@@ -532,8 +532,8 @@ Copy `.env.example` to `.env` and populate with your credentials:
 
 ```bash
 # GCS settings
-GCS_RAW_BUCKET=gcs-automation-project-raw
-GCS_SILVER_BUCKET=gcs-automation-project-silver
+GCS_RAW_BUCKET=acme-analytics-raw
+GCS_SILVER_BUCKET=acme-analytics-silver
 GCS_PREFIX=ecom/raw
 
 # BigQuery settings
@@ -560,12 +560,12 @@ Configure partition keys, quality thresholds, and transformation rules:
 
 ```yaml
 bronze:
-  bucket: gcs-automation-project-raw
+  bucket: acme-analytics-raw
   prefix: ecom/raw
   partition_key: ingest_dt
 
 silver:
-  bucket: gcs-automation-project-silver
+  bucket: acme-analytics-silver
   prefix: ecom/silver
   partition_key: event_dt
 

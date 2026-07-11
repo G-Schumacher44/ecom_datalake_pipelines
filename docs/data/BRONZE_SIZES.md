@@ -4,13 +4,13 @@ Generated: 2026-01-12T17:26:21Z
 
 ## Full Bucket Totals
 
-- Bucket: `gs://gcs-automation-project-raw`
+- Bucket: `gs://acme-analytics-raw`
   - Total: **14.01 GB**
   - Raw bytes: 15047237579
 
 ## Prefix Summary
 
-- Prefix: `gs://gcs-automation-project-raw/ecom/raw`
+- Prefix: `gs://acme-analytics-raw/ecom/raw`
   - Total: **14.01 GB**
   - Raw bytes: 15047237579
 

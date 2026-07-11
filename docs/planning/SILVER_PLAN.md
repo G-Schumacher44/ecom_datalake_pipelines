@@ -25,7 +25,7 @@ query-ready Base Silver layer and a Rich (Enriched) Silver layer for downstream 
 - Real-time BI serving (batch only).
 
 ## Inputs (Bronze)
-- Location: `gs://gcs-automation-project-raw/ecom/raw/...`
+- Location: `gs://acme-analytics-raw/ecom/raw/...`
 - Partitioning: `ingest_dt=YYYY-MM-DD`
 - Manifest: `_MANIFEST.json` per partition
 
