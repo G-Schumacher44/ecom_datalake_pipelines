@@ -21,21 +21,21 @@ MAX_DAYS="${MAX_DAYS:-0}"
 
 # Tables partitioned by ingest_dt
 INGEST_DT_TABLES=(
-  "acme-analytics-raw/ecom/raw/cart_items"
-  "acme-analytics-raw/ecom/raw/order_items"
-  "acme-analytics-raw/ecom/raw/orders"
-  "acme-analytics-raw/ecom/raw/return_items"
-  "acme-analytics-raw/ecom/raw/returns"
-  "acme-analytics-raw/ecom/raw/shopping_carts"
+  "${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw/cart_items"
+  "${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw/order_items"
+  "${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw/orders"
+  "${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw/return_items"
+  "${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw/returns"
+  "${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw/shopping_carts"
 )
 
 # Tables with alternative partitioning schemes
 SIGNUP_DATE_TABLES=(
-  "acme-analytics-raw/ecom/raw/customers"
+  "${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw/customers"
 )
 
 CATEGORY_TABLES=(
-  "acme-analytics-raw/ecom/raw/product_catalog"
+  "${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw/product_catalog"
 )
 
 mkdir -p "${DEST_DIR}"
