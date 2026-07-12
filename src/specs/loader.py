@@ -25,7 +25,7 @@ class SpecValidationError(Exception):
 _SPEC_ENV_PATTERN = re.compile(r"\$\{([^}:]+)(:-([^}]+))?\}")
 
 
-def _expand_env_vars(value: Any) -> Any:
+def expand_env_vars(value: Any) -> Any:
     if isinstance(value, str):
 
         def replacer(match: re.Match[str]) -> str:
@@ -41,9 +41,9 @@ def _expand_env_vars(value: Any) -> Any:
 
         return _SPEC_ENV_PATTERN.sub(replacer, value)
     if isinstance(value, list):
-        return [_expand_env_vars(item) for item in value]
+        return [expand_env_vars(item) for item in value]
     if isinstance(value, dict):
-        return {key: _expand_env_vars(val) for key, val in value.items()}
+        return {key: expand_env_vars(val) for key, val in value.items()}
     return value
 
 
@@ -98,7 +98,7 @@ def load_spec(spec_path: str | Path | None = None) -> PipelineSpec:
     else:
         payload = _load_yaml(path)
 
-    expanded = _expand_env_vars(payload)
+    expanded = expand_env_vars(payload)
 
     try:
         return PipelineSpec.model_validate(expanded)

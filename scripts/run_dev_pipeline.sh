@@ -38,7 +38,7 @@ echo "→ Phase 1: Dimension Refresh"
 # Validate Bronze Dims
 echo "  → Validating Bronze dimensions..."
 python -m src.validation.bronze_quality \
-    --bronze-path gs://acme-analytics-raw/data/bronze \
+    --bronze-path gs://${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/bronze \
     --tables customers,product_catalog \
     --output-report docs/validation_reports/BRONZE_DIMS_${RUN_ID}.md \
     --run-id $RUN_ID \
@@ -46,7 +46,7 @@ python -m src.validation.bronze_quality \
 
 # Refresh Customers
 echo "  → Refreshing customers dimension..."
-export BRONZE_BASE_PATH="gs://acme-analytics-raw/data/bronze"
+export BRONZE_BASE_PATH="gs://${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/bronze"
 export SILVER_BASE_PATH="./data/silver/base"
 python -m src.runners.base_silver \
     --select stg_ecommerce__customers stg_ecommerce__customers_quarantine
@@ -59,7 +59,7 @@ python -m src.runners.base_silver \
 # Validate Dim Quality
 echo "  → Validating dimension quality..."
 python -m src.validation.silver \
-    --bronze-path gs://acme-analytics-raw/data/bronze \
+    --bronze-path gs://${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/bronze \
     --silver-path ./data/silver/base \
     --quarantine-path ./data/silver/base/quarantine \
     --tables customers,product_catalog \
@@ -73,7 +73,7 @@ python -m src.validation.silver \
 echo ""
 echo "→ Phase 2: Bronze Quality Validation"
 python -m src.validation.bronze_quality \
-    --bronze-path gs://acme-analytics-raw/data/bronze \
+    --bronze-path gs://${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/bronze \
     --output-report docs/validation_reports/BRONZE_QUALITY_${RUN_ID}.md \
     --run-id $RUN_ID \
     --enforce-quality
@@ -97,7 +97,7 @@ python -m src.runners.base_silver \
 echo ""
 echo "→ Phase 4: Silver Quality Validation"
 python -m src.validation.silver \
-    --bronze-path gs://acme-analytics-raw/data/bronze \
+    --bronze-path gs://${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/bronze \
     --silver-path ./data/silver/base \
     --quarantine-path ./data/silver/base/quarantine \
     --run-id $RUN_ID \
@@ -111,7 +111,7 @@ echo ""
 echo "→ Phase 5: Syncing Silver Base to GCS"
 gcloud storage rsync -r --delete-unmatched-destination-objects \
     ./data/silver/base \
-    gs://acme-analytics-silver/data/silver/base
+    gs://${ECOM_SILVER_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/silver/base
 
 # ==============================================================================
 # Phase 6: Enriched Silver (Polars)
@@ -200,7 +200,7 @@ echo ""
 echo "→ Phase 8: Syncing Enriched Silver to GCS"
 gcloud storage rsync -r --delete-unmatched-destination-objects \
     ./data/silver/enriched \
-    gs://acme-analytics-silver/data/silver/enriched
+    gs://${ECOM_SILVER_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/silver/enriched
 
 # ==============================================================================
 # Phase 9: Mock BQ Validation
@@ -231,8 +231,8 @@ echo "=========================================="
 echo "Results:"
 echo "  → Local Silver: ./data/silver/base"
 echo "  → Local Enriched: ./data/silver/enriched"
-echo "  → GCS Silver: gs://acme-analytics-silver/data/silver/base"
-echo "  → GCS Enriched: gs://acme-analytics-silver/data/silver/enriched"
+echo "  → GCS Silver: gs://${ECOM_SILVER_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/silver/base"
+echo "  → GCS Enriched: gs://${ECOM_SILVER_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/silver/enriched"
 echo "  → Validation Reports: docs/validation_reports/*_${RUN_ID}.md"
 echo ""
 echo "BigQuery load and Gold marts were SKIPPED (dev mode)"
