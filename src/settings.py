@@ -11,6 +11,8 @@ import yaml
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .specs.loader import expand_env_vars
+
 logger = logging.getLogger(__name__)
 
 
@@ -387,6 +389,12 @@ class Settings(BaseSettings):
         """
         try:
             payload = yaml.safe_load(Path(path).read_text()) or {}
+            # Expand ${VAR} / ${VAR:-default} the same way spec YAML is
+            # expanded — one env-expansion mechanism, not two. This is what
+            # lets config.yml ship placeholders instead of real project or
+            # bucket identifiers: the real values come from the environment
+            # (.env, gitignored) and never enter the tracked tree.
+            payload = expand_env_vars(payload)
         except OSError as exc:
             if strict:
                 raise ConfigValidationError(
@@ -394,6 +402,17 @@ class Settings(BaseSettings):
                 ) from exc
             payload = {}
             logger.warning(f"Failed to read config {path}: {exc}")
+
+        # Honor the standard env var. A config placeholder can only expand
+        # one name, but the dbt profile, docs and Airflow all treat
+        # GOOGLE_CLOUD_PROJECT as the project source. Without this, exporting
+        # only GOOGLE_CLOUD_PROJECT would leave project_id as "local" and send
+        # BigQuery jobs to a project literally named "local".
+        project_override = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv(
+            "ECOM_PROJECT_ID"
+        )
+        if project_override and isinstance(payload.get("pipeline"), dict):
+            payload["pipeline"]["project_id"] = project_override
 
         try:
             return cls.model_validate(payload)
