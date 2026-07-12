@@ -14,11 +14,11 @@ set -euo pipefail
 INGEST_DATE=${1:-"2020-01-01"}
 RUN_ID="manual_$(date +%Y%m%d_%H%M%S)"
 
-: "${GOOGLE_CLOUD_PROJECT:=gcs-automation-project}"
-: "${BRONZE_BASE_PATH:=gs://gcs-automation-project-raw/ecom/raw}"
-: "${SILVER_BASE_PATH:=gs://gcs-automation-project-silver/data/silver/base}"
-: "${SILVER_ENRICHED_PATH:=gs://gcs-automation-project-silver/data/silver/enriched}"
-: "${SILVER_DIMS_PATH:=gs://gcs-automation-project-silver/data/silver/dims}"
+: "${GOOGLE_CLOUD_PROJECT:?Not set. Copy .env.example -> .env and set your GCP project}"
+: "${BRONZE_BASE_PATH:=gs://${ECOM_BRONZE_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/ecom/raw}"
+: "${SILVER_BASE_PATH:=gs://${ECOM_SILVER_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/silver/base}"
+: "${SILVER_ENRICHED_PATH:=gs://${ECOM_SILVER_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/silver/enriched}"
+: "${SILVER_DIMS_PATH:=gs://${ECOM_SILVER_BUCKET:?Not set. Copy .env.example -> .env and set your GCP buckets}/data/silver/dims}"
 : "${SILVER_ENRICHED_LOCAL_PATH:=./data/silver/enriched}"
 : "${SILVER_LOCAL_BASE_PATH:=./data/silver/base}"
 : "${SILVER_EXPORT_BASE_PATH:=$SILVER_BASE_PATH}"

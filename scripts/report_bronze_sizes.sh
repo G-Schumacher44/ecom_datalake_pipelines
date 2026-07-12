@@ -16,7 +16,9 @@ set -euo pipefail
 
 CONFIG_PATH="${CONFIG_PATH:-config/config.yml}"
 
-default_bucket="gcs-automation-project-raw"
+# Only require the env var if the caller did NOT pass a bucket explicitly — the documented
+# usage is `report_bronze_sizes.sh [BUCKET]`, which must keep working without any env setup.
+default_bucket="${ECOM_BRONZE_BUCKET:-}"
 default_prefix="ecom/raw"
 
 # Cost estimation defaults (USD per GB per month)
@@ -46,6 +48,11 @@ PY
 fi
 
 BUCKET="${1:-${default_bucket}}"
+if [[ -z "${BUCKET}" ]]; then
+  echo "ERROR: no bucket resolved. Pass one as the first argument, or set ECOM_BRONZE_BUCKET" >&2
+  echo "       (copy .env.example -> .env). Usage: report_bronze_sizes.sh [BUCKET] [PREFIX]" >&2
+  exit 1
+fi
 PREFIX="${2:-${default_prefix}}"
 OUTPUT="${3:-docs/data/BRONZE_BUCKET_SIZES.md}"
 

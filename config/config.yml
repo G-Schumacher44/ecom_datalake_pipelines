@@ -1,11 +1,11 @@
 pipeline:
   # GCP Configuration
-  project_id: "gcs-automation-project"
+  project_id: "${ECOM_PROJECT_ID:-local}"
 
   # Data Lake Buckets (use "local" for local filesystem)
-  bronze_bucket: "gcs-automation-project-raw"
+  bronze_bucket: "${ECOM_BRONZE_BUCKET:-local}"
   bronze_prefix: "ecom/raw"
-  silver_bucket: "gcs-automation-project-silver"
+  silver_bucket: "${ECOM_SILVER_BUCKET:-local}"
   silver_base_prefix: "data/silver/base"
   silver_enriched_prefix: "data/silver/enriched"
   silver_publish_mode: "direct"
